@@ -40,7 +40,7 @@ def generate_diff(current_doc: str, new_info: str, update_reason: str = "") -> s
     Returns:
         Raw diff output string from the LLM.
     """
-    from services.claude_client import call_sonnet, load_prompt
+    from services.claude_client import call_sonnet, escape_xml, load_prompt
 
     prompt_template = load_prompt("diff_generate")
 
@@ -48,8 +48,8 @@ def generate_diff(current_doc: str, new_info: str, update_reason: str = "") -> s
 
 <diff_input>
   <current_document>{current_doc}</current_document>
-  <new_information>{new_info}</new_information>
-  <update_reason>{update_reason}</update_reason>
+  <new_information>{escape_xml(new_info)}</new_information>
+  <update_reason>{escape_xml(update_reason)}</update_reason>
 </diff_input>"""
 
     result = call_sonnet(prompt, task_type="diff_generate")

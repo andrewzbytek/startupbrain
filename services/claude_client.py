@@ -45,6 +45,16 @@ def _get_client() -> Optional[object]:
     return anthropic.Anthropic(api_key=api_key)
 
 
+def escape_xml(text: str) -> str:
+    """Escape user-controlled content for safe XML embedding."""
+    text = text.replace("&", "&amp;")
+    text = text.replace("<", "&lt;")
+    text = text.replace(">", "&gt;")
+    text = text.replace('"', "&quot;")
+    text = text.replace("'", "&apos;")
+    return text
+
+
 def load_prompt(prompt_name: str) -> str:
     """
     Load a prompt from prompts/{prompt_name}.md.

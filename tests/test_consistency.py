@@ -473,7 +473,8 @@ class TestPass3OnlyOnCritical:
              patch("services.claude_client.call_opus") as mock_opus, \
              patch("services.claude_client.load_prompt", return_value="mock prompt"), \
              patch("services.consistency.read_living_document", return_value=sample_living_document), \
-             patch("services.consistency._get_rag_evidence", return_value=[]):
+             patch("services.consistency._get_rag_evidence", return_value=[]), \
+             patch("services.consistency.check_dismissed", side_effect=lambda c, d: c):
             mock_sonnet.side_effect = [
                 {"text": pass1_response, "tokens_in": 500, "tokens_out": 300, "model": "claude-sonnet-4-20250514"},
                 {"text": pass2_response, "tokens_in": 600, "tokens_out": 400, "model": "claude-sonnet-4-20250514"},

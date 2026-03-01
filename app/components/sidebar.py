@@ -130,7 +130,8 @@ def render_sidebar():
                 pos = section["current_position"]
                 if not pos or pos == "[Not yet defined]":
                     pos = "_Not yet defined_"
-                with st.expander(section["name"], expanded=False):
+                icon = "🟢" if pos and pos != "_Not yet defined_" else "⚪"
+                with st.expander(f"{icon} {section['name']}", expanded=False):
                     st.markdown(pos)
         else:
             st.caption("No current state defined yet.")
@@ -157,7 +158,11 @@ def render_sidebar():
                 for theme in themes[:5]:
                     count = theme.get("count", 0)
                     name = theme.get("theme", "")
-                    st.caption(f"• {name} ({count}x)")
+                    color_class = "pill-badge-red" if count >= 3 else "pill-badge-blue"
+                    st.markdown(
+                        f'<span class="pill-badge {color_class}">{name} ({count}x)</span>',
+                        unsafe_allow_html=True,
+                    )
             else:
                 # Fall back to parsing document
                 doc_themes = _parse_feedback_themes(doc)
@@ -174,8 +179,12 @@ def render_sidebar():
         # --- Cost Tracking ---
         st.subheader("API Cost")
         try:
-            from services.cost_tracker import get_cost_summary
-            st.caption(get_cost_summary())
+            from services.cost_tracker import get_monthly_cost
+            monthly = get_monthly_cost()
+            budget = 300.0
+            progress = min(monthly / budget, 1.0)
+            st.progress(progress)
+            st.caption(f"${monthly:.2f} / ${budget:.0f} budget")
         except Exception:
             st.caption("Cost data unavailable.")
 
@@ -193,7 +202,7 @@ def render_sidebar():
         else:
             st.button("Ingest New Session", use_container_width=True, disabled=True)
 
-        if st.button("Run Consistency Audit", use_container_width=True):
+        if st.button("Run Consistency Audit", use_container_width=True, disabled=current_mode != "chat"):
             with st.spinner("Running full consistency audit..."):
                 try:
                     from services.consistency import run_audit
@@ -210,6 +219,44 @@ def render_sidebar():
                         st.info("No discrepancies found.")
                 except Exception as e:
                     st.error(f"Audit failed: {e}")
+
+        # --- Evolution Narrative ---
+        st.subheader("Topic Evolution")
+        topic_names = [s["name"] for s in sections] if sections else []
+        if topic_names:
+            selected_topic = st.selectbox(
+                "Select topic",
+                options=topic_names,
+                key="evolution_topic_select",
+                disabled=current_mode != "chat",
+            )
+            if st.button("Show Evolution", use_container_width=True, disabled=current_mode != "chat", key="show_evolution_btn"):
+                with st.spinner(f"Generating evolution narrative for {selected_topic}..."):
+                    try:
+                        from services.feedback import generate_evolution_narrative
+                        evo_result = generate_evolution_narrative(selected_topic)
+                        st.session_state.evolution_result = evo_result
+                    except Exception as e:
+                        st.error(f"Evolution narrative failed: {e}")
+            evo = st.session_state.get("evolution_result")
+            if evo:
+                with st.expander("Evolution Narrative", expanded=True):
+                    narrative = evo.get("narrative", "")
+                    if narrative:
+                        st.markdown(narrative)
+                    inflection_points = evo.get("key_inflection_points", [])
+                    if inflection_points:
+                        st.markdown("**Key Inflection Points**")
+                        for pt in inflection_points:
+                            date = pt.get("date", "")
+                            what = pt.get("what_changed", "")
+                            why = pt.get("why", "")
+                            st.caption(f"**{date}** — {what}" + (f" _{why}_" if why else ""))
+                    current_pos = evo.get("current_position_summary", "")
+                    if current_pos:
+                        st.info(f"**Current position:** {current_pos}")
+        else:
+            st.caption("No topics found in living document.")
 
         # Whiteboard photo uploader
         st.subheader("Whiteboard Photo")

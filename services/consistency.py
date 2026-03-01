@@ -24,14 +24,15 @@ def read_living_document() -> str:
 
 def _claims_to_xml(claims: list) -> str:
     """Convert list of claim dicts to XML for prompts."""
+    from services.claude_client import escape_xml
     parts = ["<new_claims>"]
     for claim in claims:
         parts.append("  <claim>")
-        parts.append(f"    <claim_text>{claim.get('claim_text', '')}</claim_text>")
-        parts.append(f"    <claim_type>{claim.get('claim_type', 'claim')}</claim_type>")
-        parts.append(f"    <confidence>{claim.get('confidence', 'definite')}</confidence>")
+        parts.append(f"    <claim_text>{escape_xml(claim.get('claim_text', ''))}</claim_text>")
+        parts.append(f"    <claim_type>{escape_xml(claim.get('claim_type', 'claim'))}</claim_type>")
+        parts.append(f"    <confidence>{escape_xml(claim.get('confidence', 'definite'))}</confidence>")
         if claim.get("who_said_it"):
-            parts.append(f"    <who_said_it>{claim['who_said_it']}</who_said_it>")
+            parts.append(f"    <who_said_it>{escape_xml(claim['who_said_it'])}</who_said_it>")
         parts.append("  </claim>")
     parts.append("</new_claims>")
     return "\n".join(parts)
@@ -359,6 +360,20 @@ def run_consistency_check(claims: list) -> dict:
             "has_contradictions": False,
             "has_critical": False,
             "summary": "No potential contradictions found.",
+        }
+
+    # Filter dismissed contradictions before Pass 2
+    pass1["contradictions"] = check_dismissed(pass1["contradictions"], living_doc)
+    pass1["total_found"] = len(pass1["contradictions"])
+
+    if pass1["total_found"] == 0:
+        return {
+            "pass1": pass1,
+            "pass2": None,
+            "pass3": None,
+            "has_contradictions": False,
+            "has_critical": False,
+            "summary": "All potential contradictions were previously dismissed.",
         }
 
     # Pass 2

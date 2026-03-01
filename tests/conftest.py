@@ -4,6 +4,8 @@ All external dependencies (MongoDB, Claude API) are mocked.
 Tests must run without API keys.
 """
 
+from pathlib import Path
+
 import pytest
 from unittest.mock import MagicMock, patch
 
@@ -258,6 +260,12 @@ def mock_claude_client(mock_claude_response):
         mock_sonnet.return_value = mock_claude_response("<extraction_output><session_summary>Mock</session_summary><topic_tags></topic_tags><claims></claims></extraction_output>")
         mock_opus.return_value = mock_claude_response("<analysis></analysis>")
         yield {"sonnet": mock_sonnet, "opus": mock_opus}
+
+
+@pytest.fixture
+def living_doc_path():
+    """Return the path to the real living document (documents/startup_brain.md)."""
+    return Path(__file__).parent.parent / "documents" / "startup_brain.md"
 
 
 @pytest.fixture

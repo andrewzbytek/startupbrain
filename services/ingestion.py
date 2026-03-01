@@ -37,16 +37,16 @@ def extract_claims(
             claims (list of claim dicts)
             raw (str)
     """
-    from services.claude_client import call_sonnet, load_prompt
+    from services.claude_client import call_sonnet, escape_xml, load_prompt
 
     prompt_template = load_prompt("extraction")
 
     prompt = f"""{prompt_template}
 
 <session_input>
-<participants>{participants}</participants>
-<topic_hint>{topic_hint}</topic_hint>
-<transcript>{transcript}</transcript>
+<participants>{escape_xml(participants)}</participants>
+<topic_hint>{escape_xml(topic_hint)}</topic_hint>
+<transcript>{escape_xml(transcript)}</transcript>
 <whiteboard_extraction>{whiteboard_text}</whiteboard_extraction>
 </session_input>"""
 

@@ -38,6 +38,8 @@ def init_session_state():
         "contradiction_index": 0,
         # Whiteboard context for current ingestion
         "whiteboard_text": "",
+        # Evolution narrative result
+        "evolution_result": None,
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -61,6 +63,11 @@ def add_message(role: str, content: str):
     if "conversation_history" not in st.session_state:
         st.session_state.conversation_history = []
     st.session_state.conversation_history.append({"role": role, "content": content})
+
+
+def invalidate_sidebar():
+    """Clear sidebar cache so it refreshes on next rerun."""
+    st.session_state.sidebar_data = {}
 
 
 def reset_ingestion():

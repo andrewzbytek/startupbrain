@@ -50,7 +50,7 @@ def detect_patterns(feedback_tracker_section: str, new_feedback: dict) -> dict:
             document_updates_needed (list)
             raw (str)
     """
-    from services.claude_client import call_sonnet, load_prompt
+    from services.claude_client import call_sonnet, escape_xml, load_prompt
 
     prompt_template = load_prompt("feedback_pattern")
     strategy_summary = _get_current_strategy_summary()
@@ -60,11 +60,11 @@ def detect_patterns(feedback_tracker_section: str, new_feedback: dict) -> dict:
 <feedback_input>
   <current_feedback_tracker>{feedback_tracker_section}</current_feedback_tracker>
   <new_feedback>
-    <date>{new_feedback.get('date', datetime.now(timezone.utc).strftime('%Y-%m-%d'))}</date>
-    <source_name>{new_feedback.get('source_name', '')}</source_name>
-    <source_type>{new_feedback.get('source_type', 'investor')}</source_type>
-    <feedback_text>{new_feedback.get('feedback_text', '')}</feedback_text>
-    <meeting_context>{new_feedback.get('meeting_context', '')}</meeting_context>
+    <date>{escape_xml(new_feedback.get('date', datetime.now(timezone.utc).strftime('%Y-%m-%d')))}</date>
+    <source_name>{escape_xml(new_feedback.get('source_name', ''))}</source_name>
+    <source_type>{escape_xml(new_feedback.get('source_type', 'investor'))}</source_type>
+    <feedback_text>{escape_xml(new_feedback.get('feedback_text', ''))}</feedback_text>
+    <meeting_context>{escape_xml(new_feedback.get('meeting_context', ''))}</meeting_context>
   </new_feedback>
   <current_strategy_summary>{strategy_summary}</current_strategy_summary>
 </feedback_input>"""

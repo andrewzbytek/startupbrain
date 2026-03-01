@@ -19,18 +19,19 @@ def render_claim_editor():
 
     claims = st.session_state.get("pending_claims", [])
     count = len(claims)
-    st.write(f"Found **{count}** claim(s) from this session. Review and edit before proceeding.")
+    confirmed_count = sum(1 for c in claims if c.get("confirmed", True))
+    st.metric("Confirmed", f"{confirmed_count} / {count}")
 
     if not claims:
         st.warning("No claims were extracted. You can add claims manually below, or cancel and try again.")
     else:
         st.markdown("---")
-        # Render each claim as checkbox + text input + remove button
+        # Render each claim as checkbox + text input + metadata + remove button
         updated_claims = []
         to_remove = set()
 
         for i, claim in enumerate(claims):
-            col_check, col_text, col_remove = st.columns([1, 10, 1])
+            col_check, col_text, col_meta, col_remove = st.columns([1, 8, 2, 1])
 
             with col_check:
                 checked = st.checkbox(
@@ -48,9 +49,22 @@ def render_claim_editor():
                     label_visibility="collapsed",
                 )
 
+            with col_meta:
+                claim_type = claim.get("claim_type", "claim")
+                confidence = claim.get("confidence", "")
+                badge_color = "#DBEAFE" if claim_type == "claim" else "#FEF3C7"
+                text_color = "#1E40AF" if claim_type == "claim" else "#92400E"
+                st.markdown(
+                    f'<span style="background:{badge_color};color:{text_color};padding:2px 6px;border-radius:4px;font-size:0.75rem;">'
+                    f'{claim_type}</span>'
+                    + (f' <span style="font-size:0.75rem;color:#6B7280;">{confidence}</span>' if confidence else ""),
+                    unsafe_allow_html=True,
+                )
+
             with col_remove:
-                if st.button("X", key=f"claim_remove_{i}", help="Remove this claim"):
+                if st.button("🗑️", key=f"claim_remove_{i}", help="Remove this claim"):
                     to_remove.add(i)
+                    st.toast("Claim removed")
 
             if i not in to_remove:
                 updated_claim = {**claim, "confirmed": checked, "claim_text": edited_text}
@@ -61,8 +75,6 @@ def render_claim_editor():
             st.session_state.pending_claims = updated_claims
             st.rerun()
         else:
-            # Keep the pending_claims in sync with current UI state
-            # (edits are live via session_state keys, but we sync on action)
             pass
 
     st.markdown("---")
@@ -91,6 +103,7 @@ def render_claim_editor():
                 if "pending_claims" not in st.session_state:
                     st.session_state.pending_claims = []
                 st.session_state.pending_claims.append(new_claim)
+                st.toast("Claim added!")
                 st.rerun()
 
     st.markdown("---")

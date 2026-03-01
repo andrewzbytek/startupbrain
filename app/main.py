@@ -13,10 +13,13 @@ st.set_page_config(
 )
 
 # Must import state before any other app imports to avoid circular refs
-from app.state import init_session_state, set_mode, reset_ingestion
+from app.state import init_session_state, set_mode, reset_ingestion, invalidate_sidebar
 
 # Initialize session state on every rerun
 init_session_state()
+
+from app.components.styles import inject_custom_css
+inject_custom_css()
 
 from app.components.sidebar import render_sidebar
 from app.components.chat import render_chat, render_contradiction_resolution
@@ -125,11 +128,11 @@ def render_checking_consistency():
         "topic": st.session_state.get("ingestion_topic", ""),
     }
 
-    # Use st.status to show multi-step progress
-    with st.status("Running ingestion pipeline...", expanded=True) as status:
-        try:
+    progress = IngestionProgress()
+    try:
+        with progress.start("Running ingestion pipeline..."):
             # Step 1: Store session
-            st.write("Storing session...")
+            progress.update_step("Storing session...", status="running")
             from services.ingestion import store_session
             session_id = store_session(
                 transcript,
@@ -138,10 +141,10 @@ def render_checking_consistency():
                 topic_tags=topic_tags,
             )
             st.session_state.current_session_id = session_id
-            st.write("✓ Session stored")
+            progress.update_step("Session stored", status="complete")
 
             # Step 2: Run consistency check
-            st.write("Checking consistency (Pass 1 of 2)...")
+            progress.update_step("Checking consistency (Pass 1 of 2)...", status="running")
             from services.consistency import run_consistency_check
             consistency_results = run_consistency_check(confirmed_claims)
             st.session_state.consistency_results = consistency_results
@@ -150,12 +153,12 @@ def render_checking_consistency():
             has_contradictions = consistency_results.get("has_contradictions", False)
 
             if has_critical:
-                st.write("✓ Consistency check complete (Pass 3 — Opus deep analysis run)")
+                progress.update_step("Consistency check complete (Pass 3 — Opus deep analysis run)", status="complete")
             else:
-                st.write("✓ Consistency check complete")
+                progress.update_step("Consistency check complete", status="complete")
 
             # Step 3: Update living document
-            st.write("Updating living document...")
+            progress.update_step("Updating living document...", status="running")
             from services.ingestion import run_ingestion_pipeline
             pipeline_result = run_ingestion_pipeline(
                 transcript=transcript,
@@ -168,10 +171,10 @@ def render_checking_consistency():
             doc_updated = pipeline_result.get("document_updated", False)
 
             if doc_updated:
-                st.write(f"✓ Living document updated ({claims_stored} claims stored)")
+                progress.update_step(f"Living document updated ({claims_stored} claims stored)", status="complete")
             else:
                 msg = pipeline_result.get("document_update_message", "unknown reason")
-                st.write(f"⚠ Document update issue: {msg}")
+                progress.update_step(f"Document update issue: {msg}", status="error")
 
             # Determine if we have contradictions to resolve
             if has_contradictions:
@@ -180,30 +183,22 @@ def render_checking_consistency():
                 st.session_state.contradictions = contradictions
                 st.session_state.contradiction_index = 0
                 summary = consistency_results.get("summary", "")
-                st.write(f"⚠ {summary}")
-                status.update(
-                    label=f"Consistency check found issues. Review required.",
-                    state="complete",
-                    expanded=False,
-                )
-                # Brief pause for user to read, then transition
+                progress.complete(f"Consistency check found issues. Review required.")
                 st.info(f"Found {len(contradictions)} contradiction(s) to review.")
                 set_mode("resolving_contradiction")
             else:
-                st.write("✓ No contradictions found")
-                status.update(label="All done. Session ingested.", state="complete", expanded=False)
+                progress.complete("All done. Session ingested.")
                 # Invalidate sidebar cache
-                st.session_state.sidebar_data = {}
+                invalidate_sidebar()
                 set_mode("done")
 
-        except Exception as e:
-            status.update(label=f"Pipeline failed: {e}", state="error", expanded=True)
-            st.error(f"Ingestion pipeline failed: {e}")
-            st.info("You can try again or cancel.")
-            if st.button("Cancel", key="cancel_after_error"):
-                reset_ingestion()
-                st.rerun()
-            return
+    except Exception as e:
+        st.error(f"Ingestion pipeline failed: {e}")
+        st.info("You can try again or cancel.")
+        if st.button("Cancel", key="cancel_after_error"):
+            reset_ingestion()
+            st.rerun()
+        return
 
     st.rerun()
 

@@ -5,7 +5,7 @@ Handles conversation, query routing, and contradiction resolution UI.
 
 import streamlit as st
 
-from app.state import add_message, set_mode, reset_ingestion
+from app.state import add_message, set_mode, reset_ingestion, invalidate_sidebar
 
 
 # Minimum transcript length to suggest ingestion flow
@@ -83,45 +83,58 @@ def _get_system_prompt() -> str:
     return base
 
 
+def _build_claude_prompt(user_message: str, query_type: str):
+    """Build prompt components shared by streaming and non-streaming callers."""
+    from services.claude_client import call_with_routing
+
+    history = st.session_state.get("conversation_history", [])
+    recent_history = history[-10:] if len(history) > 10 else history
+
+    history_text = ""
+    for msg in recent_history[:-1]:
+        role_label = "Founder" if msg["role"] == "user" else "Startup Brain"
+        history_text += f"{role_label}: {msg['content']}\n\n"
+
+    if history_text:
+        full_prompt = f"<conversation_history>\n{history_text}</conversation_history>\n\nFounder: {user_message}"
+    else:
+        full_prompt = user_message
+
+    task_map = {
+        "pitch": "pitch_generation",
+        "analysis": "strategic_analysis",
+        "current_state": "general",
+        "historical": "general",
+        "general": "general",
+    }
+    task_type = task_map.get(query_type, "general")
+    system = _get_system_prompt()
+    return full_prompt, task_type, system
+
+
 def _call_claude(user_message: str, query_type: str) -> str:
-    """
-    Route to appropriate Claude model and return response text.
-    For streaming, returns plain text (non-streaming fallback used here for simplicity).
-    """
+    """Route to appropriate Claude model and return full response text (non-streaming)."""
     try:
         from services.claude_client import call_with_routing
-
-        # Build conversation history for context
-        history = st.session_state.get("conversation_history", [])
-        # Include last 10 messages for context
-        recent_history = history[-10:] if len(history) > 10 else history
-
-        # Build the full prompt with history context
-        history_text = ""
-        for msg in recent_history[:-1]:  # Exclude the message just added
-            role_label = "Founder" if msg["role"] == "user" else "Startup Brain"
-            history_text += f"{role_label}: {msg['content']}\n\n"
-
-        if history_text:
-            full_prompt = f"<conversation_history>\n{history_text}</conversation_history>\n\nFounder: {user_message}"
-        else:
-            full_prompt = user_message
-
-        # Map query type to task type for routing
-        task_map = {
-            "pitch": "pitch_generation",
-            "analysis": "strategic_analysis",
-            "current_state": "general",
-            "historical": "general",
-            "general": "general",
-        }
-        task_type = task_map.get(query_type, "general")
-
-        system = _get_system_prompt()
-        result = call_with_routing(full_prompt, task_type=task_type, system=system)
+        full_prompt, task_type, system = _build_claude_prompt(user_message, query_type)
+        result = call_with_routing(full_prompt, task_type=task_type, system=system, stream=False)
         return result.get("text", "Sorry, I could not generate a response.")
     except Exception as e:
         return f"Error: {e}"
+
+
+def _call_claude_stream(user_message: str, query_type: str):
+    """
+    Route to appropriate Claude model and return a generator yielding text chunks.
+    Compatible with st.write_stream().
+    """
+    try:
+        from services.claude_client import call_with_routing
+        full_prompt, task_type, system = _build_claude_prompt(user_message, query_type)
+        generator = call_with_routing(full_prompt, task_type=task_type, system=system, stream=True)
+        yield from generator
+    except Exception as e:
+        yield f"Error: {e}"
 
 
 def _apply_direct_correction(user_message: str) -> str:
@@ -149,10 +162,44 @@ def _apply_direct_correction(user_message: str) -> str:
         return f"Understood. Could not auto-update the document: {e}. Use the ingestion flow for structured updates."
 
 
+def _handle_quick_action(text: str, query_type: str):
+    """Process a quick-action button click as a user message."""
+    with st.chat_message("user"):
+        st.markdown(text)
+    add_message("user", text)
+    with st.chat_message("assistant"):
+        response = st.write_stream(_call_claude_stream(text, query_type))
+    add_message("assistant", response)
+    st.rerun()
+
+
 def render_chat():
     """Main chat UI. Called when mode='chat'."""
+    from services.mongo_client import is_mongo_available
+    if not is_mongo_available():
+        st.warning("MongoDB is unavailable. Running in degraded mode — chat works but ingestion and history are disabled.")
+
     # Display conversation history
     history = st.session_state.get("conversation_history", [])
+
+    # Welcome message when conversation is empty
+    if not history:
+        st.markdown("**Welcome to Startup Brain** — your startup's AI memory.")
+        st.caption("Ask me anything about your startup, or try one of these:")
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            if st.button("What's our current state?", key="quick_state"):
+                _handle_quick_action("What's our current state?", "current_state")
+                return
+        with col2:
+            if st.button("Any open questions?", key="quick_questions"):
+                _handle_quick_action("Any open questions?", "general")
+                return
+        with col3:
+            if st.button("Recent changes", key="quick_changes"):
+                _handle_quick_action("Recent changes", "historical")
+                return
+
     for msg in history:
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
@@ -188,16 +235,14 @@ def render_chat():
                 st.markdown(response)
             add_message("assistant", response)
             # Invalidate sidebar cache so it reflects the update
-            st.session_state.sidebar_data = {}
+            invalidate_sidebar()
             st.rerun()
             return
 
         # Normal query — classify and route
         query_type = _classify_query(user_input)
         with st.chat_message("assistant"):
-            with st.spinner("Thinking..."):
-                response = _call_claude(user_input, query_type)
-            st.markdown(response)
+            response = st.write_stream(_call_claude_stream(user_input, query_type))
 
         add_message("assistant", response)
         st.rerun()
@@ -221,10 +266,15 @@ def render_contradiction_resolution():
     total = len(contradictions)
 
     st.header(f"Contradiction {idx + 1} of {total}")
+    st.progress((idx + 1) / total)
 
     severity = contradiction.get("severity", "Notable")
-    severity_color = {"Critical": "red", "Notable": "orange", "Minor": "blue"}.get(severity, "gray")
-    st.markdown(f"**Severity:** :{severity_color}[{severity}]")
+    if severity == "Critical":
+        st.error(f"Severity: {severity}")
+    elif severity == "Notable":
+        st.warning(f"Severity: {severity}")
+    else:
+        st.info(f"Severity: {severity}")
 
     # Show the tension
     col1, col2 = st.columns(2)
@@ -258,13 +308,15 @@ def render_contradiction_resolution():
             for analysis in pass3["analyses"]:
                 if analysis.get("contradiction_id") == c_id:
                     with st.expander("Deep Analysis (Opus)", expanded=True):
-                        st.write(f"**{analysis.get('headline', '')}**")
+                        headline = analysis.get("headline", "")
+                        if headline:
+                            st.markdown(f"> {headline}")
                         implications = analysis.get("downstream_implications", "")
                         if implications:
-                            st.write(f"**Downstream implications:** {implications}")
+                            st.markdown(f"> **Downstream implications:** {implications}")
                         observation = analysis.get("analyst_observation", "")
                         if observation:
-                            st.write(f"**Analyst observation:** {observation}")
+                            st.info(observation)
                     break
 
     # Resolution buttons
@@ -272,22 +324,24 @@ def render_contradiction_resolution():
     col_update, col_keep, col_explain = st.columns(3)
 
     with col_update:
-        update_label = f"Update to new"
-        if st.button(update_label, type="primary", use_container_width=True, key=f"resolve_update_{idx}"):
+        if st.button("Update to new", type="primary", use_container_width=True, key=f"resolve_update_{idx}"):
             with st.spinner("Updating document..."):
                 _resolve_contradiction(contradiction, "update", new_claim_text, "")
             _advance_contradiction()
+        st.caption("Replace the current position with the new claim")
 
     with col_keep:
         if st.button("Keep current", use_container_width=True, key=f"resolve_keep_{idx}"):
             with st.spinner("Logging decision..."):
                 _resolve_contradiction(contradiction, "keep", "", "")
             _advance_contradiction()
+        st.caption("Dismiss the new claim and keep what we have")
 
     with col_explain:
-        if st.button("Let me explain the change", use_container_width=True, key=f"resolve_explain_{idx}"):
+        if st.button("Let me explain", use_container_width=True, key=f"resolve_explain_{idx}"):
             st.session_state[f"show_explain_{idx}"] = True
             st.rerun()
+        st.caption("Provide context before updating")
 
     # Explanation text input
     if st.session_state.get(f"show_explain_{idx}", False):
@@ -359,7 +413,7 @@ def _advance_contradiction():
     next_idx = idx + 1
     if next_idx >= len(contradictions):
         # All done
-        st.session_state.sidebar_data = {}  # Invalidate sidebar cache
+        invalidate_sidebar()  # Invalidate sidebar cache
         set_mode("done")
     else:
         st.session_state.contradiction_index = next_idx
