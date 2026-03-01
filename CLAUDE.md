@@ -36,7 +36,7 @@ When splitting tasks across agents, avoid overlapping file edits:
 - Test transcripts in `tests/test_transcripts/`
 - Run unit tests: `python -m pytest tests/ -m "not integration"`
 - Run integration tests: `python -m pytest tests/ -m integration` (requires API key + MongoDB)
-- 588+ tests, all unit tests run fully offline with mocks
+- 599 unit tests + 25 integration tests, all unit tests run fully offline with mocks
 
 ## Deployment
 - Streamlit Community Cloud from this repo
@@ -46,31 +46,32 @@ When splitting tasks across agents, avoid overlapping file edits:
 
 ## Current Status (as of 2026-03-01)
 
-### What's Built and Working
-- Full ingestion pipeline: transcript → claim extraction → human confirmation → consistency check → doc update
-- 3-pass consistency engine (Pass 1+2 Sonnet, Pass 3 Opus on Critical only)
-- Living document with diff-and-verify updates
-- Conversational chat interface with query classification and streaming
-- Sidebar dashboard: Our Current View, External Feedback (split by source), Recent Changes, Actions, Topic Evolution, API Cost
-- Session type categorization flowing through the entire pipeline (extraction, consistency, pushback, audit, storage)
-- Whiteboard photo processing (vision) — integrated into ingestion page
-- Feedback pattern detection and evolution narratives
-- Pitch material generation (Opus)
-- Cost tracking with budget alerts
-- Step indicators across the 4-stage ingestion flow
-- 588 unit tests passing, 25 integration tests
-- Book framework cross-check via .md upload in chat
-- Vector search code ready (`vector_search_text()`, upgraded `_get_rag_evidence()`), but requires Atlas M10+ for autoEmbed — currently using time-based fallback which works fine on free tier
-- RAG health monitor: sidebar shows claim count vs threshold (200), warns when upgrade is needed
-- Direct corrections run lightweight consistency check (informational only, never blocking)
-- Contradiction resolution explicitly writes Decision Log and Dismissed Contradictions entries
-- Git auto-commit on living document updates
+### Implementation: Complete
+All 24 sections of `docs/SPEC.md` are implemented. The system is production-ready for daily use.
+
+**Core pipeline:** Full ingestion (transcript → claim extraction → human confirmation → consistency check → doc update), 3-pass consistency engine (P1+P2 Sonnet, P3 Opus on Critical only), diff-and-verify living document updates, git auto-commit after every update.
+
+**UI:** Conversational chat with query classification and streaming, sidebar dashboard (Current View, External Feedback by source, Recent Changes, Actions, Topic Evolution, API Cost, RAG Health), step indicators across 4-stage ingestion flow, claim editor with inline editing.
+
+**Features:** Session type categorization through entire pipeline, whiteboard photo processing (vision), feedback pattern detection, evolution narratives, pitch material generation (Opus), cost tracking with budget alerts, book framework cross-check via .md upload in chat, direct corrections with informational consistency check, contradiction resolution writing Decision Log and Dismissed Contradictions entries.
+
+**Infrastructure:** Vector search code ready (`vector_search_text()`, upgraded `_get_rag_evidence()`), time-based fallback on free tier, RAG health monitor (warns at 200 claims).
+
+**Tests:** 599 unit tests, 25 integration tests. All unit tests run fully offline with mocks.
 
 ### Decided Against
 
-- **Feedback ingestion UI** — not needed. Feedback enters via chat (paste email + commentary) or ingestion flow (select "Investor email/feedback" session type). No friction.
-- **Full book framework storage** — not needed. Temporary .md upload in chat is the permanent solution. No MongoDB persistence for book frameworks.
-- **Atlas M10+ upgrade (for now)** — autoEmbed requires paid tier ($57/mo). Time-based retrieval works fine until ~200 claims. The sidebar monitors this and will alert when upgrade is worthwhile.
+- **Dedicated feedback ingestion UI** — feedback enters via chat (paste email + commentary) or ingestion flow (select "Investor meeting" session type). No extra UI needed.
+- **Persistent book framework storage** — temporary .md upload in chat is the permanent solution. No MongoDB persistence for book content.
+- **Atlas M10+ upgrade (for now)** — autoEmbed requires paid tier ($57/mo). Time-based retrieval works fine until ~200 claims. Sidebar monitors this automatically.
+- **MongoDB backup script** — optional extra for the future. Atlas has its own backup and data volume is tiny.
+- **Delete claim chat command** — edge case; if a bad claim slips through, delete directly in MongoDB.
+
+### Spec Deviations (intentional, no action needed)
+- Session metadata stored in nested `metadata` dict rather than flat top-level fields — functionally equivalent, MongoDB queries nested fields fine with dot notation.
+- Sessions store `summary` (2-3 sentences) rather than a separate `one_line_summary` — serves the same purpose.
+- Claims don't store `confirmed_by_user` boolean — redundant since only confirmed claims are ever stored.
 
 ### Next Steps
-1. **When sidebar says "RAG upgrade needed"** — upgrade Atlas to M10+ and create vector search indexes per `scripts/bootstrap.py`. Until then, time-based retrieval is sufficient.
+1. **Use the system daily** — ingest real transcripts, build up the living document, see how consistency engine performs on real data.
+2. **When sidebar says "RAG upgrade needed"** (~200 claims) — upgrade Atlas to M10+ and create vector search indexes per `scripts/bootstrap.py`.

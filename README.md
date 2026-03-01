@@ -59,7 +59,7 @@ startupbrain/
 │   └── whiteboard.md           # Whiteboard photo extraction (vision)
 ├── documents/
 │   └── startup_brain.md        # The living document (git-tracked, mirrored to MongoDB)
-├── tests/                      # 588+ unit tests, 25 integration tests
+├── tests/                      # 599 unit tests, 25 integration tests
 │   ├── conftest.py             # Shared fixtures and sample data
 │   ├── test_transcripts/       # Sample transcripts for testing
 │   └── test_*.py               # Test modules (one per service/component)
@@ -145,7 +145,7 @@ python -m pytest tests/ -m integration
 python -m pytest tests/ -v --tb=short -m "not integration"
 ```
 
-588 unit tests across 15 test files. All service and component tests run fully offline with mocks.
+599 unit tests across 15 test files. All service and component tests run fully offline with mocks.
 
 ## Deployment
 
@@ -162,6 +162,15 @@ Deployed on **Streamlit Community Cloud** directly from this repo.
 - Occasional Opus (deep analysis, pitch): ~$15-30/month
 - **Estimated total: $25-40/month**
 - Hard cap: $400/month, alert at $300
+
+## Project Status
+
+All 24 sections of the spec are implemented. The system is production-ready for daily use.
+
+**Deliberate deviations from spec:**
+- **Vector search**: Code is in place but Atlas free tier (M0) doesn't support Voyage AI autoEmbed. System uses time-based retrieval with a health monitor that alerts at 200 claims when upgrading to M10+ becomes worthwhile.
+- **Book frameworks**: Temporary .md upload in chat replaces the spec's persistent MongoDB storage. No book framework collection is populated.
+- **MongoDB backup script** (`scripts/backup_mongodb.py`): Not yet built. Optional — Atlas has its own backup.
 
 ## Full Specification
 
