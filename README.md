@@ -31,10 +31,10 @@ startupbrain/
 │   ├── main.py                 # Entry point + page routing (state machine)
 │   ├── state.py                # Session state, mode transitions, constants
 │   └── components/
-│       ├── chat.py             # Chat interface + contradiction resolution
+│       ├── chat.py             # Chat interface, quick notes, contradiction resolution
 │       ├── claim_editor.py     # Claim confirmation/editing UI
 │       ├── progress.py         # Pipeline progress + step indicator
-│       ├── sidebar.py          # Dashboard sidebar (current view, feedback, actions)
+│       ├── sidebar.py          # Dashboard sidebar (current view, feedback, actions, download)
 │       └── styles.py           # Custom CSS injection
 ├── services/                   # Backend service layer
 │   ├── claude_client.py        # Anthropic API wrapper (Sonnet/Opus routing, cost tracking)
@@ -59,7 +59,7 @@ startupbrain/
 │   └── whiteboard.md           # Whiteboard photo extraction (vision)
 ├── documents/
 │   └── startup_brain.md        # The living document (git-tracked, mirrored to MongoDB)
-├── tests/                      # 599 unit tests, 25 integration tests
+├── tests/                      # 647 unit tests, 28 integration tests
 │   ├── conftest.py             # Shared fixtures and sample data
 │   ├── test_transcripts/       # Sample transcripts for testing
 │   └── test_*.py               # Test modules (one per service/component)
@@ -107,6 +107,8 @@ Paste transcript → Select session type → [Optional: upload whiteboard]
 - **Book cross-check** — upload a .md book summary in chat for temporary framework cross-referencing
 - **Semantic RAG** — Atlas Vector Search with Voyage AI automated embedding for consistency evidence (graceful fallback to time-based)
 - **Direct corrections** — "no, actually X" runs a lightweight consistency check before applying (informational only)
+- **Quick notes** — prefix-based (`note:`, `remember:`, `jot:`, `fyi:`) lightweight doc updates without full ingestion pipeline
+- **Living document download** — one-click download from sidebar Actions
 - **Explicit decision tracking** — contradiction resolution writes Decision Log and Dismissed Contradictions entries directly
 
 ### State Machine
@@ -145,7 +147,7 @@ python -m pytest tests/ -m integration
 python -m pytest tests/ -v --tb=short -m "not integration"
 ```
 
-599 unit tests across 15 test files. All service and component tests run fully offline with mocks.
+647 unit tests across 22 test files. All service and component tests run fully offline with mocks.
 
 ## Deployment
 
@@ -165,7 +167,7 @@ Deployed on **Streamlit Community Cloud** directly from this repo.
 
 ## Project Status
 
-All 24 sections of the spec are implemented. The system is production-ready for daily use.
+All 24 sections of the spec are implemented. The system is production-ready for daily use. The living document template has 17 sections under Current State, ordered for pitch narrative flow based on a Kamps pitch guide cross-check.
 
 **Deliberate deviations from spec:**
 - **Vector search**: Code is in place but Atlas free tier (M0) doesn't support Voyage AI autoEmbed. System uses time-based retrieval with a health monitor that alerts at 200 claims when upgrading to M10+ becomes worthwhile.

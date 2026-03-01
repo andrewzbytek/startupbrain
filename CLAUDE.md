@@ -36,7 +36,7 @@ When splitting tasks across agents, avoid overlapping file edits:
 - Test transcripts in `tests/test_transcripts/`
 - Run unit tests: `python -m pytest tests/ -m "not integration"`
 - Run integration tests: `python -m pytest tests/ -m integration` (requires API key + MongoDB)
-- 599 unit tests + 25 integration tests, all unit tests run fully offline with mocks
+- 647 unit tests + 28 integration tests, all unit tests run fully offline with mocks
 
 ## Deployment
 - Streamlit Community Cloud from this repo
@@ -44,20 +44,20 @@ When splitting tasks across agents, avoid overlapping file edits:
 - Entry point: `app/main.py`
 - Required secrets: `ANTHROPIC_API_KEY`, `MONGODB_URI`
 
-## Current Status (as of 2026-03-01)
+## Current Status (as of 2026-03-02)
 
 ### Implementation: Complete
 All 24 sections of `docs/SPEC.md` are implemented. The system is production-ready for daily use.
 
-**Core pipeline:** Full ingestion (transcript → claim extraction → human confirmation → consistency check → doc update), 3-pass consistency engine (P1+P2 Sonnet, P3 Opus on Critical only), diff-and-verify living document updates, git auto-commit after every update.
+**Core pipeline:** Full ingestion (transcript → claim extraction → human confirmation → consistency check → doc update), 3-pass consistency engine (P1+P2 Sonnet, P3 Opus on Critical only), diff-and-verify living document updates, git auto-commit after every update. Living document has 17 sections under Current State, ordered for pitch narrative flow (Kamps cross-check).
 
-**UI:** Conversational chat with query classification and streaming, sidebar dashboard (Current View, External Feedback by source, Recent Changes, Actions, Topic Evolution, API Cost, RAG Health), step indicators across 4-stage ingestion flow, claim editor with inline editing.
+**UI:** Conversational chat with query classification and streaming, sidebar dashboard (Current View, External Feedback by source, Recent Changes, Actions with download button, Topic Evolution, API Cost, RAG Health), step indicators across 4-stage ingestion flow, claim editor with inline editing.
 
-**Features:** Session type categorization through entire pipeline, whiteboard photo processing (vision), feedback pattern detection, evolution narratives, pitch material generation (Opus), cost tracking with budget alerts, book framework cross-check via .md upload in chat, direct corrections with informational consistency check, contradiction resolution writing Decision Log and Dismissed Contradictions entries.
+**Features:** Session type categorization through entire pipeline, whiteboard photo processing (vision), feedback pattern detection, evolution narratives, pitch material generation (Opus), cost tracking with budget alerts, book framework cross-check via .md upload in chat, direct corrections with informational consistency check, contradiction resolution writing Decision Log and Dismissed Contradictions entries, quick notes via chat prefix (`note:`, `remember:`, `jot:`, `fyi:`) for lightweight doc updates without full pipeline.
 
 **Infrastructure:** Vector search code ready (`vector_search_text()`, upgraded `_get_rag_evidence()`), time-based fallback on free tier, RAG health monitor (warns at 200 claims).
 
-**Tests:** 599 unit tests, 25 integration tests. All unit tests run fully offline with mocks.
+**Tests:** 647 unit tests, 28 integration tests across 22 test files. All unit tests run fully offline with mocks.
 
 ### Decided Against
 
@@ -71,6 +71,11 @@ All 24 sections of `docs/SPEC.md` are implemented. The system is production-read
 - Session metadata stored in nested `metadata` dict rather than flat top-level fields — functionally equivalent, MongoDB queries nested fields fine with dot notation.
 - Sessions store `summary` (2-3 sentences) rather than a separate `one_line_summary` — serves the same purpose.
 - Claims don't store `confirmed_by_user` boolean — redundant since only confirmed claims are ever stored.
+
+### Living Document Sections (17 under Current State)
+Problem We're Solving, Target Market / Initial Customer, Value Proposition, Why Now, Traction / Milestones, Business Model / Revenue Model, Pricing, Go-to-Market Strategy, Technical Approach, Competitive Landscape, Moat / Defensibility, Key Assumptions, Open Questions, Key Risks, Team / Hiring Plans, Key Contacts / Prospects, Fundraising Status / Strategy.
+
+Sections from Kamps pitch guide cross-check: Problem We're Solving, Why Now, Traction / Milestones, Moat / Defensibility. Key Contacts / Prospects from user request.
 
 ### Next Steps
 1. **Use the system daily** — ingest real transcripts, build up the living document, see how consistency engine performs on real data.
