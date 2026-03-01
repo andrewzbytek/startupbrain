@@ -51,6 +51,9 @@ def init_session_state():
         "whiteboard_text": "",
         # Evolution narrative result
         "evolution_result": None,
+        # Book cross-check (temporary .md upload)
+        "book_crosscheck_content": "",
+        "book_crosscheck_filename": "",
     }
     for key, value in defaults.items():
         if key not in st.session_state:

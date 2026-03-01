@@ -78,6 +78,7 @@ class TestInitSessionState:
             "ingestion_session_summary", "ingestion_topic_tags",
             "consistency_results", "contradiction_index", "whiteboard_text",
             "evolution_result", "ingestion_session_type",
+            "book_crosscheck_content", "book_crosscheck_filename",
         }
         assert expected_keys == set(mock_st.session_state.keys())
 

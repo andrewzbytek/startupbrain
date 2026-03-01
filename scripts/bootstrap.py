@@ -98,50 +98,72 @@ They CANNOT be created via pymongo. Follow these steps:
 2. Click "Atlas Search" → "Create Search Index" → "JSON Editor".
 3. Select database: startup_brain
 
+These indexes use Atlas automated embedding with Voyage AI — no API key needed.
+Atlas automatically generates embeddings on insert/update. Queries use queryString
+instead of queryVector.
+
 Create the following indexes:
 
 INDEX 1: claims_vector_index (on collection: claims)
 {
-  "fields": [
-    {
-      "type": "vector",
-      "path": "embedding",
-      "numDimensions": 1536,
-      "similarity": "cosine"
-    },
-    {
-      "type": "filter",
-      "path": "source_type"
-    },
-    {
-      "type": "filter",
-      "path": "session_id"
-    }
-  ]
+  "type": "vectorSearch",
+  "definition": {
+    "fields": [
+      {
+        "type": "vector",
+        "path": "claim_text_embedding",
+        "numDimensions": 1024,
+        "similarity": "cosine"
+      },
+      {
+        "type": "filter",
+        "path": "source_type"
+      }
+    ],
+    "models": [
+      {
+        "name": "voyage-3",
+        "provider": "voyageai",
+        "type": "embedding",
+        "fieldMappings": [
+          { "sourceField": "claim_text", "embeddedField": "claim_text_embedding" }
+        ]
+      }
+    ]
+  }
 }
 
-INDEX 2: sessions_vector_index (on collection: sessions)
+INDEX 2: feedback_vector_index (on collection: feedback)
 {
-  "fields": [
-    {
-      "type": "vector",
-      "path": "embedding",
-      "numDimensions": 1536,
-      "similarity": "cosine"
-    },
-    {
-      "type": "filter",
-      "path": "source_type"
-    }
-  ]
+  "type": "vectorSearch",
+  "definition": {
+    "fields": [
+      {
+        "type": "vector",
+        "path": "feedback_text_embedding",
+        "numDimensions": 1024,
+        "similarity": "cosine"
+      },
+      {
+        "type": "filter",
+        "path": "source_type"
+      }
+    ],
+    "models": [
+      {
+        "name": "voyage-3",
+        "provider": "voyageai",
+        "type": "embedding",
+        "fieldMappings": [
+          { "sourceField": "feedback_text", "embeddedField": "feedback_text_embedding" }
+        ]
+      }
+    ]
+  }
 }
 
-Note: numDimensions should match your Voyage AI embedding model output.
-Voyage 3 (voyage-3): 1024 dimensions
-Voyage 3 Large (voyage-3-large): 1024 dimensions
-Voyage Code 2 (voyage-code-2): 1536 dimensions
-
-Adjust numDimensions to match whichever model you configure.
+Note: These indexes use Voyage 3 (1024 dimensions) via Atlas automated embedding.
+No sessions collection index is needed — claims provide fine-grained retrieval.
 """)
 
 

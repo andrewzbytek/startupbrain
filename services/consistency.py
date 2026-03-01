@@ -213,10 +213,33 @@ def pass2_severity_filter(pass1_results: dict, living_doc: str, session_type: st
 def _get_rag_evidence(claims: list) -> list:
     """
     Retrieve RAG evidence from MongoDB for contradiction analysis.
+    Tries Atlas Vector Search first (semantic), falls back to time-based retrieval.
     Returns list of evidence dicts: {source_date, source_type, relevant_excerpt}
     """
-    from services.mongo_client import get_claims, get_sessions
+    from services.mongo_client import get_claims, get_sessions, vector_search_text
 
+    # Try vector search first (semantic retrieval via Atlas automated embedding)
+    try:
+        query_text = " ".join(c.get("claim_text", "") for c in claims if c.get("claim_text"))
+        if query_text:
+            results = vector_search_text(
+                "claims", query_text, "claims_vector_index", limit=10,
+            )
+            if results:
+                evidence = []
+                for r in results:
+                    created = r.get("created_at", "")
+                    date_str = str(created)[:10] if created else ""
+                    evidence.append({
+                        "source_date": date_str,
+                        "source_type": r.get("source_type", "session"),
+                        "relevant_excerpt": r.get("claim_text", ""),
+                    })
+                return evidence
+    except Exception:
+        pass  # Fall back to time-based retrieval
+
+    # Fallback: time-based retrieval
     evidence = []
 
     # Fetch recent claims from MongoDB to provide evidence context

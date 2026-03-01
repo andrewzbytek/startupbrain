@@ -43,7 +43,7 @@ startupbrain/
 │   ├── document_updater.py     # Living document diff-and-verify updates
 │   ├── feedback.py             # Feedback patterns, evolution narratives, pitch generation
 │   ├── ingestion.py            # Transcript → claims → storage pipeline
-│   └── mongo_client.py         # MongoDB Atlas client (sessions, claims, feedback)
+│   └── mongo_client.py         # MongoDB Atlas client (sessions, claims, feedback, vector search)
 ├── prompts/                    # LLM prompt templates (12 markdown files)
 │   ├── extraction.md           # Claim extraction from session transcripts
 │   ├── consistency_pass1.md    # Wide-net contradiction detection
@@ -59,7 +59,7 @@ startupbrain/
 │   └── whiteboard.md           # Whiteboard photo extraction (vision)
 ├── documents/
 │   └── startup_brain.md        # The living document (git-tracked, mirrored to MongoDB)
-├── tests/                      # 561+ unit tests, 25 integration tests
+├── tests/                      # 588+ unit tests, 25 integration tests
 │   ├── conftest.py             # Shared fixtures and sample data
 │   ├── test_transcripts/       # Sample transcripts for testing
 │   └── test_*.py               # Test modules (one per service/component)
@@ -104,6 +104,10 @@ Paste transcript → Select session type → [Optional: upload whiteboard]
 - **Session types** — categorize sessions (co-founder discussion, investor meeting, customer interview, etc.) to calibrate extraction and consistency behavior
 - **Claim confirmation** — human-in-the-loop before anything enters the system
 - **Informational pushback** — surfaces context on direction changes, never blocks
+- **Book cross-check** — upload a .md book summary in chat for temporary framework cross-referencing
+- **Semantic RAG** — Atlas Vector Search with Voyage AI automated embedding for consistency evidence (graceful fallback to time-based)
+- **Direct corrections** — "no, actually X" runs a lightweight consistency check before applying (informational only)
+- **Explicit decision tracking** — contradiction resolution writes Decision Log and Dismissed Contradictions entries directly
 
 ### State Machine
 
@@ -141,7 +145,7 @@ python -m pytest tests/ -m integration
 python -m pytest tests/ -v --tb=short -m "not integration"
 ```
 
-561 unit tests across 14 test files. All service and component tests run fully offline with mocks.
+588 unit tests across 15 test files. All service and component tests run fully offline with mocks.
 
 ## Deployment
 

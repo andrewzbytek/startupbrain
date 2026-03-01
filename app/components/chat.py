@@ -80,6 +80,12 @@ def _get_system_prompt() -> str:
     )
     if doc:
         base += f"<startup_brain>\n{doc}\n</startup_brain>"
+
+    # Append book framework if loaded for cross-check
+    book_content = st.session_state.get("book_crosscheck_content", "")
+    if book_content:
+        base += f"\n\n<book_framework>{book_content}</book_framework>"
+
     return base
 
 
@@ -140,26 +146,57 @@ def _call_claude_stream(user_message: str, query_type: str):
 def _apply_direct_correction(user_message: str) -> str:
     """
     Apply a direct correction to the living document immediately.
+    Runs a lightweight consistency check (informational only) before applying.
+    The correction always goes through regardless of consistency findings.
     Returns a confirmation message.
     """
     try:
         from services.document_updater import update_document
+        from services.consistency import run_consistency_check
+
+        # Build synthetic claim for consistency check
+        claim = {
+            "claim_text": user_message,
+            "claim_type": "decision",
+            "confidence": "definite",
+        }
+
+        # Run lightweight consistency check (informational only)
+        info_note = ""
+        try:
+            results = run_consistency_check([claim], session_type="Direct correction")
+            if results.get("has_contradictions"):
+                contradictions = results.get("pass2", {}).get("retained", [])
+                if contradictions:
+                    notes = []
+                    for c in contradictions:
+                        notes.append(
+                            f"- **{c.get('severity', 'Notable')}**: "
+                            f"{c.get('evidence_summary', c.get('tension_description', ''))}"
+                        )
+                    info_note = (
+                        "\n\nHeads up — this touches on some existing positions:\n"
+                        + "\n".join(notes)
+                        + "\n\nThe update has been applied as requested."
+                    )
+        except Exception:
+            pass  # Consistency check failure should never block corrections
+
+        # Always apply the correction
         result = update_document(
             new_info=f"Direct correction from founder: {user_message}",
             update_reason="Direct founder correction",
         )
+
         if result.get("success"):
-            return (
-                f"Got it — updated. {result.get('message', '')}\n\n"
-                f"What else can I help with?"
-            )
+            base = f"Got it — updated. {result.get('message', '')}"
+            return base + info_note + "\n\nWhat else can I help with?"
         else:
             return (
-                f"I heard you. The document update ran into an issue: {result.get('message', 'unknown error')}. "
-                f"You may want to try the ingestion flow for a more structured update."
+                f"I heard you. The document update ran into an issue: {result.get('message', 'unknown error')}."
             )
     except Exception as e:
-        return f"Understood. Could not auto-update the document: {e}. Use the ingestion flow for structured updates."
+        return f"Understood. Could not auto-update the document: {e}."
 
 
 def _handle_quick_action(text: str, query_type: str):
@@ -203,6 +240,27 @@ def render_chat():
     for msg in history:
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
+
+    # Book framework upload for cross-check
+    uploaded_file = st.file_uploader(
+        "Upload .md for cross-check", type=["md"], key="book_upload",
+    )
+    if uploaded_file is not None:
+        content = uploaded_file.read().decode("utf-8")
+        st.session_state.book_crosscheck_content = content
+        st.session_state.book_crosscheck_filename = uploaded_file.name
+
+    if st.session_state.get("book_crosscheck_content"):
+        filename = st.session_state.get("book_crosscheck_filename", "file")
+        char_count = len(st.session_state.book_crosscheck_content)
+        col_info, col_clear = st.columns([4, 1])
+        with col_info:
+            st.info(f"Book loaded: {filename} ({char_count} chars) — Ask me to cross-check your model against this.")
+        with col_clear:
+            if st.button("Clear", key="clear_book"):
+                st.session_state.book_crosscheck_content = ""
+                st.session_state.book_crosscheck_filename = ""
+                st.rerun()
 
     # Chat input
     user_input = st.chat_input("Ask anything about your startup...")
@@ -364,9 +422,17 @@ def _resolve_contradiction(contradiction: dict, action: str, new_claim: str, exp
     """
     Apply a contradiction resolution to the living document.
     action: "update" | "keep" | "explain"
+
+    - "update" / "explain": calls update_document() AND explicitly adds a Decision Log entry.
+    - "keep": does NOT call update_document(); adds a Dismissed Contradiction entry.
+    All paths write the doc, mirror to MongoDB, and git commit.
     """
     try:
-        from services.document_updater import update_document
+        from services.document_updater import (
+            update_document, read_living_document, write_living_document,
+            _add_decision, _add_dismissed, _git_commit,
+        )
+        from services.mongo_client import upsert_living_document
         from datetime import datetime, timezone
 
         date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -380,13 +446,30 @@ def _resolve_contradiction(contradiction: dict, action: str, new_claim: str, exp
                 f"Tension was: {tension}"
             )
             reason = f"Contradiction resolved — updated {section} ({date_str})"
+            update_document(new_info, update_reason=reason)
+
+            # Explicit Decision Log entry
+            doc = read_living_document()
+            decision_entry = f"- [{date_str}] Updated {section}: {new_claim} (resolved contradiction)"
+            doc = _add_decision(doc, decision_entry)
+            write_living_document(doc)
+            upsert_living_document(doc, metadata={"last_updated": date_str, "update_reason": reason})
+            _git_commit(f"Decision log: {reason}")
+
         elif action == "keep":
-            new_info = (
-                f"Contradiction reviewed ({date_str}): Keeping current position in {section}.\n"
-                f"Rejected new claim: {contradiction.get('new_claim', '')}\n"
-                f"Tension was: {tension}"
+            # Don't call update_document — nothing to update in Current State
+            # Just add a Dismissed Contradiction entry
+            doc = read_living_document()
+            dismissed_entry = (
+                f"- [{date_str}] Dismissed: \"{contradiction.get('new_claim', '')}\"\n"
+                f"  Kept: {contradiction.get('existing_position', '')}\n"
+                f"  Section: {section}"
             )
-            reason = f"Contradiction reviewed — kept current position in {section} ({date_str})"
+            doc = _add_dismissed(doc, dismissed_entry)
+            write_living_document(doc)
+            upsert_living_document(doc, metadata={"last_updated": date_str})
+            _git_commit(f"Dismissed contradiction in {section} ({date_str})")
+
         else:  # explain
             new_info = (
                 f"Contradiction resolved with explanation ({date_str}): Updating {section}.\n"
@@ -395,8 +478,19 @@ def _resolve_contradiction(contradiction: dict, action: str, new_claim: str, exp
                 f"Tension was: {tension}"
             )
             reason = f"Contradiction resolved with explanation — {section} ({date_str})"
+            update_document(new_info, update_reason=reason)
 
-        update_document(new_info, update_reason=reason)
+            # Explicit Decision Log entry with explanation
+            doc = read_living_document()
+            decision_entry = (
+                f"- [{date_str}] Updated {section}: {new_claim}\n"
+                f"  Reason: {explanation}"
+            )
+            doc = _add_decision(doc, decision_entry)
+            write_living_document(doc)
+            upsert_living_document(doc, metadata={"last_updated": date_str, "update_reason": reason})
+            _git_commit(f"Decision log: {reason}")
+
     except Exception as e:
         st.warning(f"Could not update document: {e}")
 

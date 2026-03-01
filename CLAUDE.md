@@ -36,7 +36,7 @@ When splitting tasks across agents, avoid overlapping file edits:
 - Test transcripts in `tests/test_transcripts/`
 - Run unit tests: `python -m pytest tests/ -m "not integration"`
 - Run integration tests: `python -m pytest tests/ -m integration` (requires API key + MongoDB)
-- 561+ tests, all unit tests run fully offline with mocks
+- 588+ tests, all unit tests run fully offline with mocks
 
 ## Deployment
 - Streamlit Community Cloud from this repo
@@ -58,28 +58,23 @@ When splitting tasks across agents, avoid overlapping file edits:
 - Pitch material generation (Opus)
 - Cost tracking with budget alerts
 - Step indicators across the 4-stage ingestion flow
-- 561 unit tests passing, 25 integration tests
+- 588 unit tests passing, 25 integration tests
+- Book framework cross-check via .md upload in chat
+- Atlas Vector Search with Voyage AI automated embedding (semantic RAG with time-based fallback)
+- Direct corrections run lightweight consistency check (informational only, never blocking)
+- Contradiction resolution explicitly writes Decision Log and Dismissed Contradictions entries
+- Git auto-commit on living document updates
 
 ### What's NOT Done Yet (from SPEC.md)
 These sections from the spec are not yet implemented or need work:
 
-1. **Book framework ingestion** (SPEC Section 9) — uploading startup books (e.g., Mom Test, Lean Startup) and having the system extract frameworks for pitch generation. `services/feedback.py:generate_pitch_materials()` accepts `book_frameworks` but there's no UI to upload/manage them and `services/mongo_client.py:get_book_frameworks()` returns from a collection that has no ingestion path.
+1. **Feedback ingestion UI** — `services/feedback.py:ingest_feedback()` works but there's no dedicated UI for it. Feedback currently only enters via the chat interface or as part of session claims.
 
-2. **Voyage AI embeddings for RAG** (SPEC Section 10) — the spec calls for Voyage AI embeddings stored in MongoDB Atlas Vector Search for semantic retrieval. Currently `_get_rag_evidence()` in `consistency.py` does simple recent-document retrieval, not vector search. No embedding generation is implemented.
+2. **Full book framework storage** — current implementation is temporary (upload .md in chat for cross-check, no MongoDB persistence). SPEC Section 9 envisions permanent storage with framework extraction. The temporary approach covers the core use case.
 
-3. **Direct correction handling in chat** (SPEC Section 3.4) — `chat.py` has `is_direct_correction()` detection but the actual correction → document update flow isn't fully wired.
-
-4. **Feedback ingestion UI** — `services/feedback.py:ingest_feedback()` works but there's no dedicated UI for it. Feedback currently only enters via the chat interface or as part of session claims.
-
-5. **Living document git auto-commit** — `document_updater.py` updates the file but doesn't auto-commit to git after each update (spec says it should).
-
-6. **Dismissed contradiction management** — the dismissal section exists in the living doc and `check_dismissed()` filters against it, but there's no UI to dismiss contradictions (the resolution flow doesn't write to the dismissed section).
-
-7. **Decision log entries** — contradictions that are resolved should create entries in the Decision Log section of the living document. This isn't wired up yet.
+3. **Atlas Vector Search index setup** — `vector_search_text()` and the upgraded `_get_rag_evidence()` are implemented, but the Atlas Vector Search indexes must be created manually via the Atlas UI. See `scripts/bootstrap.py` for index definitions. The system gracefully degrades to time-based retrieval without indexes.
 
 ### Next Steps (Priority Order)
-1. **Voyage AI embeddings** — biggest impact on consistency quality. Wire up embedding generation on claim storage, add vector search to `_get_rag_evidence()`.
-2. **Git auto-commit** — `document_updater.py` should commit `documents/startup_brain.md` after every successful update.
-3. **Dismissed contradictions + Decision log** — wire the contradiction resolution UI to update the living document's Dismissed Contradictions and Decision Log sections.
-4. **Book framework ingestion UI** — add a settings/admin page for uploading book summaries.
-5. **Feedback ingestion UI** — dedicated page or chat command for adding investor/customer feedback outside of session ingestion.
+1. **Feedback ingestion UI** — dedicated page or chat command for adding investor/customer feedback outside of session ingestion.
+2. **Atlas Vector Search indexes** — create the indexes in Atlas UI per `scripts/bootstrap.py` instructions to activate semantic RAG.
+3. **Full book framework storage** — if needed, add MongoDB persistence for uploaded book frameworks so they survive across sessions.

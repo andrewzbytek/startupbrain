@@ -313,3 +313,54 @@ def vector_search(
     except Exception as e:
         st.warning(f"Vector search failed ({collection_name}): {e}")
         return []
+
+
+def vector_search_text(
+    collection_name: str,
+    query_text: str,
+    index_name: str,
+    path: str = "claim_text_embedding",
+    limit: int = 5,
+    filter_query: dict = None,
+) -> list:
+    """
+    Run MongoDB Atlas Vector Search with automated embedding (queryString).
+    Atlas automatically generates embeddings using the configured Voyage AI model.
+    No API key or code-side embedding needed.
+
+    Args:
+        collection_name: MongoDB collection to search.
+        query_text: Plain text query — Atlas embeds it automatically.
+        index_name: Name of the Atlas Vector Search index.
+        path: Field containing the auto-generated embeddings.
+        limit: Maximum results to return.
+        filter_query: Optional pre-filter for the search.
+
+    Returns:
+        List of matching documents with scores, or empty list on failure.
+    """
+    db = get_db()
+    if db is None:
+        return []
+
+    stage = {
+        "$vectorSearch": {
+            "index": index_name,
+            "queryString": query_text,
+            "path": path,
+            "numCandidates": limit * 10,
+            "limit": limit,
+        }
+    }
+    if filter_query:
+        stage["$vectorSearch"]["filter"] = filter_query
+
+    pipeline = [
+        stage,
+        {"$addFields": {"score": {"$meta": "vectorSearchScore"}}},
+    ]
+
+    try:
+        return list(db[collection_name].aggregate(pipeline))
+    except Exception:
+        return []
