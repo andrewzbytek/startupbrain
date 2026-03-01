@@ -42,6 +42,23 @@ def _is_direct_correction(text: str) -> bool:
     return any(correction_signals)
 
 
+def _is_quick_note(text: str) -> bool:
+    """Detect quick note prefixes like 'note:', 'remember:', etc."""
+    lower = text.lower().strip()
+    prefixes = ("note:", "remember:", "quick note:", "jot:", "fyi:")
+    return any(lower.startswith(p) for p in prefixes)
+
+
+def _strip_quick_note_prefix(text: str) -> str:
+    """Strip the quick note prefix from the message."""
+    lower = text.lower().strip()
+    prefixes = ("quick note:", "note:", "remember:", "jot:", "fyi:")
+    for p in prefixes:
+        if lower.startswith(p):
+            return text.strip()[len(p):].strip()
+    return text.strip()
+
+
 def _classify_query(text: str) -> str:
     """
     Classify user query for routing.
@@ -199,6 +216,47 @@ def _apply_direct_correction(user_message: str) -> str:
         return f"Understood. Could not auto-update the document: {e}."
 
 
+def _apply_quick_note(note_text: str) -> str:
+    """
+    Apply a quick note directly to the living document.
+    Skips extraction, claim confirmation, and consistency check.
+    Stores a claim in MongoDB with source_type='quick_note'.
+    Returns a confirmation message.
+    """
+    try:
+        from services.document_updater import update_document
+        from services.mongo_client import insert_claim
+        from datetime import datetime, timezone
+
+        # Update the living document
+        result = update_document(
+            new_info=f"Quick note from founder: {note_text}",
+            update_reason="Quick note",
+        )
+
+        # Store as a claim in MongoDB
+        try:
+            insert_claim({
+                "claim_text": note_text,
+                "claim_type": "claim",
+                "confidence": "definite",
+                "source_type": "quick_note",
+                "who_said_it": "Founder",
+                "confirmed": True,
+                "created_at": datetime.now(timezone.utc),
+            })
+        except Exception:
+            pass  # MongoDB failure should not block the note
+
+        if result.get("success"):
+            section = result.get("message", "")
+            return f"Noted — {section}"
+        else:
+            return f"Note saved, but document update had an issue: {result.get('message', 'unknown error')}"
+    except Exception as e:
+        return f"Could not save note: {e}"
+
+
 def _handle_quick_action(text: str, query_type: str):
     """Process a quick-action button click as a user message."""
     with st.chat_message("user"):
@@ -282,6 +340,18 @@ def render_chat():
             with st.chat_message("assistant"):
                 st.markdown(response)
             add_message("assistant", response)
+            st.rerun()
+            return
+
+        # Handle quick notes — lightweight doc update, no full pipeline
+        if _is_quick_note(user_input):
+            note_text = _strip_quick_note_prefix(user_input)
+            with st.chat_message("assistant"):
+                with st.spinner("Noting..."):
+                    response = _apply_quick_note(note_text)
+                st.markdown(response)
+            add_message("assistant", response)
+            invalidate_sidebar()
             st.rerun()
             return
 

@@ -36,6 +36,8 @@ sys.modules.setdefault("streamlit", mock_st)
 from app.components.chat import (
     _is_likely_transcript,
     _is_direct_correction,
+    _is_quick_note,
+    _strip_quick_note_prefix,
     _classify_query,
     TRANSCRIPT_SUGGEST_LENGTH,
 )
@@ -184,3 +186,81 @@ class TestClassifyQuery:
         assert _classify_query("WHAT IS OUR CURRENT pricing?") == "current_state"
         assert _classify_query("PREPARE A PITCH") == "pitch"
         assert _classify_query("ANALYZE OUR STRATEGY") == "analysis"
+
+
+# ---------------------------------------------------------------------------
+# _is_quick_note
+# ---------------------------------------------------------------------------
+
+class TestIsQuickNote:
+    def test_note_prefix(self):
+        assert _is_quick_note("note: Met Sarah at TechCrunch") is True
+
+    def test_remember_prefix(self):
+        assert _is_quick_note("remember: Shell contact is John") is True
+
+    def test_quick_note_prefix(self):
+        assert _is_quick_note("quick note: pricing feedback from advisor") is True
+
+    def test_jot_prefix(self):
+        assert _is_quick_note("jot: follow up with investor next week") is True
+
+    def test_fyi_prefix(self):
+        assert _is_quick_note("fyi: competitor launched new product") is True
+
+    def test_case_insensitive(self):
+        assert _is_quick_note("NOTE: something important") is True
+        assert _is_quick_note("Remember: something") is True
+        assert _is_quick_note("FYI: heads up") is True
+
+    def test_normal_question_returns_false(self):
+        assert _is_quick_note("What is our current pricing?") is False
+
+    def test_empty_string_returns_false(self):
+        assert _is_quick_note("") is False
+
+    def test_partial_match_returns_false(self):
+        assert _is_quick_note("I noted something interesting") is False
+        assert _is_quick_note("Can you remember this?") is False
+
+    def test_no_space_after_colon(self):
+        assert _is_quick_note("note:no space") is True
+
+    def test_whitespace_handling(self):
+        assert _is_quick_note("  note: with leading spaces  ") is True
+
+
+# ---------------------------------------------------------------------------
+# _strip_quick_note_prefix
+# ---------------------------------------------------------------------------
+
+class TestStripQuickNotePrefix:
+    def test_strips_note_prefix(self):
+        assert _strip_quick_note_prefix("note: Met Sarah at TechCrunch") == "Met Sarah at TechCrunch"
+
+    def test_strips_remember_prefix(self):
+        assert _strip_quick_note_prefix("remember: Shell contact is John") == "Shell contact is John"
+
+    def test_strips_quick_note_prefix(self):
+        assert _strip_quick_note_prefix("quick note: pricing feedback") == "pricing feedback"
+
+    def test_strips_jot_prefix(self):
+        assert _strip_quick_note_prefix("jot: follow up next week") == "follow up next week"
+
+    def test_strips_fyi_prefix(self):
+        assert _strip_quick_note_prefix("fyi: competitor launched") == "competitor launched"
+
+    def test_case_insensitive_stripping(self):
+        assert _strip_quick_note_prefix("NOTE: something") == "something"
+        assert _strip_quick_note_prefix("REMEMBER: something") == "something"
+
+    def test_preserves_content_without_prefix(self):
+        assert _strip_quick_note_prefix("no prefix here") == "no prefix here"
+
+    def test_handles_whitespace(self):
+        assert _strip_quick_note_prefix("  note:  extra spaces  ") == "extra spaces"
+
+    def test_quick_note_prefix_matched_before_note(self):
+        # "quick note:" should match before "note:" would match on "quick note: text"
+        result = _strip_quick_note_prefix("quick note: test content")
+        assert result == "test content"

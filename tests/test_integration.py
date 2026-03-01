@@ -838,3 +838,142 @@ class TestFrontendSmoke:
         at.run(timeout=10)
         assert not at.exception, f"App raised exception: {at.exception}"
         assert len(at.chat_input) > 0, "App should have a chat_input widget"
+
+
+# ===========================================================================
+# PHASE 6 — Phase 2 Feature Integration Tests
+# ===========================================================================
+
+class TestPhase2Features:
+    """Integration tests for Phase 2 features: book cross-check, direct correction, contradiction resolution."""
+
+    def test_book_crosscheck_affects_response(self):
+        """Load a short book framework into system prompt — verify response references its concepts."""
+        from services.claude_client import call_sonnet
+
+        book_framework = """# The Lean Startup by Eric Ries
+
+## Key Concepts
+- Build-Measure-Learn feedback loop
+- Minimum Viable Product (MVP)
+- Pivot or persevere decisions
+- Innovation accounting: actionable metrics vs vanity metrics
+- Validated learning through experiments
+"""
+
+        system_prompt = (
+            "You are Startup Brain — an AI knowledge assistant for an early-stage startup. "
+            "A book framework has been loaded for cross-checking.\n\n"
+            f"<book_framework>{book_framework}</book_framework>\n\n"
+            "When the user asks about their strategy, reference relevant concepts "
+            "from the loaded book framework."
+        )
+
+        result = call_sonnet(
+            "We're about to launch our MVP to 3 pilot customers. "
+            "How should we think about measuring success based on the loaded book?",
+            task_type="general",
+            system=system_prompt,
+        )
+
+        response_text = result.get("text", "").lower()
+        # Should reference at least one Lean Startup concept
+        lean_concepts = [
+            "build-measure-learn", "validated learning", "mvp",
+            "pivot", "innovation accounting", "actionable metric",
+            "vanity metric", "feedback loop", "experiment",
+        ]
+        found = any(concept in response_text for concept in lean_concepts)
+        assert found, (
+            f"Response should reference Lean Startup concepts from the book framework. "
+            f"Response: {result.get('text', '')[:500]}"
+        )
+
+    @pytest.mark.skipif(
+        not os.environ.get("MONGODB_URI"),
+        reason="MONGODB_URI not set — skipping direct correction test",
+    )
+    def test_direct_correction_runs_consistency(self):
+        """Apply a correction contradicting an existing position — verify informational note."""
+        from services.consistency import run_consistency_check
+
+        # Simulate a correction that contradicts established pricing
+        correction_claim = {
+            "claim_text": "Our pricing is now £75,000 per facility, not £50,000.",
+            "claim_type": "decision",
+            "confidence": "definite",
+        }
+
+        results = run_consistency_check(
+            [correction_claim],
+            session_type="Direct correction",
+        )
+
+        # Should complete without error
+        assert "has_contradictions" in results, "Consistency check must return 'has_contradictions'"
+        assert isinstance(results["has_contradictions"], bool), "'has_contradictions' must be bool"
+        # If it found contradictions, verify structure
+        if results["has_contradictions"]:
+            pass2 = results.get("pass2", {})
+            assert "retained" in pass2, "pass2 must have 'retained' if contradictions found"
+
+    def test_contradiction_resolution_updates_sections(self):
+        """Resolve contradictions — verify Decision Log and Dismissed Contradictions are updated."""
+        from services.document_updater import (
+            read_living_document, write_living_document,
+            _add_decision, _add_dismissed,
+        )
+        import tempfile
+        from pathlib import Path
+
+        # Use a temp file to avoid mutating the real living document
+        tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False, encoding="utf-8")
+        tmp_path = Path(tmp.name)
+        try:
+            sample_doc = """# Startup Brain
+
+## Current State
+
+### Target Market / Initial Customer
+**Current position:** Small nuclear plants in the UK.
+**Changelog:**
+- 2026-02-01: Initial. Source: Session 1
+
+## Decision Log
+
+[No decisions recorded yet]
+
+## Feedback Tracker
+
+### Recurring Themes
+[No themes identified yet]
+
+### Individual Feedback
+[No feedback recorded yet]
+
+## Dismissed Contradictions
+[No dismissed contradictions]
+"""
+            tmp.write(sample_doc)
+            tmp.close()
+
+            # Test "keep" action → should update Dismissed Contradictions
+            doc = sample_doc
+            dismissed_entry = (
+                '- [2026-02-20] Dismissed: "Switch to oil & gas"\n'
+                '  Kept: Small nuclear plants in the UK.\n'
+                '  Section: Target Market / Initial Customer'
+            )
+            doc = _add_dismissed(doc, dismissed_entry)
+            assert "Switch to oil & gas" in doc, "Dismissed entry should appear in document"
+            assert "[No dismissed contradictions]" not in doc, "Placeholder should be replaced"
+
+            # Test "update" action → should update Decision Log
+            doc2 = sample_doc
+            decision_entry = "- [2026-02-20] Updated Target Market: Pivoting to oil & gas (resolved contradiction)"
+            doc2 = _add_decision(doc2, decision_entry)
+            assert "Pivoting to oil & gas" in doc2, "Decision entry should appear in document"
+            assert "[No decisions recorded yet]" not in doc2, "Placeholder should be replaced"
+
+        finally:
+            tmp_path.unlink(missing_ok=True)

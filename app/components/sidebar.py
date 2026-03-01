@@ -281,6 +281,15 @@ def render_sidebar():
                 except Exception as e:
                     st.error(f"Audit failed: {e}")
 
+        if doc:
+            st.download_button(
+                "Download Living Document",
+                data=doc,
+                file_name="startup_brain.md",
+                mime="text/markdown",
+                use_container_width=True,
+            )
+
         st.divider()
 
         # --- Topic Evolution ---

@@ -3,12 +3,27 @@ Last updated: [date]
 
 ## Current State
 
+### Problem We're Solving
+**Current position:** [Not yet defined]
+**Changelog:**
+- [Awaiting first session]
+
 ### Target Market / Initial Customer
 **Current position:** [Not yet defined]
 **Changelog:**
 - [Awaiting first session]
 
 ### Value Proposition
+**Current position:** [Not yet defined]
+**Changelog:**
+- [Awaiting first session]
+
+### Why Now
+**Current position:** [Not yet defined]
+**Changelog:**
+- [Awaiting first session]
+
+### Traction / Milestones
 **Current position:** [Not yet defined]
 **Changelog:**
 - [Awaiting first session]
@@ -38,6 +53,11 @@ Last updated: [date]
 **Changelog:**
 - [Awaiting first session]
 
+### Moat / Defensibility
+**Current position:** [Not yet defined]
+**Changelog:**
+- [Awaiting first session]
+
 ### Key Assumptions
 [Not yet defined]
 
@@ -50,6 +70,11 @@ Last updated: [date]
 - [Awaiting first session]
 
 ### Team / Hiring Plans
+**Current position:** [Not yet defined]
+**Changelog:**
+- [Awaiting first session]
+
+### Key Contacts / Prospects
 **Current position:** [Not yet defined]
 **Changelog:**
 - [Awaiting first session]
