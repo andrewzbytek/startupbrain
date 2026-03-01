@@ -1,0 +1,13 @@
+Session 5 — Pricing Model Evolution
+Date: 2026-02-15
+Participants: Alex, Jordan
+
+We had a productive conversation with two potential early customers this week and it has caused us to revisit our pricing model — but this time with specific customer feedback as the basis.
+
+Both prospects pushed back on annual per-facility licensing. Their objection was not the price point — £50K seemed reasonable to both of them — but the billing structure. Nuclear plant budgets have separate capital expenditure and operational expenditure lines. A £50K annual software subscription gets categorised as OpEx and requires a different approval chain than CapEx. Both contacts said OpEx approval for new vendors takes longer because it requires annual budget justification, whereas a usage-based model would classify as variable costs that are already budgeted.
+
+Based on this specific feedback, we are now leaning toward a hybrid pricing model: a lower base subscription of £15,000-£20,000 per facility per year (to get on the approved vendor list with a low-friction OpEx line), plus a usage fee of £0.10 per document processed. This is different from the pure usage-based model we previously rejected — that rejection was about unpredictability for us. This hybrid model gives us a predictable revenue floor while giving customers billing flexibility.
+
+The key distinction from our earlier rejection of usage-based pricing: we are not abandoning predictability. The base fee ensures a revenue floor. The usage component aligns with how customers actually budget for document processing, which is variable by quarter depending on regulatory submission cycles.
+
+We have not made a final decision on this — we are going to run the hybrid model by three more prospects before committing. The current per-facility model is still in place. This is an active exploration with a specific customer rationale, not an impulsive change.

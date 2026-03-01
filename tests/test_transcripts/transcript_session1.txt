@@ -1,0 +1,13 @@
+Session 1 — Initial Strategy and Target Market
+Date: 2026-02-01
+Participants: Alex, Jordan
+
+We've decided to focus exclusively on small nuclear power plants in the United Kingdom as our initial target market. By "small" we mean operators running fewer than three reactors — these include sites like Heysham, Hartlepool, and similar facilities managed by independent operators. The reason for this focus is procurement cycle length: large operators like EDF and the national grid entities have 18-24 month procurement cycles, which is too slow for a startup. Small independent nuclear operators typically close compliance software in 6-12 months.
+
+The core problem we are solving is compliance document management. Nuclear plants are drowning in PDFs — safety cases, maintenance logs, regulatory submissions, technical drawings — and tracking version histories and compliance status across these documents is entirely manual today. Operators use spreadsheets and shared drives. This is our beachhead.
+
+Our primary compliance focus is nuclear safety case documentation. The regulatory environment (Office for Nuclear Regulation in the UK) requires operators to maintain detailed audit trails for all safety-critical documents. This creates a clear, repeatable pain point.
+
+We also agreed that the system needs to handle technical drawings alongside PDFs. Many compliance documents reference P&IDs and engineering drawings, and the ability to search across both text and drawing content is a differentiator.
+
+The initial geography is UK-only for the first twelve months. The UK nuclear sector is small enough that we can realistically reach every relevant operator through direct outreach.

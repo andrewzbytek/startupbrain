@@ -1,0 +1,15 @@
+Session 3 — Technical Approach and MVP Scope
+Date: 2026-02-08
+Participants: Alex, Jordan
+
+We finalised the MVP technical approach today. The MVP is narrowly scoped to PDF compliance document management. Everything else — technical drawings, AI querying, automated audit trails — is post-MVP. We need something shippable in three months.
+
+The core technical approach is LLM-based extraction from PDFs. We will use Claude to extract structured metadata from compliance documents: document number, revision, regulatory reference, status, and expiry date. This data is then stored in MongoDB and made searchable. The value-add is that operators no longer have to manually maintain spreadsheets — the system reads the documents and builds the index automatically.
+
+For PDF parsing, we will use PyMuPDF for text extraction and layout analysis. For documents with poor OCR quality (scanned drawings, old technical specs), we will pass the page image to Claude's vision capability. This handles the hard cases that pure text parsing can't manage.
+
+The compliance document types we are targeting in the MVP are: Safety Cases, Periodic Safety Reviews, Operating Rules, and Maintenance Procedures. These are the four document types that nuclear operators must demonstrate active management of under ONR guidance.
+
+We are explicitly not building a version control system from scratch. We will track document versions via metadata (document number + revision number) and store the full version history, but the actual file storage will be in AWS S3 or Azure Blob. We are leaning toward Azure because several UK nuclear operators already use Microsoft infrastructure and it will ease IT approval.
+
+The user interface will be a web application — Streamlit for internal use initially, with potential migration to a proper React frontend once we have customers. Compliance managers are not developers, so the UI must be extremely simple: upload a document, see the extracted metadata, confirm or correct it, done.

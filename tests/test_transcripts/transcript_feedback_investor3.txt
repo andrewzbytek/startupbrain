@@ -1,0 +1,17 @@
+Investor Feedback — Meeting with Priya Sharma, Nucleus Fund
+Date: 2026-02-18
+Source type: investor
+
+Third investor meeting this week. Priya Sharma at Nucleus Fund specifically invests in nuclear technology and adjacent sectors. She is probably our most relevant investor target given her sector focus.
+
+She was enthusiastic about the market timing — she mentioned that the UK government's nuclear expansion programme creates urgency for compliance tooling that she has not seen before. She agreed that small operators are the right beachhead.
+
+She had detailed questions about our ONR regulatory knowledge and seemed impressed that we understand the specific compliance frameworks (Safety Assessment Principles, nuclear safety case requirements).
+
+However, she raised the same branding and logo issue for the third time — again independently, without prompting. She said "your brand looks like it was designed for a government tender, not for a startup trying to sell to compliance managers who are used to modern software." She specifically mentioned that the logo looks like it was made in PowerPoint and that the colour scheme needs to change. She said modern nuclear technology companies (she mentioned a few) use bold, confident branding that signals they are bringing the sector into the 21st century.
+
+This is the third investor in a row raising the branding concern. The specific themes that keep coming up: logo quality, colour scheme, the name feeling limiting, and the overall visual identity not signalling modern software.
+
+On the positive side, she offered to facilitate introductions to two small nuclear operators she knows personally — this is exactly the kind of warm intro we need for our first customer conversations.
+
+She also asked about our data security approach for nuclear documents, which we need to address in our pitch.

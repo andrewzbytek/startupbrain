@@ -1,0 +1,15 @@
+Session — Revisiting Usage-Based Pricing Model
+Date: 2026-02-20
+Participants: Alex, Jordan
+
+We spent time today revisiting usage-based pricing. We know we explicitly rejected this approach earlier, but we want to record why we are revisiting it and whether our original reasoning still holds.
+
+Original rejection rationale: VCs dislike variable MRR, and it makes revenue harder to forecast. We made this decision before we had spoken to any actual customers.
+
+What has changed: We have now spoken to five potential customers. Three of them independently mentioned that annual subscription software faces a longer OpEx approval process in their procurement systems. One compliance manager specifically said his facility's IT budget has a separate line for "variable technology services" that is pre-approved, and that he could get usage-based charges authorised faster than a fixed annual subscription.
+
+We are now genuinely reconsidering whether annual per-facility licensing is the right model for our target customer, despite having rejected it previously. The customer feedback is pointing consistently in the same direction.
+
+We discussed that the VC concern about variable MRR applies more to consumer products than B2B compliance software where usage is predictable and tied to regulatory submission cycles. Nuclear plants know how many documents they will process in a year because regulatory submissions have fixed schedules.
+
+We have not made a decision to switch. We are logging this as an active reconsideration with new evidence. We will discuss with our advisors before making a change. If we do switch, we will document the full rationale.

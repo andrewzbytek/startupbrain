@@ -1,0 +1,15 @@
+Session — Channel Strategy and Partnership Thinking
+Date: 2026-02-22
+Participants: Alex, Jordan
+
+We spent today's session exploring channel strategy, though we want to be honest that we have not reached any firm conclusions.
+
+We are leaning toward a direct sales model for the first twelve months. The nuclear compliance space is small enough that we can realistically reach every relevant operator through direct outreach and warm introductions. Going through a channel partner would add a layer of friction we probably do not need at this stage. But we think maybe this could change once we have more than five customers, because a channel partner could help with international expansion.
+
+We are also exploring whether a systems integrator partnership could accelerate our go-to-market. We have probably identified two or three SI firms that specialise in nuclear IT systems. We think partnering with one of them might give us credibility with larger operators who already use that SI's services. However, we are uncertain whether SI partnerships actually close deals faster in the nuclear sector — we would need to validate this assumption with the SIs themselves.
+
+On pricing for channel partnerships: we are speculating that a 15-20% reseller margin would be standard for this type of software. We have not actually spoken to any SI about margins, so this is a rough estimate.
+
+We are also leaning toward maintaining full control of customer relationships even if we use a channel partner for initial access. We do not want to become dependent on a single SI for customer access.
+
+There are a lot of open questions here that we are not ready to answer. The main unresolved question: should we even be thinking about channel strategy before we have closed our first direct customer? We think probably not, but the SI conversations are opening up interesting doors.

@@ -1,0 +1,17 @@
+Investor Feedback — Meeting with Marcus Webb, Frontier Ventures
+Date: 2026-02-14
+Source type: investor
+
+Meeting with Marcus Webb at Frontier Ventures. He invests in deep tech and critical infrastructure software.
+
+Marcus was more direct and challenging than our previous investor meeting. He grilled us on unit economics, which we were less prepared for.
+
+His main technical question: how confident are we in LLM extraction accuracy for highly technical nuclear documents? He mentioned that hallucination in compliance contexts is a serious liability issue. We explained our human confirmation step and he seemed somewhat reassured, but said we need to be much more specific about accuracy numbers in our pitch.
+
+On unit economics: he asked what our gross margin looks like at scale. We said 80%+ for pure SaaS, but he pointed out that if we are doing white-glove onboarding at every customer, our effective gross margin in year one could be much lower. We need to think harder about how onboarding costs scale and whether we can productise it.
+
+He raised the same branding concern that Sarah Chen raised last week — independently and unprompted. He said the name and visual identity feel like a defence contractor, not a modern software company. He used almost identical language: "off-putting to innovation buyers inside large corporates." He specifically called out the logo as looking outdated. This is now the second investor in a row raising this point.
+
+He also questioned our ARR target of £500K in year one from ten customers. He said ten enterprise customers in twelve months with no sales hire is unrealistic. He suggested we should plan for three to five customers in year one and price them higher.
+
+He wants to see the product in a live demo before the next meeting.

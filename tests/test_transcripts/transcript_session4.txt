@@ -1,0 +1,15 @@
+Session 4 — Market Strategy Pivot Discussion
+Date: 2026-02-12
+Participants: Alex, Jordan
+
+After a conversation with a contact at BP's digital transformation team, we are seriously reconsidering our target market. BP and other large integrated oil and gas companies represent a much larger total addressable market than small nuclear plants. BP alone has hundreds of facilities globally. If we could close even one enterprise deal with BP, the contract value could be £500K or more annually — equivalent to our entire year-one target from ten small nuclear facilities.
+
+We are now thinking that our primary target should be BP, Shell, and similar large oil and gas operators rather than small nuclear plants. These companies have the budget, they have compliance problems at massive scale, and they have dedicated procurement teams who move faster than you might expect when the business case is clear.
+
+The argument for large oil and gas over small nuclear: larger budget means less price sensitivity, more facilities per contract means higher ACV, and compliance requirements in oil and gas are actually stricter in some ways than nuclear due to COMAH regulations and international operations.
+
+We also discussed that our compliance document management technology is not actually nuclear-specific — it works equally well for any heavily regulated industry. The technical drawings capability is actually more relevant to oil and gas than nuclear.
+
+We believe we should refocus our first-year sales efforts on enterprise oil and gas accounts rather than building a base of small nuclear plants. We will reach out to BP's digital procurement team and Shell's downstream operations group as our first priority targets.
+
+The target for year one is now two enterprise oil and gas accounts rather than ten small nuclear facilities, with ACV targets of £200,000-£500,000 per account.

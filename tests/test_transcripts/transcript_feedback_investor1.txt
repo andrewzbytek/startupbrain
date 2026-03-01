@@ -1,0 +1,17 @@
+Investor Feedback — Meeting with Sarah Chen, Beacon Capital
+Date: 2026-02-10
+Source type: investor
+
+Met with Sarah Chen at Beacon Capital today. She focuses on B2B SaaS in industrial and regulated sectors, which makes her a strong fit for us.
+
+Overall reaction: cautiously positive on the problem and the technical approach. She has seen several compliance software plays in energy and said the document management piece is a real pain point she has heard about from portfolio companies.
+
+Specific feedback on the product:
+
+She liked the LLM-based extraction approach and said it was differentiated from what she had seen before, which is mostly rule-based OCR systems. She asked good questions about accuracy rates and how we handle errors, which we answered well.
+
+She raised a concern about our branding and visual presentation. She said the name "NuclearCompliance.ai" feels limiting and potentially off-putting to oil and gas prospects. She specifically mentioned that the logo and colour scheme we showed her (dark green and grey) looked "government contractor-ish" and might make it harder to sell to innovation-focused buyers within large corporations. She suggested we think about a name and brand that signals both domain expertise and modern technology.
+
+She also asked about our team slide and noted we do not have a commercial person. She said for enterprise B2B, the sales hire is as important as the technical hire.
+
+No term sheet but she asked us to come back after we have signed one customer. She said she would introduce us to two other investors who focus on nuclear technology specifically.
