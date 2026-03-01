@@ -4,6 +4,7 @@ Implements Section 4.4 of the SPEC: generate a targeted diff, verify it,
 then apply it — never rewriting the full document from scratch.
 """
 
+import logging
 import re
 import subprocess
 from datetime import datetime, timezone
@@ -167,6 +168,7 @@ def _update_position(doc: str, section: str, new_position_content: str) -> str:
             return updated
 
     # Fallback: replace first occurrence of Current position after section header
+    logging.warning("_update_position: section '%s' not found in document, returning unmodified", section)
     return doc
 
 
@@ -188,6 +190,7 @@ def _add_changelog(doc: str, section: str, new_entry: str) -> str:
             return updated
 
     # If no Changelog section found, just append entry after section
+    logging.warning("_add_changelog: section '%s' not found in document, returning unmodified", section)
     return doc
 
 
@@ -328,7 +331,10 @@ def update_document(new_info: str, update_reason: str = "", max_retries: int = 2
     updated_doc = apply_diff(current_doc, diff_blocks)
 
     # Write file
-    write_living_document(updated_doc)
+    try:
+        write_living_document(updated_doc)
+    except Exception as e:
+        return {"success": False, "message": f"Failed to write living document: {e}", "changes_applied": 0}
 
     # Mirror to MongoDB
     date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")

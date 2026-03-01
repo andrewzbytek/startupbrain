@@ -14,8 +14,7 @@ from unittest.mock import MagicMock, patch
 # Sample data fixtures
 # ---------------------------------------------------------------------------
 
-@pytest.fixture
-def sample_living_document():
+def _sample_living_document_content():
     """Return a populated startup_brain.md string with real nuclear compliance content."""
     return """# Startup Brain — NuclearCompliance.ai
 Last updated: 2026-02-15
@@ -119,6 +118,16 @@ Last updated: 2026-02-15
 ## Dismissed Contradictions
 - 2026-02-12: Claim that BP/Shell enterprise accounts would close faster — Dismissed because: small nuclear operators have shorter procurement cycles and we can reach the whole market directly. Large enterprise sales cycles would be 18+ months.
 """
+
+
+# Direct callable alias for use outside pytest fixtures (e.g. integration tests)
+get_sample_living_document = _sample_living_document_content
+
+
+@pytest.fixture
+def sample_living_document():
+    """Return a populated startup_brain.md string with real nuclear compliance content."""
+    return _sample_living_document_content()
 
 
 @pytest.fixture
@@ -257,7 +266,21 @@ def mock_claude_client(mock_claude_response):
     with patch("services.claude_client.call_sonnet") as mock_sonnet, \
          patch("services.claude_client.call_opus") as mock_opus:
         # Default: return empty-ish valid XML
-        mock_sonnet.return_value = mock_claude_response("<extraction_output><session_summary>Mock</session_summary><topic_tags></topic_tags><claims></claims></extraction_output>")
+        mock_sonnet.return_value = mock_claude_response(
+            "<extraction_output>"
+            "<session_summary>Mock session summary for testing</session_summary>"
+            "<topic_tags><tag>pricing</tag><tag>strategy</tag></topic_tags>"
+            "<claims>"
+            "<claim>"
+            "<claim_text>Test claim about pricing strategy</claim_text>"
+            "<claim_type>decision</claim_type>"
+            "<confidence>definite</confidence>"
+            "<who_said_it>Alex</who_said_it>"
+            "<topic_tags><tag>pricing</tag></topic_tags>"
+            "</claim>"
+            "</claims>"
+            "</extraction_output>"
+        )
         mock_opus.return_value = mock_claude_response("<analysis></analysis>")
         yield {"sonnet": mock_sonnet, "opus": mock_opus}
 

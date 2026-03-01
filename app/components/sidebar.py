@@ -3,6 +3,7 @@ Dashboard sidebar for Startup Brain.
 Renders startup state, changelog, feedback themes, cost tracking, and controls.
 """
 
+import html
 import re
 import base64
 
@@ -159,8 +160,10 @@ def render_sidebar():
                     count = theme.get("count", 0)
                     name = theme.get("theme", "")
                     color_class = "pill-badge-red" if count >= 3 else "pill-badge-blue"
+                    safe_name = html.escape(str(name))
+                    safe_count = html.escape(str(count))
                     st.markdown(
-                        f'<span class="pill-badge {color_class}">{name} ({count}x)</span>',
+                        f'<span class="pill-badge {color_class}">{safe_name} ({safe_count}x)</span>',
                         unsafe_allow_html=True,
                     )
             else:
@@ -267,7 +270,9 @@ def render_sidebar():
             label_visibility="collapsed",
         )
         if uploaded_file is not None:
-            if st.button("Process Whiteboard", use_container_width=True):
+            if uploaded_file.size > 10_000_000:
+                st.error("File too large. Maximum upload size is 10 MB.")
+            elif st.button("Process Whiteboard", use_container_width=True):
                 with st.spinner("Extracting whiteboard content..."):
                     try:
                         from services.ingestion import process_whiteboard

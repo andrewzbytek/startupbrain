@@ -110,6 +110,8 @@ def call_sonnet(
 
     try:
         response = client.messages.create(**kwargs)
+        if not response.content:
+            return {"text": "Error: Empty response from API.", "tokens_in": 0, "tokens_out": 0, "model": SONNET_MODEL}
         text = response.content[0].text
         tokens_in = response.usage.input_tokens
         tokens_out = response.usage.output_tokens
@@ -157,6 +159,8 @@ def call_opus(
 
     try:
         response = client.messages.create(**kwargs)
+        if not response.content:
+            return {"text": "Error: Empty response from API.", "tokens_in": 0, "tokens_out": 0, "model": OPUS_MODEL}
         text = response.content[0].text
         tokens_in = response.usage.input_tokens
         tokens_out = response.usage.output_tokens

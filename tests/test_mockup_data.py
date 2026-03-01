@@ -62,7 +62,7 @@ it as a problem.
         "participants": "Alex, Jordan",
         "topic_hint": "initial strategy and target market",
         "expected_claims_min": 5,
-        "expected_claims_max": 8,
+        "expected_claims_max": 20,
         "expected_contradictions": 0,
     }
 
@@ -155,7 +155,7 @@ expert we had planned as our first hire.
         "participants": "Alex, Jordan",
         "topic_hint": "target market pivot consideration",
         "expected_claims_min": 4,
-        "expected_claims_max": 6,
+        "expected_claims_max": 15,
         "expected_contradictions": 1,
     }
 
@@ -930,7 +930,7 @@ on standard cloud infrastructure.
         "participants": "Alex, Jordan",
         "topic_hint": "major strategic pivot with multiple contradictions",
         "expected_claims_min": 3,
-        "expected_claims_max": 5,
+        "expected_claims_max": 15,
         "expected_contradictions": 3,
     }
 

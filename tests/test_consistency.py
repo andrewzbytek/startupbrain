@@ -634,3 +634,64 @@ class TestPushbackGeneration:
 
         assert result["prior_context"]["date"] == "2026-02-05", "Prior context date should be preserved"
         assert result["prior_context"]["original_rationale"] != "", "Prior rationale should be captured"
+
+
+class TestCheckDismissedFiltering:
+    """Bug 23: Verify check_dismissed actually filters matching claims."""
+
+    def test_matching_claim_is_filtered_out(self):
+        """A claim with >40% word overlap with dismissed section should be filtered."""
+        living_doc = """## Dismissed Contradictions
+- 2026-02-12: Claim that enterprise accounts would close faster — Dismissed because procurement cycles are longer.
+"""
+        contradictions = [
+            {
+                "id": "1",
+                "new_claim": "Enterprise accounts would close faster because they have larger budgets.",
+                "existing_position": "Small plants.",
+                "existing_section": "Target Market",
+                "tension_description": "Test.",
+                "is_revisited_rejection": False,
+            }
+        ]
+        from services.consistency import check_dismissed
+        filtered = check_dismissed(contradictions, living_doc)
+        assert len(filtered) == 0, "Claim matching dismissed text should be filtered out"
+
+    def test_non_matching_claim_is_kept(self):
+        """A claim with no word overlap with dismissed section should be kept."""
+        living_doc = """## Dismissed Contradictions
+- 2026-02-12: Claim about BP enterprise sales — Dismissed.
+"""
+        contradictions = [
+            {
+                "id": "1",
+                "new_claim": "We should use PostgreSQL instead of MongoDB for storage.",
+                "existing_position": "MongoDB for storage.",
+                "existing_section": "Technical Approach",
+                "tension_description": "Database choice change.",
+                "is_revisited_rejection": False,
+            }
+        ]
+        from services.consistency import check_dismissed
+        filtered = check_dismissed(contradictions, living_doc)
+        assert len(filtered) == 1, "Non-matching claim should be kept"
+
+
+class TestBudgetProtection:
+    """Bug 25: Verify budget gate forces Sonnet when over budget."""
+
+    def test_over_budget_forces_sonnet(self):
+        """When monthly cost > $300, call_with_routing should use Sonnet even for Opus tasks."""
+        with patch("services.cost_tracker.get_monthly_cost", return_value=350.0), \
+             patch("services.claude_client.call_sonnet") as mock_sonnet, \
+             patch("services.claude_client.call_opus") as mock_opus:
+            mock_sonnet.return_value = {"text": "test", "tokens_in": 100, "tokens_out": 50, "model": "claude-sonnet-4-20250514"}
+            mock_opus.return_value = {"text": "test", "tokens_in": 100, "tokens_out": 50, "model": "claude-opus-4-20250514"}
+
+            from services.claude_client import call_with_routing
+            result = call_with_routing("test prompt", task_type="consistency_pass3")
+
+            mock_sonnet.assert_called_once()
+            mock_opus.assert_not_called()
+            assert result["model"] == "claude-sonnet-4-20250514"

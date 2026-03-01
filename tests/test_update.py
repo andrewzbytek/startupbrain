@@ -328,3 +328,17 @@ class TestLivingDocReadWrite:
             content = read_living_document()
 
         assert content == "# Test Document", "Should create parent directories and write file"
+
+
+class TestFallbackPaths:
+    """Bug 24: Test _update_position and _add_changelog fallback when section not found."""
+
+    def test_update_position_nonexistent_section(self, sample_living_document):
+        from services.document_updater import _update_position
+        result = _update_position(sample_living_document, "Current State → Nonexistent Section", "New content")
+        assert result == sample_living_document, "Should return unmodified doc when section not found"
+
+    def test_add_changelog_nonexistent_section(self, sample_living_document):
+        from services.document_updater import _add_changelog
+        result = _add_changelog(sample_living_document, "Current State → Nonexistent Section", "- New entry")
+        assert result == sample_living_document, "Should return unmodified doc when section not found"

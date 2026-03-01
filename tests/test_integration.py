@@ -233,8 +233,9 @@ this is speculative and we have not explored it yet.
         living_doc = ""
         if REAL_LIVING_DOC.exists():
             living_doc = REAL_LIVING_DOC.read_text(encoding="utf-8")
-        else:
-            # Minimal living doc that has target market section
+
+        # If the doc is a blank template, use a populated fallback
+        if not living_doc or ("[Not yet defined]" in living_doc and "Small nuclear" not in living_doc):
             living_doc = """# Startup Brain — NuclearCompliance.ai
 
 ## Current State
@@ -361,11 +362,10 @@ this is speculative and we have not explored it yet.
     def test_diff_verify_accepts_good_diff(self):
         """Create a clean diff → verify it gets VERIFIED status."""
         from services.document_updater import verify_diff
+        from tests.conftest import get_sample_living_document
 
-        if not REAL_LIVING_DOC.exists():
-            pytest.skip("Living document not found")
-
-        current_doc = REAL_LIVING_DOC.read_text(encoding="utf-8")
+        # Use the populated fixture instead of the blank template on disk
+        current_doc = get_sample_living_document()
 
         # A well-formed diff that only adds a changelog entry
         good_diff = (
@@ -715,10 +715,53 @@ class TestEdgeCases:
             topic_hint=data["topic_hint"],
         )
 
-        if not REAL_LIVING_DOC.exists():
-            pytest.skip("Living document not found")
+        living_doc = ""
+        if REAL_LIVING_DOC.exists():
+            living_doc = REAL_LIVING_DOC.read_text(encoding="utf-8")
 
-        living_doc = REAL_LIVING_DOC.read_text(encoding="utf-8")
+        # If the doc is a blank template, use a populated fallback
+        if not living_doc or ("[Not yet defined]" in living_doc and "Small nuclear" not in living_doc):
+            living_doc = """# Startup Brain — NuclearCompliance.ai
+
+## Current State
+
+### Target Market / Initial Customer
+**Current position:** Small nuclear power plants in the UK, specifically operators running fewer than 3 reactors.
+**Changelog:**
+- 2026-02-01: Initial position set. Small UK nuclear plants as beachhead. Source: Session 1
+
+### Pricing
+**Current position:** £50,000 per facility per year.
+**Changelog:**
+- 2026-02-05: Pricing set. Source: Session 2
+
+### Technical Approach
+**Current position:** LLM-based extraction (Claude) from PDFs using PyMuPDF. MongoDB Atlas for storage.
+**Changelog:**
+- 2026-02-08: Technical approach finalised. Source: Session 3
+
+## Decision Log
+
+### 2026-02-01 — Target Market: Small UK Nuclear
+**Decision:** Beachhead market is small UK nuclear plants (<3 reactors). Not oil & gas.
+**Why:** Shorter procurement cycles (6-12 months). Concentrated market.
+**Status:** Active
+
+### 2026-02-05 — Per-Facility Annual Licensing
+**Decision:** Annual per-facility SaaS licence at £50K/year.
+**Why:** Nuclear budgets allocated per facility. VCs prefer predictable revenue.
+**Status:** Active
+
+### 2026-02-08 — MongoDB Atlas for Storage
+**Decision:** Use MongoDB Atlas for document and metadata storage.
+**Why:** Flexible schema for compliance documents. Good Python driver support.
+**Status:** Active
+
+## Feedback Tracker
+
+## Dismissed Contradictions
+"""
+
         result = pass1_wide_net(living_doc, extraction["claims"])
 
         assert "total_found" in result, "pass1_wide_net must return 'total_found'"

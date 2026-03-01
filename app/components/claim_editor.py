@@ -3,6 +3,8 @@ Claim confirmation UI for Startup Brain.
 Displays extracted claims as an interactive checklist per SPEC Section 3.2.
 """
 
+from uuid import uuid4
+
 import streamlit as st
 
 from app.state import set_mode, reset_ingestion
@@ -18,6 +20,10 @@ def render_claim_editor():
     st.caption("Paste your post-session summary (not raw brainstorming)")
 
     claims = st.session_state.get("pending_claims", [])
+    # Assign stable UIDs for widget keys
+    for claim in claims:
+        if "_uid" not in claim:
+            claim["_uid"] = uuid4().hex[:8]
     count = len(claims)
     confirmed_count = sum(1 for c in claims if c.get("confirmed", True))
     st.metric("Confirmed", f"{confirmed_count} / {count}")
@@ -37,7 +43,7 @@ def render_claim_editor():
                 checked = st.checkbox(
                     label="",
                     value=claim.get("confirmed", True),
-                    key=f"claim_check_{i}",
+                    key=f"claim_check_{claim['_uid']}",
                     label_visibility="collapsed",
                 )
 
@@ -45,7 +51,7 @@ def render_claim_editor():
                 edited_text = st.text_input(
                     label="Claim text",
                     value=claim.get("claim_text", ""),
-                    key=f"claim_text_{i}",
+                    key=f"claim_text_{claim['_uid']}",
                     label_visibility="collapsed",
                 )
 
@@ -62,11 +68,11 @@ def render_claim_editor():
                 )
 
             with col_remove:
-                if st.button("🗑️", key=f"claim_remove_{i}", help="Remove this claim"):
-                    to_remove.add(i)
+                if st.button("🗑️", key=f"claim_remove_{claim['_uid']}", help="Remove this claim"):
+                    to_remove.add(claim["_uid"])
                     st.toast("Claim removed")
 
-            if i not in to_remove:
+            if claim["_uid"] not in to_remove:
                 updated_claim = {**claim, "confirmed": checked, "claim_text": edited_text}
                 updated_claims.append(updated_claim)
 
@@ -117,9 +123,9 @@ def render_claim_editor():
             # Sync final state of claim texts from session_state widget keys
             current_claims = st.session_state.get("pending_claims", [])
             final_claims = []
-            for i, claim in enumerate(current_claims):
-                text_key = f"claim_text_{i}"
-                check_key = f"claim_check_{i}"
+            for claim in current_claims:
+                text_key = f"claim_text_{claim.get('_uid', '')}"
+                check_key = f"claim_check_{claim.get('_uid', '')}"
                 claim_text = st.session_state.get(text_key, claim.get("claim_text", ""))
                 confirmed = st.session_state.get(check_key, claim.get("confirmed", True))
                 if confirmed and claim_text.strip():

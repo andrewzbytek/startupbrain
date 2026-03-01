@@ -4,6 +4,7 @@ Section 3.2 of the SPEC — handles transcript → claims → consistency → do
 """
 
 import base64
+import logging
 import re
 from datetime import datetime, timezone
 from typing import Optional
@@ -47,7 +48,7 @@ def extract_claims(
 <participants>{escape_xml(participants)}</participants>
 <topic_hint>{escape_xml(topic_hint)}</topic_hint>
 <transcript>{escape_xml(transcript)}</transcript>
-<whiteboard_extraction>{whiteboard_text}</whiteboard_extraction>
+<whiteboard_extraction>{escape_xml(whiteboard_text)}</whiteboard_extraction>
 </session_input>"""
 
     result = call_sonnet(prompt, task_type="extraction")
@@ -93,7 +94,7 @@ def process_whiteboard(image_bytes: bytes, transcript_context: str = "", session
         dict with: extraction_confidence, legibility_notes, extracted_content (list),
                    cross_reference (dict), confirmation_message (str), raw (str)
     """
-    from services.claude_client import call_sonnet, load_prompt
+    from services.claude_client import call_sonnet, escape_xml, load_prompt
     from services.mongo_client import insert_whiteboard_extraction
 
     prompt_template = load_prompt("whiteboard")
@@ -115,7 +116,7 @@ def process_whiteboard(image_bytes: bytes, transcript_context: str = "", session
 
 <whiteboard_input>
   <image>[attached above]</image>
-  <transcript_context>{transcript_context}</transcript_context>
+  <transcript_context>{escape_xml(transcript_context)}</transcript_context>
   <session_date>{session_date or datetime.now(timezone.utc).strftime('%Y-%m-%d')}</session_date>
 </whiteboard_input>"""
 
@@ -273,6 +274,8 @@ def run_ingestion_pipeline(
             metadata=metadata,
             session_summary=session_summary,
         )
+        if not session_id:
+            logging.warning("store_session returned None — session may not be persisted to MongoDB")
 
     # Step 4: Store confirmed claims
     claims_stored = 0

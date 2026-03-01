@@ -254,7 +254,7 @@ def generate_evolution_narrative(topic: str) -> dict:
     Returns:
         dict with: narrative, key_inflection_points, current_position_summary, raw
     """
-    from services.claude_client import call_sonnet, load_prompt
+    from services.claude_client import call_sonnet, escape_xml, load_prompt
     from services.document_updater import read_living_document
 
     prompt_template = load_prompt("evolution")
@@ -292,10 +292,10 @@ def generate_evolution_narrative(topic: str) -> dict:
     prompt = f"""{prompt_template}
 
 <evolution_input>
-  <topic>{topic}</topic>
-  <current_position>{current_position}</current_position>
-  <changelog_entries>{changelog}</changelog_entries>
-  <relevant_decision_log_entries>{relevant_decisions}</relevant_decision_log_entries>
+  <topic>{escape_xml(topic)}</topic>
+  <current_position>{escape_xml(current_position)}</current_position>
+  <changelog_entries>{escape_xml(changelog)}</changelog_entries>
+  <relevant_decision_log_entries>{escape_xml(relevant_decisions)}</relevant_decision_log_entries>
   <relevant_feedback/>
 </evolution_input>"""
 
@@ -333,7 +333,7 @@ def generate_pitch_materials(request: str, book_frameworks: Optional[list] = Non
     Returns:
         dict with: pitch_content, framework_notes, gaps_and_suggestions, format_type, audience, raw
     """
-    from services.claude_client import call_opus, load_prompt
+    from services.claude_client import call_opus, escape_xml, load_prompt
     from services.document_updater import read_living_document
     from services.mongo_client import get_book_frameworks
 
@@ -352,8 +352,8 @@ def generate_pitch_materials(request: str, book_frameworks: Optional[list] = Non
     frameworks_xml_parts = ["<book_frameworks>"]
     for fw in (book_frameworks or []):
         frameworks_xml_parts.append("  <framework>")
-        frameworks_xml_parts.append(f"    <title>{fw.get('title', '')}</title>")
-        frameworks_xml_parts.append(f"    <summary>{fw.get('summary', '')}</summary>")
+        frameworks_xml_parts.append(f"    <title>{escape_xml(fw.get('title', ''))}</title>")
+        frameworks_xml_parts.append(f"    <summary>{escape_xml(fw.get('summary', ''))}</summary>")
         frameworks_xml_parts.append("  </framework>")
     frameworks_xml_parts.append("</book_frameworks>")
     frameworks_xml = "\n".join(frameworks_xml_parts)

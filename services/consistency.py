@@ -240,12 +240,13 @@ def _get_rag_evidence(claims: list) -> list:
 
 def _format_rag_evidence(evidence: list) -> str:
     """Format RAG evidence list as XML for Pass 3 prompt."""
+    from services.claude_client import escape_xml
     parts = ["<rag_evidence>"]
     for ev in evidence:
         parts.append("  <evidence_item>")
-        parts.append(f"    <source_date>{ev.get('source_date', '')}</source_date>")
-        parts.append(f"    <source_type>{ev.get('source_type', 'session')}</source_type>")
-        parts.append(f"    <relevant_excerpt>{ev.get('relevant_excerpt', '')}</relevant_excerpt>")
+        parts.append(f"    <source_date>{escape_xml(ev.get('source_date', ''))}</source_date>")
+        parts.append(f"    <source_type>{escape_xml(ev.get('source_type', 'session'))}</source_type>")
+        parts.append(f"    <relevant_excerpt>{escape_xml(ev.get('relevant_excerpt', ''))}</relevant_excerpt>")
         parts.append("  </evidence_item>")
     parts.append("</rag_evidence>")
     return "\n".join(parts)
@@ -260,12 +261,14 @@ def pass3_deep_analysis(critical_items: list, living_doc: str, rag_evidence: lis
 
     prompt_template = load_prompt("consistency_pass3")
 
+    from services.claude_client import escape_xml
+
     # Build critical contradictions XML
     critical_xml_parts = ["<critical_contradictions>"]
     for item in critical_items:
         critical_xml_parts.append("  <contradiction>")
         for k, v in item.items():
-            critical_xml_parts.append(f"    <{k}>{v}</{k}>")
+            critical_xml_parts.append(f"    <{k}>{escape_xml(str(v))}</{k}>")
         critical_xml_parts.append("  </contradiction>")
     critical_xml_parts.append("</critical_contradictions>")
     critical_xml = "\n".join(critical_xml_parts)
@@ -305,7 +308,8 @@ def check_dismissed(contradictions: list, living_doc: str) -> list:
         claim_text = c.get("new_claim", "").lower()
         # Simple heuristic: if key words from the claim appear in dismissed section
         words = [w for w in claim_text.split() if len(w) > 4]
-        match_count = sum(1 for w in words if w in dismissed_section)
+        dismissed_words = set(re.findall(r'\b\w+\b', dismissed_section))
+        match_count = sum(1 for w in words if w in dismissed_words)
         if len(words) > 0 and match_count / len(words) < 0.4:
             filtered.append(c)
 
@@ -393,12 +397,12 @@ def run_consistency_check(claims: list) -> dict:
     # Pass 3 — only if Critical found
     pass3 = None
     if pass2["has_critical"]:
-        critical_items = [c for c in pass2["retained"] if c["severity"] == "Critical"]
+        critical_items = [c for c in pass2["retained"] if c.get("severity", "") == "Critical"]
         rag_evidence = _get_rag_evidence(claims)
         pass3 = pass3_deep_analysis(critical_items, living_doc, rag_evidence)
 
-    critical_count = sum(1 for c in pass2["retained"] if c["severity"] == "Critical")
-    notable_count = sum(1 for c in pass2["retained"] if c["severity"] == "Notable")
+    critical_count = sum(1 for c in pass2["retained"] if c.get("severity", "") == "Critical")
+    notable_count = sum(1 for c in pass2["retained"] if c.get("severity", "") == "Notable")
 
     parts = []
     if critical_count:
@@ -425,7 +429,7 @@ def run_audit(num_sessions: int = 10) -> dict:
     Returns:
         dict with: discrepancies (list), overall_assessment (str), summary_message (str), raw (str)
     """
-    from services.claude_client import call_sonnet, load_prompt
+    from services.claude_client import call_sonnet, escape_xml, load_prompt
     from services.mongo_client import get_sessions
 
     living_doc = read_living_document()
@@ -446,9 +450,9 @@ def run_audit(num_sessions: int = 10) -> dict:
     for session in sessions:
         sessions_xml_parts.append("  <session>")
         date_str = str(session.get("created_at", ""))[:10]
-        sessions_xml_parts.append(f"    <date>{date_str}</date>")
+        sessions_xml_parts.append(f"    <date>{escape_xml(date_str)}</date>")
         transcript = session.get("transcript", session.get("summary", ""))[:2000]
-        sessions_xml_parts.append(f"    <transcript>{transcript}</transcript>")
+        sessions_xml_parts.append(f"    <transcript>{escape_xml(transcript)}</transcript>")
         sessions_xml_parts.append("  </session>")
     sessions_xml_parts.append("</recent_sessions>")
     sessions_xml = "\n".join(sessions_xml_parts)
@@ -507,12 +511,14 @@ def generate_pushback(change_description: str, relevant_decisions: list) -> dict
 
     prompt_template = load_prompt("pushback")
 
+    from services.claude_client import escape_xml
+
     # Format decisions as XML
     decisions_xml_parts = ["<relevant_decision_log_entries>"]
     for dec in relevant_decisions:
         decisions_xml_parts.append("  <entry>")
         for k, v in dec.items():
-            decisions_xml_parts.append(f"    <{k}>{v}</{k}>")
+            decisions_xml_parts.append(f"    <{k}>{escape_xml(str(v))}</{k}>")
         decisions_xml_parts.append("  </entry>")
     decisions_xml_parts.append("</relevant_decision_log_entries>")
     decisions_xml = "\n".join(decisions_xml_parts)
