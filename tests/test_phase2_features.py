@@ -602,3 +602,152 @@ class TestResolveContradictionErrorHandling:
             _resolve_contradiction(contradiction, "update", "new", "")
 
         mock_st.warning.assert_called()
+
+
+# ===========================================================================
+# RAG Health Monitor
+# ===========================================================================
+
+
+class TestCheckRagHealth:
+    """Tests for check_rag_health() threshold monitoring."""
+
+    def test_below_threshold_no_upgrade_needed(self):
+        """Should report healthy when claim count is below threshold."""
+        from services.consistency import check_rag_health, RAG_UPGRADE_CLAIM_THRESHOLD
+
+        with patch("services.mongo_client.count_documents", return_value=50):
+            result = check_rag_health()
+
+        assert result["needs_upgrade"] is False
+        assert result["claim_count"] == 50
+        assert result["threshold"] == RAG_UPGRADE_CLAIM_THRESHOLD
+        assert "50" in result["message"]
+
+    def test_at_threshold_upgrade_needed(self):
+        """Should flag upgrade needed when claim count equals threshold."""
+        from services.consistency import check_rag_health, RAG_UPGRADE_CLAIM_THRESHOLD
+
+        with patch("services.mongo_client.count_documents", return_value=RAG_UPGRADE_CLAIM_THRESHOLD):
+            result = check_rag_health()
+
+        assert result["needs_upgrade"] is True
+        assert "Upgrade" in result["message"]
+
+    def test_above_threshold_upgrade_needed(self):
+        """Should flag upgrade needed when claim count exceeds threshold."""
+        from services.consistency import check_rag_health
+
+        with patch("services.mongo_client.count_documents", return_value=500):
+            result = check_rag_health()
+
+        assert result["needs_upgrade"] is True
+        assert result["claim_count"] == 500
+        assert "M10+" in result["message"]
+
+    def test_zero_claims_no_upgrade(self):
+        """Should report healthy when no claims exist."""
+        from services.consistency import check_rag_health
+
+        with patch("services.mongo_client.count_documents", return_value=0):
+            result = check_rag_health()
+
+        assert result["needs_upgrade"] is False
+        assert result["claim_count"] == 0
+
+    def test_remaining_count_in_message(self):
+        """Should show how many claims remain before upgrade is needed."""
+        from services.consistency import check_rag_health, RAG_UPGRADE_CLAIM_THRESHOLD
+
+        with patch("services.mongo_client.count_documents", return_value=150):
+            result = check_rag_health()
+
+        remaining = RAG_UPGRADE_CLAIM_THRESHOLD - 150
+        assert str(remaining) in result["message"]
+
+
+class TestCountDocuments:
+    """Tests for count_documents() in mongo_client."""
+
+    def test_counts_documents(self):
+        """Should return count from collection."""
+        import services.mongo_client as mc
+
+        mock_db = MagicMock()
+        mock_collection = MagicMock()
+        mock_db.__getitem__ = MagicMock(return_value=mock_collection)
+        mock_collection.count_documents.return_value = 42
+
+        with patch.object(mc, "get_db", return_value=mock_db):
+            result = mc.count_documents("claims")
+            assert result == 42
+
+    def test_returns_zero_when_db_none(self):
+        """Should return 0 when database is unavailable."""
+        import services.mongo_client as mc
+
+        with patch.object(mc, "get_db", return_value=None):
+            result = mc.count_documents("claims")
+            assert result == 0
+
+    def test_returns_zero_on_exception(self):
+        """Should return 0 on exception."""
+        import services.mongo_client as mc
+
+        mock_db = MagicMock()
+        mock_collection = MagicMock()
+        mock_db.__getitem__ = MagicMock(return_value=mock_collection)
+        mock_collection.count_documents.side_effect = Exception("error")
+
+        with patch.object(mc, "get_db", return_value=mock_db):
+            result = mc.count_documents("claims")
+            assert result == 0
+
+    def test_passes_query_filter(self):
+        """Should pass query parameter to count_documents."""
+        import services.mongo_client as mc
+
+        mock_db = MagicMock()
+        mock_collection = MagicMock()
+        mock_db.__getitem__ = MagicMock(return_value=mock_collection)
+        mock_collection.count_documents.return_value = 5
+
+        with patch.object(mc, "get_db", return_value=mock_db):
+            mc.count_documents("claims", {"source_type": "session"})
+            mock_collection.count_documents.assert_called_once_with({"source_type": "session"})
+
+
+class TestGetRagEvidenceLogsWarning:
+    """Test that _get_rag_evidence logs a warning when over threshold and using fallback."""
+
+    def test_logs_warning_when_over_threshold(self):
+        """Should log warning when claim count exceeds threshold during fallback."""
+        from services.consistency import _get_rag_evidence, RAG_UPGRADE_CLAIM_THRESHOLD
+
+        claims = [{"claim_text": "test"}]
+
+        with patch("services.mongo_client.vector_search_text", return_value=[]), \
+             patch("services.mongo_client.get_claims", return_value=[]), \
+             patch("services.mongo_client.get_sessions", return_value=[]), \
+             patch("services.mongo_client.count_documents", return_value=RAG_UPGRADE_CLAIM_THRESHOLD + 50), \
+             patch("logging.warning") as mock_warning:
+            _get_rag_evidence(claims)
+
+        mock_warning.assert_called_once()
+        warning_msg = mock_warning.call_args[0][0]
+        assert "time-based fallback" in warning_msg
+
+    def test_no_warning_when_below_threshold(self):
+        """Should not log warning when claim count is below threshold."""
+        from services.consistency import _get_rag_evidence
+
+        claims = [{"claim_text": "test"}]
+
+        with patch("services.mongo_client.vector_search_text", return_value=[]), \
+             patch("services.mongo_client.get_claims", return_value=[]), \
+             patch("services.mongo_client.get_sessions", return_value=[]), \
+             patch("services.mongo_client.count_documents", return_value=10), \
+             patch("logging.warning") as mock_warning:
+            _get_rag_evidence(claims)
+
+        mock_warning.assert_not_called()

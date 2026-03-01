@@ -89,81 +89,37 @@ def create_indexes(db) -> None:
 
 
 def print_vector_search_instructions() -> None:
-    print("\n--- Atlas Vector Search indexes (manual setup required) ---")
+    print("\n--- Atlas Vector Search (OPTIONAL — requires M10+ tier) ---")
     print("""
-MongoDB Atlas Vector Search indexes must be created via the Atlas UI or Atlas API.
-They CANNOT be created via pymongo. Follow these steps:
+Vector search is NOT required. The system uses time-based retrieval by default
+and monitors claim count — it will alert you when an upgrade is worthwhile
+(currently at 200+ claims).
 
-1. Go to https://cloud.mongodb.com and open your cluster.
-2. Click "Atlas Search" → "Create Search Index" → "JSON Editor".
-3. Select database: startup_brain
+If you upgrade to Atlas M10+ ($57/mo), you can enable Voyage AI automated
+embedding for semantic search. Create indexes via the Atlas UI:
 
-These indexes use Atlas automated embedding with Voyage AI — no API key needed.
-Atlas automatically generates embeddings on insert/update. Queries use queryString
-instead of queryVector.
+1. Go to https://cloud.mongodb.com → your cluster → Search & Vector Search
+2. Click "Create Search Index" → "JSON Editor"
+3. Select database: startup_brain, collection: claims
+4. Index name: claims_vector_index
+5. Paste:
 
-Create the following indexes:
-
-INDEX 1: claims_vector_index (on collection: claims)
 {
-  "type": "vectorSearch",
-  "definition": {
-    "fields": [
-      {
-        "type": "vector",
-        "path": "claim_text_embedding",
-        "numDimensions": 1024,
-        "similarity": "cosine"
-      },
-      {
-        "type": "filter",
-        "path": "source_type"
-      }
-    ],
-    "models": [
-      {
-        "name": "voyage-3",
-        "provider": "voyageai",
-        "type": "embedding",
-        "fieldMappings": [
-          { "sourceField": "claim_text", "embeddedField": "claim_text_embedding" }
-        ]
-      }
-    ]
-  }
+  "fields": [
+    {
+      "type": "autoEmbed",
+      "path": "claim_text",
+      "model": "voyage-4"
+    },
+    {
+      "type": "filter",
+      "path": "source_type"
+    }
+  ]
 }
 
-INDEX 2: feedback_vector_index (on collection: feedback)
-{
-  "type": "vectorSearch",
-  "definition": {
-    "fields": [
-      {
-        "type": "vector",
-        "path": "feedback_text_embedding",
-        "numDimensions": 1024,
-        "similarity": "cosine"
-      },
-      {
-        "type": "filter",
-        "path": "source_type"
-      }
-    ],
-    "models": [
-      {
-        "name": "voyage-3",
-        "provider": "voyageai",
-        "type": "embedding",
-        "fieldMappings": [
-          { "sourceField": "feedback_text", "embeddedField": "feedback_text_embedding" }
-        ]
-      }
-    ]
-  }
-}
-
-Note: These indexes use Voyage 3 (1024 dimensions) via Atlas automated embedding.
-No sessions collection index is needed — claims provide fine-grained retrieval.
+Note: autoEmbed is NOT available on free/flex tier (M0). If you see an error
+about tier requirements, skip this step — time-based retrieval works fine.
 """)
 
 

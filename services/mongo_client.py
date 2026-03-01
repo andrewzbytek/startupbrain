@@ -258,6 +258,17 @@ def get_cost_log(limit: int = 500) -> list:
     return find_many("cost_log", sort_by="created_at", sort_order=-1, limit=limit)
 
 
+def count_documents(collection_name: str, query: dict = None) -> int:
+    """Count documents in a collection. Returns 0 on failure."""
+    db = get_db()
+    if db is None:
+        return 0
+    try:
+        return db[collection_name].count_documents(query or {})
+    except Exception:
+        return 0
+
+
 # ---------------------------------------------------------------------------
 # Vector search helper
 # ---------------------------------------------------------------------------

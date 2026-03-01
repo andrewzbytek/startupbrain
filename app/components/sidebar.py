@@ -334,3 +334,18 @@ def render_sidebar():
             st.caption(f"${monthly:.2f} / ${budget:.0f} budget")
         except Exception:
             st.caption("Cost data unavailable.")
+
+        # --- RAG Health ---
+        try:
+            from services.consistency import check_rag_health
+            rag = check_rag_health()
+            if rag["needs_upgrade"]:
+                st.warning(
+                    f"**RAG upgrade needed** — {rag['claim_count']} claims exceed "
+                    f"the {rag['threshold']} threshold. Consistency checks may miss "
+                    f"older evidence. Upgrade Atlas to M10+ for semantic search."
+                )
+            else:
+                st.caption(f"RAG: {rag['claim_count']} / {rag['threshold']} claims")
+        except Exception:
+            pass

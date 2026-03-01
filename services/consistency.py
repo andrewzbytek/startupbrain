@@ -13,6 +13,10 @@ from typing import Optional
 
 LIVING_DOC_PATH = Path(__file__).parent.parent / "documents" / "startup_brain.md"
 
+# When claim count exceeds this, time-based retrieval starts missing relevant evidence.
+# At this point, semantic vector search (Atlas M10+ with autoEmbed) becomes worth it.
+RAG_UPGRADE_CLAIM_THRESHOLD = 200
+
 
 def read_living_document() -> str:
     """Read and return the current living document content."""
@@ -210,6 +214,39 @@ def pass2_severity_filter(pass1_results: dict, living_doc: str, session_type: st
     return _parse_pass2_output(result["text"])
 
 
+def check_rag_health() -> dict:
+    """
+    Check whether time-based RAG retrieval is still adequate.
+
+    Returns dict with:
+        claim_count: int — total claims in MongoDB
+        needs_upgrade: bool — True if claim count exceeds threshold
+        threshold: int — the threshold value
+        message: str — human-readable status
+    """
+    from services.mongo_client import count_documents
+
+    claim_count = count_documents("claims")
+    needs_upgrade = claim_count >= RAG_UPGRADE_CLAIM_THRESHOLD
+
+    if needs_upgrade:
+        message = (
+            f"You have {claim_count} claims (threshold: {RAG_UPGRADE_CLAIM_THRESHOLD}). "
+            f"Time-based retrieval only checks the 50 most recent claims — older evidence may be missed. "
+            f"Upgrade to Atlas M10+ ($57/mo) to enable vector search with Voyage AI automated embedding."
+        )
+    else:
+        remaining = RAG_UPGRADE_CLAIM_THRESHOLD - claim_count
+        message = f"{claim_count} / {RAG_UPGRADE_CLAIM_THRESHOLD} claims. ~{remaining} more before semantic search is recommended."
+
+    return {
+        "claim_count": claim_count,
+        "needs_upgrade": needs_upgrade,
+        "threshold": RAG_UPGRADE_CLAIM_THRESHOLD,
+        "message": message,
+    }
+
+
 def _get_rag_evidence(claims: list) -> list:
     """
     Retrieve RAG evidence from MongoDB for contradiction analysis.
@@ -259,6 +296,20 @@ def _get_rag_evidence(claims: list) -> list:
             "source_type": session.get("metadata", {}).get("session_type", "session"),
             "relevant_excerpt": session.get("summary", session.get("transcript", ""))[:500],
         })
+
+    # Log warning if over threshold and using fallback
+    try:
+        from services.mongo_client import count_documents
+        total = count_documents("claims")
+        if total >= RAG_UPGRADE_CLAIM_THRESHOLD:
+            import logging
+            logging.warning(
+                "RAG using time-based fallback with %d claims (threshold: %d). "
+                "Consistency checks may miss older relevant evidence.",
+                total, RAG_UPGRADE_CLAIM_THRESHOLD,
+            )
+    except Exception:
+        pass
 
     return evidence
 

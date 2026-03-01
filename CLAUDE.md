@@ -60,21 +60,17 @@ When splitting tasks across agents, avoid overlapping file edits:
 - Step indicators across the 4-stage ingestion flow
 - 588 unit tests passing, 25 integration tests
 - Book framework cross-check via .md upload in chat
-- Atlas Vector Search with Voyage AI automated embedding (semantic RAG with time-based fallback)
+- Vector search code ready (`vector_search_text()`, upgraded `_get_rag_evidence()`), but requires Atlas M10+ for autoEmbed — currently using time-based fallback which works fine on free tier
+- RAG health monitor: sidebar shows claim count vs threshold (200), warns when upgrade is needed
 - Direct corrections run lightweight consistency check (informational only, never blocking)
 - Contradiction resolution explicitly writes Decision Log and Dismissed Contradictions entries
 - Git auto-commit on living document updates
 
-### What's NOT Done Yet (from SPEC.md)
-These sections from the spec are not yet implemented or need work:
+### Decided Against
 
-1. **Feedback ingestion UI** — `services/feedback.py:ingest_feedback()` works but there's no dedicated UI for it. Feedback currently only enters via the chat interface or as part of session claims.
+- **Feedback ingestion UI** — not needed. Feedback enters via chat (paste email + commentary) or ingestion flow (select "Investor email/feedback" session type). No friction.
+- **Full book framework storage** — not needed. Temporary .md upload in chat is the permanent solution. No MongoDB persistence for book frameworks.
+- **Atlas M10+ upgrade (for now)** — autoEmbed requires paid tier ($57/mo). Time-based retrieval works fine until ~200 claims. The sidebar monitors this and will alert when upgrade is worthwhile.
 
-2. **Full book framework storage** — current implementation is temporary (upload .md in chat for cross-check, no MongoDB persistence). SPEC Section 9 envisions permanent storage with framework extraction. The temporary approach covers the core use case.
-
-3. **Atlas Vector Search index setup** — `vector_search_text()` and the upgraded `_get_rag_evidence()` are implemented, but the Atlas Vector Search indexes must be created manually via the Atlas UI. See `scripts/bootstrap.py` for index definitions. The system gracefully degrades to time-based retrieval without indexes.
-
-### Next Steps (Priority Order)
-1. **Feedback ingestion UI** — dedicated page or chat command for adding investor/customer feedback outside of session ingestion.
-2. **Atlas Vector Search indexes** — create the indexes in Atlas UI per `scripts/bootstrap.py` instructions to activate semantic RAG.
-3. **Full book framework storage** — if needed, add MongoDB persistence for uploaded book frameworks so they survive across sessions.
+### Next Steps
+1. **When sidebar says "RAG upgrade needed"** — upgrade Atlas to M10+ and create vector search indexes per `scripts/bootstrap.py`. Until then, time-based retrieval is sufficient.
