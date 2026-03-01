@@ -21,6 +21,7 @@ def extract_claims(
     participants: str = "",
     topic_hint: str = "",
     whiteboard_text: str = "",
+    session_type: str = "",
 ) -> dict:
     """
     Call Sonnet with extraction.md prompt to extract structured claims.
@@ -45,6 +46,7 @@ def extract_claims(
     prompt = f"""{prompt_template}
 
 <session_input>
+<session_type>{escape_xml(session_type)}</session_type>
 <participants>{escape_xml(participants)}</participants>
 <topic_hint>{escape_xml(topic_hint)}</topic_hint>
 <transcript>{escape_xml(transcript)}</transcript>
@@ -183,7 +185,7 @@ def store_session(
     return insert_session(doc)
 
 
-def store_confirmed_claims(claims: list, session_id: str) -> list:
+def store_confirmed_claims(claims: list, session_id: str, metadata: Optional[dict] = None) -> list:
     """
     Save each confirmed claim as a separate document in MongoDB claims collection.
     This provides fine-grained RAG retrieval (one embedding per claim).
@@ -208,6 +210,7 @@ def store_confirmed_claims(claims: list, session_id: str) -> list:
             "confidence": claim.get("confidence", "definite"),
             "who_said_it": claim.get("who_said_it", ""),
             "topic_tags": claim.get("topic_tags", []),
+            "source_type": (metadata or {}).get("session_type", ""),
         }
         claim_id = insert_claim(doc)
         if claim_id:
@@ -247,12 +250,16 @@ def run_ingestion_pipeline(
     from services import consistency, document_updater
 
     # Step 1: Consistency check
-    consistency_results = consistency.run_consistency_check(confirmed_claims)
+    session_type = (metadata or {}).get("session_type", "")
+    consistency_results = consistency.run_consistency_check(confirmed_claims, session_type=session_type)
 
     # Step 2: Update living document
     # Build new_info string from confirmed claims
     date_str = (metadata or {}).get("session_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
-    update_reason = f"Session {date_str}"
+    if session_type:
+        update_reason = f"{session_type} — {date_str}"
+    else:
+        update_reason = f"Session {date_str}"
     if metadata and metadata.get("participants"):
         update_reason += f" ({metadata['participants']})"
 
@@ -280,7 +287,7 @@ def run_ingestion_pipeline(
     # Step 4: Store confirmed claims
     claims_stored = 0
     if session_id:
-        inserted = store_confirmed_claims(confirmed_claims, session_id)
+        inserted = store_confirmed_claims(confirmed_claims, session_id, metadata=metadata)
         claims_stored = len(inserted)
 
     return {

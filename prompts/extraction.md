@@ -9,6 +9,7 @@ Extract every conclusion, decision, preference, and assertion as a discrete, sel
 ## Input Format
 
 <session_input>
+<session_type>{{session_type}}</session_type>
 <participants>{{participants}}</participants>
 <topic_hint>{{topic_hint}}</topic_hint>
 <transcript>{{transcript}}</transcript>
@@ -28,6 +29,14 @@ Extract every conclusion, decision, preference, and assertion as a discrete, sel
    - `preference` — a directional lean not yet decided ("We prefer direct sales over channel")
    - `assertion` — a belief about their startup ("Our moat is regulatory domain expertise")
    - `question` — something they explicitly flagged as unresolved ("How do we handle multi-site licenses?")
+
+## Session Type Context
+
+The `<session_type>` tag tells you the context of this session. Use it to calibrate extraction:
+- **Co-founder discussion / Internal notes**: Claims may be exploratory. Mark uncertain statements as `confidence: speculative` or `confidence: leaning`.
+- **Investor meeting / Investor email**: Feedback and preferences are common. External perspectives should be clearly attributed.
+- **Customer interview**: Market claims and objections are high-value. Preserve exact customer language.
+- **Advisor session**: Strategic advice should be flagged as `claim_type: preference` unless the founders explicitly adopted it as a decision.
 
 ## Output Format
 

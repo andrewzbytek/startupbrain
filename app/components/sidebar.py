@@ -5,7 +5,6 @@ Renders startup state, changelog, feedback themes, cost tracking, and controls.
 
 import html
 import re
-import base64
 
 import streamlit as st
 
@@ -93,6 +92,57 @@ def _parse_feedback_themes(doc: str) -> list:
     return themes
 
 
+def _parse_feedback_by_source(doc: str) -> dict:
+    """
+    Parse Individual Feedback entries from the Feedback Tracker section.
+    Each entry looks like:
+      - [DATE] SOURCE_NAME (SOURCE_TYPE): SUMMARY — Themes: theme1, theme2
+    Groups by source type: investor->vc, customer->customer, advisor->advisor.
+    Returns dict like {"vc": [...], "customer": [...], "advisor": [...]}.
+    Falls back to empty dict on failure.
+    """
+    result = {"vc": [], "customer": [], "advisor": []}
+    try:
+        ft_match = re.search(r"## Feedback Tracker\n(.*?)(?=\n## |\Z)", doc, re.DOTALL)
+        if not ft_match:
+            return result
+
+        if_match = re.search(
+            r"### Individual Feedback\n(.*?)(?=\n### |\Z)",
+            ft_match.group(1),
+            re.DOTALL,
+        )
+        if not if_match:
+            return result
+
+        content = if_match.group(1).strip()
+        if not content or content == "[No feedback recorded yet]":
+            return result
+
+        type_map = {"investor": "vc", "customer": "customer", "advisor": "advisor"}
+
+        for line in content.split("\n"):
+            line = line.strip().lstrip("- ").strip()
+            if not line:
+                continue
+            # Match pattern: [DATE] NAME (TYPE): SUMMARY
+            m = re.match(
+                r"\[.*?\]\s+\S.*?\((\w+)\):\s*(.+)",
+                line,
+            )
+            if m:
+                source_type = m.group(1).strip().lower()
+                summary = m.group(2).strip()
+                bucket = type_map.get(source_type)
+                if bucket:
+                    result[bucket].append(summary)
+
+    except Exception:
+        pass
+
+    return result
+
+
 def _read_living_document() -> str:
     """Read the living document, returning empty string on failure."""
     try:
@@ -123,8 +173,8 @@ def render_sidebar():
 
         st.divider()
 
-        # --- Current State Cards ---
-        st.subheader("Current State")
+        # --- Our Current View ---
+        st.subheader("Our Current View")
         sections = _parse_current_state(doc)
         if sections:
             for section in sections:
@@ -139,6 +189,57 @@ def render_sidebar():
 
         st.divider()
 
+        # --- External Feedback ---
+        st.subheader("External Feedback")
+        feedback_by_source = _parse_feedback_by_source(doc)
+        has_source_feedback = any(feedback_by_source.get(k) for k in ("vc", "customer", "advisor"))
+
+        if has_source_feedback:
+            if feedback_by_source.get("vc"):
+                st.markdown("**Top VC/Investor feedback:**")
+                for item in feedback_by_source["vc"]:
+                    st.caption(f"• {item}")
+            if feedback_by_source.get("customer"):
+                st.markdown("**Top Customer feedback:**")
+                for item in feedback_by_source["customer"]:
+                    st.caption(f"• {item}")
+            if feedback_by_source.get("advisor"):
+                st.markdown("**Top Advisor feedback:**")
+                for item in feedback_by_source["advisor"]:
+                    st.caption(f"• {item}")
+        else:
+            # Fall back to recurring themes
+            fallback_shown = False
+            try:
+                from services.feedback import get_recurring_themes
+                themes = get_recurring_themes()
+                if themes:
+                    for theme in themes[:5]:
+                        count = theme.get("count", 0)
+                        name = theme.get("theme", "")
+                        color_class = "pill-badge-red" if count >= 3 else "pill-badge-blue"
+                        safe_name = html.escape(str(name))
+                        safe_count = html.escape(str(count))
+                        st.markdown(
+                            f'<span class="pill-badge {color_class}">{safe_name} ({safe_count}x)</span>',
+                            unsafe_allow_html=True,
+                        )
+                    fallback_shown = True
+            except Exception:
+                pass
+
+            if not fallback_shown:
+                doc_themes = _parse_feedback_themes(doc)
+                if doc_themes:
+                    for t in doc_themes[:5]:
+                        st.caption(f"• {t}")
+                    fallback_shown = True
+
+            if not fallback_shown:
+                st.caption("No external feedback yet.")
+
+        st.divider()
+
         # --- Recent Changes ---
         st.subheader("Recent Changes")
         recent = _parse_recent_changelog(doc)
@@ -150,50 +251,7 @@ def render_sidebar():
 
         st.divider()
 
-        # --- Feedback Themes ---
-        st.subheader("Feedback Themes")
-        try:
-            from services.feedback import get_recurring_themes
-            themes = get_recurring_themes()
-            if themes:
-                for theme in themes[:5]:
-                    count = theme.get("count", 0)
-                    name = theme.get("theme", "")
-                    color_class = "pill-badge-red" if count >= 3 else "pill-badge-blue"
-                    safe_name = html.escape(str(name))
-                    safe_count = html.escape(str(count))
-                    st.markdown(
-                        f'<span class="pill-badge {color_class}">{safe_name} ({safe_count}x)</span>',
-                        unsafe_allow_html=True,
-                    )
-            else:
-                # Fall back to parsing document
-                doc_themes = _parse_feedback_themes(doc)
-                if doc_themes:
-                    for t in doc_themes[:5]:
-                        st.caption(f"• {t}")
-                else:
-                    st.caption("No themes yet.")
-        except Exception:
-            st.caption("Feedback themes unavailable.")
-
-        st.divider()
-
-        # --- Cost Tracking ---
-        st.subheader("API Cost")
-        try:
-            from services.cost_tracker import get_monthly_cost
-            monthly = get_monthly_cost()
-            budget = 300.0
-            progress = min(monthly / budget, 1.0)
-            st.progress(progress)
-            st.caption(f"${monthly:.2f} / ${budget:.0f} budget")
-        except Exception:
-            st.caption("Cost data unavailable.")
-
-        st.divider()
-
-        # --- Controls ---
+        # --- Actions ---
         st.subheader("Actions")
 
         current_mode = st.session_state.get("mode", "chat")
@@ -223,7 +281,9 @@ def render_sidebar():
                 except Exception as e:
                     st.error(f"Audit failed: {e}")
 
-        # --- Evolution Narrative ---
+        st.divider()
+
+        # --- Topic Evolution ---
         st.subheader("Topic Evolution")
         topic_names = [s["name"] for s in sections] if sections else []
         if topic_names:
@@ -261,40 +321,16 @@ def render_sidebar():
         else:
             st.caption("No topics found in living document.")
 
-        # Whiteboard photo uploader
-        st.subheader("Whiteboard Photo")
-        uploaded_file = st.file_uploader(
-            "Upload whiteboard photo",
-            type=["jpg", "jpeg", "png"],
-            key="whiteboard_upload",
-            label_visibility="collapsed",
-        )
-        if uploaded_file is not None:
-            if uploaded_file.size > 10_000_000:
-                st.error("File too large. Maximum upload size is 10 MB.")
-            elif st.button("Process Whiteboard", use_container_width=True):
-                with st.spinner("Extracting whiteboard content..."):
-                    try:
-                        from services.ingestion import process_whiteboard
-                        image_bytes = uploaded_file.read()
-                        result = process_whiteboard(
-                            image_bytes,
-                            transcript_context=st.session_state.get("current_transcript", ""),
-                        )
-                        extracted = result.get("extracted_content", [])
-                        if extracted:
-                            # Accumulate whiteboard text for current ingestion
-                            text_parts = []
-                            for item in extracted:
-                                content = item.get("content", "")
-                                if content:
-                                    text_parts.append(content)
-                            st.session_state.whiteboard_text = "\n".join(text_parts)
-                            st.success(f"Extracted {len(extracted)} item(s) from whiteboard.")
-                            conf = result.get("extraction_confidence", "")
-                            if conf:
-                                st.caption(f"Confidence: {conf}")
-                        else:
-                            st.warning("No content extracted from whiteboard.")
-                    except Exception as e:
-                        st.error(f"Whiteboard processing failed: {e}")
+        st.divider()
+
+        # --- API Cost ---
+        st.subheader("API Cost")
+        try:
+            from services.cost_tracker import get_monthly_cost
+            monthly = get_monthly_cost()
+            budget = 300.0
+            progress = min(monthly / budget, 1.0)
+            st.progress(progress)
+            st.caption(f"${monthly:.2f} / ${budget:.0f} budget")
+        except Exception:
+            st.caption("Cost data unavailable.")

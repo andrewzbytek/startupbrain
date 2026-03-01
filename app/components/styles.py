@@ -23,7 +23,6 @@ def inject_custom_css():
     /* Hide Streamlit menu and footer */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
-    header {visibility: hidden;}
 
     /* Claim row styling */
     .claim-row { border-bottom: 1px solid #E5E7EB; padding: 8px 0; }

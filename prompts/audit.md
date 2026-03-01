@@ -16,6 +16,7 @@ You are performing an independent audit of the startup's living document against
   <recent_sessions>
     <session>
       <date>{{date}}</date>
+      <session_type>{{session_type}}</session_type>
       <transcript>{{session transcript or summary}}</transcript>
     </session>
   </recent_sessions>
@@ -33,6 +34,7 @@ You are performing an independent audit of the startup's living document against
 4. **Do NOT flag things that are correct** — only surface actual discrepancies
 5. **Advisory tone** — you may be wrong. Present findings as observations, not corrections.
 6. **Changelogs count** — if the changelog already records the correct evolution, it's not a discrepancy even if the current position text is brief
+7. **Session type context** — Use session type to distinguish genuine strategic drift from exploratory thinking. If a brainstorming session mentioned an alternative but a later decision session reaffirmed the current direction, that is NOT a discrepancy.
 
 ## Output Format
 

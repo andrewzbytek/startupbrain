@@ -13,6 +13,7 @@ For each potential contradiction from Pass 1:
 ## Input Format
 
 <pass2_input>
+  <session_type>{{session_type}}</session_type>
   <living_document>{{startup_brain_md_full_text}}</living_document>
   <pass1_results>{{pass1_output_xml}}</pass1_results>
 </pass2_input>
@@ -27,6 +28,8 @@ For each potential contradiction from Pass 1:
 
 **Minor** — Trivial detail that does not affect strategy or execution in a meaningful way. Filter these out.
 - Examples: word choice differences, minor process clarifications, administrative details, specifics that are obviously being refined rather than reversed
+
+**Session type affects severity:** A claim from a formal decision session or customer interview that contradicts the living document is more likely Critical. A claim from internal notes or brainstorming that explores an alternative is more likely Notable or Minor — it may represent thinking-out-loud rather than a real strategic shift.
 
 ## Dismissed Contradictions Rule
 

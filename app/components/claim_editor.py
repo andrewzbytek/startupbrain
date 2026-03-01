@@ -8,6 +8,7 @@ from uuid import uuid4
 import streamlit as st
 
 from app.state import set_mode, reset_ingestion
+from app.components.progress import render_step_indicator
 
 
 def render_claim_editor():
@@ -16,8 +17,9 @@ def render_claim_editor():
     Called when mode="confirming_claims".
     Users can check/uncheck, edit, remove, and add claims before proceeding.
     """
-    st.header("Confirm Extracted Claims")
-    st.caption("Paste your post-session summary (not raw brainstorming)")
+    st.header("Review Extracted Claims")
+    render_step_indicator(2)
+    st.caption("Review and edit the claims extracted from your session")
 
     claims = st.session_state.get("pending_claims", [])
     # Assign stable UIDs for widget keys
@@ -118,7 +120,7 @@ def render_claim_editor():
     col_proceed, col_cancel = st.columns([2, 1])
 
     with col_proceed:
-        proceed_label = "Proceed with these claims"
+        proceed_label = "Check Consistency"
         if st.button(proceed_label, type="primary", use_container_width=True, key="proceed_btn"):
             # Sync final state of claim texts from session_state widget keys
             current_claims = st.session_state.get("pending_claims", [])

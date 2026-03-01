@@ -161,12 +161,12 @@ def _extract_tag(text: str, tag: str) -> str:
     return match.group(1).strip() if match else ""
 
 
-def pass1_wide_net(living_doc: str, claims: list) -> dict:
+def pass1_wide_net(living_doc: str, claims: list, session_type: str = "") -> dict:
     """
     Pass 1: Find ALL potential contradictions using Sonnet.
     Returns dict with: contradictions (list), total_found (int), raw (str)
     """
-    from services.claude_client import call_sonnet, load_prompt
+    from services.claude_client import call_sonnet, escape_xml, load_prompt
 
     prompt_template = load_prompt("consistency_pass1")
     claims_xml = _claims_to_xml(claims)
@@ -174,6 +174,7 @@ def pass1_wide_net(living_doc: str, claims: list) -> dict:
     prompt = f"""{prompt_template}
 
 <consistency_input>
+  <session_type>{escape_xml(session_type)}</session_type>
   <living_document>{living_doc}</living_document>
   {claims_xml}
 </consistency_input>"""
@@ -188,18 +189,19 @@ def pass1_wide_net(living_doc: str, claims: list) -> dict:
     return {"contradictions": contradictions, "total_found": total_found, "raw": raw}
 
 
-def pass2_severity_filter(pass1_results: dict, living_doc: str) -> dict:
+def pass2_severity_filter(pass1_results: dict, living_doc: str, session_type: str = "") -> dict:
     """
     Pass 2: Rate severity, filter Minor, remove dismissed.
     Returns dict from _parse_pass2_output.
     """
-    from services.claude_client import call_sonnet, load_prompt
+    from services.claude_client import call_sonnet, escape_xml, load_prompt
 
     prompt_template = load_prompt("consistency_pass2")
 
     prompt = f"""{prompt_template}
 
 <pass2_input>
+  <session_type>{escape_xml(session_type)}</session_type>
   <living_document>{living_doc}</living_document>
   <pass1_results>{pass1_results['raw']}</pass1_results>
 </pass2_input>"""
@@ -222,7 +224,7 @@ def _get_rag_evidence(claims: list) -> list:
     for claim in recent_claims[:10]:
         evidence.append({
             "source_date": str(claim.get("created_at", "")[:10] if isinstance(claim.get("created_at"), str) else ""),
-            "source_type": "session",
+            "source_type": claim.get("source_type", "session"),
             "relevant_excerpt": claim.get("claim_text", ""),
         })
 
@@ -231,7 +233,7 @@ def _get_rag_evidence(claims: list) -> list:
     for session in recent_sessions[:3]:
         evidence.append({
             "source_date": str(session.get("created_at", "")[:10] if isinstance(session.get("created_at"), str) else ""),
-            "source_type": "session",
+            "source_type": session.get("metadata", {}).get("session_type", "session"),
             "relevant_excerpt": session.get("summary", session.get("transcript", ""))[:500],
         })
 
@@ -316,7 +318,7 @@ def check_dismissed(contradictions: list, living_doc: str) -> list:
     return filtered
 
 
-def run_consistency_check(claims: list) -> dict:
+def run_consistency_check(claims: list, session_type: str = "") -> dict:
     """
     Orchestrate all consistency check passes.
 
@@ -354,7 +356,7 @@ def run_consistency_check(claims: list) -> dict:
         }
 
     # Pass 1
-    pass1 = pass1_wide_net(living_doc, claims)
+    pass1 = pass1_wide_net(living_doc, claims, session_type=session_type)
 
     if pass1["total_found"] == 0:
         return {
@@ -381,7 +383,7 @@ def run_consistency_check(claims: list) -> dict:
         }
 
     # Pass 2
-    pass2 = pass2_severity_filter(pass1, living_doc)
+    pass2 = pass2_severity_filter(pass1, living_doc, session_type=session_type)
 
     if pass2["total_retained"] == 0:
         return {
@@ -451,6 +453,9 @@ def run_audit(num_sessions: int = 10) -> dict:
         sessions_xml_parts.append("  <session>")
         date_str = str(session.get("created_at", ""))[:10]
         sessions_xml_parts.append(f"    <date>{escape_xml(date_str)}</date>")
+        session_type = session.get("metadata", {}).get("session_type", "")
+        if session_type:
+            sessions_xml_parts.append(f"    <session_type>{escape_xml(session_type)}</session_type>")
         transcript = session.get("transcript", session.get("summary", ""))[:2000]
         sessions_xml_parts.append(f"    <transcript>{escape_xml(transcript)}</transcript>")
         sessions_xml_parts.append("  </session>")
@@ -495,7 +500,7 @@ def run_audit(num_sessions: int = 10) -> dict:
     }
 
 
-def generate_pushback(change_description: str, relevant_decisions: list) -> dict:
+def generate_pushback(change_description: str, relevant_decisions: list, session_type: str = "") -> dict:
     """
     Generate informational pushback when a change contradicts prior decisions.
     Always informational, never blocking.
@@ -526,13 +531,19 @@ def generate_pushback(change_description: str, relevant_decisions: list) -> dict
     from datetime import datetime, timezone
     date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
+    if session_type:
+        context = f"{session_type} — {date_str}. No explanation provided."
+    else:
+        context = f"Session {date_str}. No explanation provided."
+
     prompt = f"""{prompt_template}
 
 <pushback_input>
   <proposed_change>{change_description}</proposed_change>
   {decisions_xml}
   <relevant_changelog_entries/>
-  <change_context>Session {date_str}. No explanation provided.</change_context>
+  <session_type>{escape_xml(session_type)}</session_type>
+  <change_context>{context}</change_context>
 </pushback_input>"""
 
     result = call_sonnet(prompt, task_type="pushback")

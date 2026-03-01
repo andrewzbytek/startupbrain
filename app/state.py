@@ -15,6 +15,16 @@ VALID_MODES = {
     "done",
 }
 
+SESSION_TYPES = [
+    "Co-founder discussion",
+    "Investor meeting",
+    "Investor email/feedback",
+    "Customer interview",
+    "Advisor session",
+    "Internal notes",
+    "Other",
+]
+
 
 def init_session_state():
     """Initialize ALL session_state keys with defaults. Safe to call on every rerun."""
@@ -30,6 +40,7 @@ def init_session_state():
         # Ingestion metadata
         "ingestion_participants": "",
         "ingestion_topic": "",
+        "ingestion_session_type": "",
         "ingestion_session_summary": "",
         "ingestion_topic_tags": [],
         # Consistency check results
@@ -85,3 +96,4 @@ def reset_ingestion():
     st.session_state.consistency_results = None
     st.session_state.contradiction_index = 0
     st.session_state.whiteboard_text = ""
+    st.session_state.ingestion_session_type = ""

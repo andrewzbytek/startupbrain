@@ -9,6 +9,7 @@ Compare each new claim against the full living document. Identify any new claim 
 ## Input Format
 
 <consistency_input>
+  <session_type>{{session_type}}</session_type>
   <living_document>{{startup_brain_md_full_text}}</living_document>
   <new_claims>{{confirmed_claims_xml}}</new_claims>
 </consistency_input>
@@ -21,6 +22,7 @@ Compare each new claim against the full living document. Identify any new claim 
 4. **Include dismissed contradictions** in your input check, but do NOT flag them — they are already resolved.
 5. **Flag revisited rejections** — if the new claim appears to revisit something in the Decision Log marked as rejected.
 6. **Do not evaluate severity** — that is Pass 2's job.
+7. **Session context** — The `<session_type>` gives context about where these claims originated. Include this context when describing tensions — a claim from a customer interview carries different weight than one from internal brainstorming.
 
 ## Output Format
 

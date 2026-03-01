@@ -77,7 +77,7 @@ class TestInitSessionState:
             "sidebar_data", "ingestion_participants", "ingestion_topic",
             "ingestion_session_summary", "ingestion_topic_tags",
             "consistency_results", "contradiction_index", "whiteboard_text",
-            "evolution_result",
+            "evolution_result", "ingestion_session_type",
         }
         assert expected_keys == set(mock_st.session_state.keys())
 

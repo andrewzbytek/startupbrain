@@ -24,12 +24,13 @@ inject_custom_css()
 from app.components.sidebar import render_sidebar
 from app.components.chat import render_chat, render_contradiction_resolution
 from app.components.claim_editor import render_claim_editor
-from app.components.progress import IngestionProgress, INGESTION_STEPS
+from app.components.progress import IngestionProgress, INGESTION_STEPS, render_step_indicator
 
 
 def render_ingesting():
     """Ingestion input screen — paste transcript and add metadata."""
     st.header("Ingest New Session")
+    render_step_indicator(1)
     st.caption("Paste your post-session summary below. This should be a clean summary, not raw brainstorming.")
 
     transcript = st.text_area(
@@ -56,7 +57,67 @@ def render_ingesting():
             key="topic_input",
         )
 
-    # Show whiteboard context if any was captured from sidebar
+    from app.state import SESSION_TYPES
+    col_type, col_custom = st.columns(2)
+    with col_type:
+        session_type = st.selectbox(
+            "Session type",
+            options=[""] + SESSION_TYPES,
+            index=0,
+            format_func=lambda x: "Select session type..." if x == "" else x,
+            key="session_type_select",
+        )
+    with col_custom:
+        custom_type = ""
+        if session_type == "Other":
+            custom_type = st.text_input(
+                "Custom session type",
+                key="custom_session_type_input",
+                placeholder="e.g. Board meeting",
+            )
+        else:
+            st.empty()
+
+    # Whiteboard photo (optional)
+    st.markdown("---")
+    st.subheader("Whiteboard Photo (optional)")
+    uploaded_file = st.file_uploader(
+        "Upload whiteboard photo",
+        type=["jpg", "jpeg", "png"],
+        key="whiteboard_upload",
+        label_visibility="collapsed",
+    )
+    if uploaded_file is not None:
+        if uploaded_file.size > 10_000_000:
+            st.error("File too large. Maximum upload size is 10 MB.")
+        else:
+            col_preview, col_action = st.columns([2, 1])
+            with col_preview:
+                st.image(uploaded_file, width=300)
+            with col_action:
+                if st.button("Process Whiteboard", key="process_wb_btn"):
+                    with st.spinner("Extracting whiteboard content..."):
+                        try:
+                            from services.ingestion import process_whiteboard
+                            image_bytes = uploaded_file.read()
+                            result = process_whiteboard(
+                                image_bytes,
+                                transcript_context=st.session_state.get("current_transcript", ""),
+                            )
+                            extracted = result.get("extracted_content", [])
+                            if extracted:
+                                text_parts = []
+                                for item in extracted:
+                                    content = item.get("content", "")
+                                    if content:
+                                        text_parts.append(content)
+                                st.session_state.whiteboard_text = "\n".join(text_parts)
+                                st.rerun()
+                            else:
+                                st.warning("No content extracted from whiteboard.")
+                        except Exception as e:
+                            st.error(f"Whiteboard processing failed: {e}")
+
     whiteboard_text = st.session_state.get("whiteboard_text", "")
     if whiteboard_text:
         st.success(f"Whiteboard content attached ({len(whiteboard_text)} chars). Will be included in extraction.")
@@ -64,7 +125,7 @@ def render_ingesting():
     col_process, col_cancel = st.columns([3, 1])
 
     with col_process:
-        if st.button("Extract Claims", type="primary", use_container_width=True, key="process_btn"):
+        if st.button("Ingest Session", type="primary", use_container_width=True, key="process_btn"):
             if not transcript.strip():
                 st.error("Please paste a session transcript before proceeding.")
             else:
@@ -73,8 +134,12 @@ def render_ingesting():
                 st.session_state.ingestion_participants = participants.strip()
                 st.session_state.ingestion_topic = topic.strip()
 
+                # Resolve session type
+                final_session_type = custom_type.strip() if session_type == "Other" else session_type
+                st.session_state.ingestion_session_type = final_session_type
+
                 # Extract claims with progress feedback
-                with st.spinner("Extracting claims from your session..."):
+                with st.spinner("Analyzing session and extracting claims..."):
                     try:
                         from services.ingestion import extract_claims
 
@@ -83,6 +148,7 @@ def render_ingesting():
                             participants=participants.strip(),
                             topic_hint=topic.strip(),
                             whiteboard_text=whiteboard_text,
+                            session_type=final_session_type,
                         )
 
                         claims = result.get("claims", [])
@@ -117,15 +183,18 @@ def render_checking_consistency():
     This mode auto-advances — it shows progress and then transitions.
     """
     st.header("Checking Consistency")
+    render_step_indicator(3)
 
     confirmed_claims = st.session_state.get("pending_claims", [])
     transcript = st.session_state.get("current_transcript", "")
     participants = st.session_state.get("ingestion_participants", "")
     session_summary = st.session_state.get("ingestion_session_summary", "")
     topic_tags = st.session_state.get("ingestion_topic_tags", [])
+    session_type = st.session_state.get("ingestion_session_type", "")
     metadata = {
         "participants": participants,
         "topic": st.session_state.get("ingestion_topic", ""),
+        "session_type": session_type,
     }
 
     progress = IngestionProgress()
@@ -146,7 +215,7 @@ def render_checking_consistency():
             # Step 2: Run consistency check
             progress.update_step("Checking consistency (Pass 1 of 2)...", status="running")
             from services.consistency import run_consistency_check
-            consistency_results = run_consistency_check(confirmed_claims)
+            consistency_results = run_consistency_check(confirmed_claims, session_type=session_type)
             st.session_state.consistency_results = consistency_results
 
             has_critical = consistency_results.get("has_critical", False)
@@ -206,6 +275,7 @@ def render_checking_consistency():
 def render_done():
     """Success summary screen after ingestion completes."""
     st.header("Session Ingested")
+    render_step_indicator(4)
 
     consistency_results = st.session_state.get("consistency_results", {})
     claims = st.session_state.get("pending_claims", [])

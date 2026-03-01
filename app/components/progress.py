@@ -79,6 +79,20 @@ class IngestionProgress:
         self._status.update(label=label, state="complete", expanded=False)
 
 
+def render_step_indicator(current_step: int):
+    """Render a 4-step horizontal progress indicator. current_step is 1-based."""
+    steps = ["Input", "Review Claims", "Consistency Check", "Done"]
+    cols = st.columns(len(steps))
+    for i, (col, label) in enumerate(zip(cols, steps), 1):
+        with col:
+            if i < current_step:
+                st.markdown(f"~~:gray[{i}. {label}]~~  :green[Done]")
+            elif i == current_step:
+                st.markdown(f"**:blue[{i}. {label}] ←**")
+            else:
+                st.markdown(f":gray[{i}. {label}]")
+
+
 def show_simple_progress(steps: list, current_step: int) -> None:
     """
     Simple non-interactive progress display using st.write.
