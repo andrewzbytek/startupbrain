@@ -84,6 +84,9 @@ Last updated: [date]
 **Changelog:**
 - [Awaiting first session]
 
+## Active Hypotheses
+[No hypotheses tracked yet]
+
 ## Decision Log
 
 [No decisions recorded yet]

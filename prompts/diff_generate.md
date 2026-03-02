@@ -23,6 +23,7 @@ If a section does not need to change, do not mention it. Your output is a diff, 
 - `ADD_DECISION` — Add a new entry to the Decision Log section
 - `ADD_FEEDBACK` — Add a new entry to the Feedback Tracker section
 - `ADD_DISMISSED` — Add a new entry to the Dismissed Contradictions section
+- `ADD_HYPOTHESIS` — Add a new entry to the Active Hypotheses section
 - `ADD_SECTION` — Add an entirely new section to Current State (only when genuinely new topic)
 
 ## Output Format
@@ -111,4 +112,19 @@ SECTION: Dismissed Contradictions
 ACTION: ADD_DISMISSED
 CONTENT:
 - 2026-02-28: Claim that enterprise targets (BP-scale) would convert faster — Dismissed because: current evidence from procurement research shows small plants still have faster cycles. Will revisit if evidence changes.
+```
+
+---
+
+### CORRECT: Adding a hypothesis
+
+Input scenario: Founder tracks a testable assumption about their market.
+
+```
+SECTION: Active Hypotheses
+ACTION: ADD_HYPOTHESIS
+CONTENT:
+- [2026-03-01] **Small nuclear plants have procurement cycles under 12 months**
+  Status: unvalidated | Test: Ask 3 plant operators directly
+  Evidence: ---
 ```

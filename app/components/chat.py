@@ -59,16 +59,48 @@ def _strip_quick_note_prefix(text: str) -> str:
     return text.strip()
 
 
+def _is_hypothesis(text: str) -> bool:
+    """Detect hypothesis prefix like 'hypothesis: ...'."""
+    lower = text.lower().strip()
+    return lower.startswith("hypothesis:")
+
+
+def _is_hypothesis_status_update(text: str) -> bool:
+    """Detect hypothesis status update prefixes like 'validated:' or 'invalidated:'."""
+    lower = text.lower().strip()
+    return lower.startswith("validated:") or lower.startswith("invalidated:")
+
+
+def _strip_hypothesis_prefix(text: str) -> str:
+    """Strip the hypothesis prefix from the message."""
+    lower = text.lower().strip()
+    if lower.startswith("hypothesis:"):
+        return text.strip()[len("hypothesis:"):].strip()
+    return text.strip()
+
+
+def _strip_status_prefix(text: str) -> tuple:
+    """Strip the status prefix and return (status, text)."""
+    lower = text.lower().strip()
+    if lower.startswith("validated:"):
+        return "validated", text.strip()[len("validated:"):].strip()
+    if lower.startswith("invalidated:"):
+        return "invalidated", text.strip()[len("invalidated:"):].strip()
+    return "", text.strip()
+
+
 def _classify_query(text: str) -> str:
     """
     Classify user query for routing.
-    Returns: "current_state" | "historical" | "pitch" | "analysis" | "general"
+    Returns: "current_state" | "historical" | "pitch" | "challenge" | "analysis" | "general"
     """
     lower = text.lower()
     if any(kw in lower for kw in ["what is our current", "what's our", "where are we on", "current position", "right now"]):
         return "current_state"
     if any(kw in lower for kw in ["pitch", "investor", "deck", "slide", "one-pager", "elevator"]):
         return "pitch"
+    if any(kw in lower for kw in ["challenge", "poke holes", "devil's advocate", "stress test", "what am i missing", "what are we missing", "pushback"]):
+        return "challenge"
     if any(kw in lower for kw in ["analyze", "analysis", "strategy", "strategic", "should we", "recommend"]):
         return "analysis"
     if any(kw in lower for kw in ["when did we", "history", "evolution", "changed", "last time", "previous"]):
@@ -87,13 +119,42 @@ def _get_system_prompt() -> str:
     base = (
         "You are Startup Brain — an AI knowledge assistant for a two-person early-stage startup "
         "in the compliance space (nuclear, oil & gas, power generation). "
-        "You have access to the startup's living knowledge document below. "
-        "Your job is to help the founders think clearly by answering questions from this document, "
-        "surfacing relevant history, and flagging any tensions you notice. "
-        "Be direct, concise, and opinionated when asked for analysis. "
-        "You NEVER block founders from making changes — you inform, not gatekeep. "
-        "If asked to update or change something, acknowledge it and update immediately. "
-        "Respond in plain markdown.\n\n"
+        "You have access to the startup's living knowledge document below.\n\n"
+
+        "## Socratic Pushback\n"
+        "When discussing a topic covered in the living document, reference specific dates from "
+        "the Changelog, rationale from the Decision Log, and any relevant Dismissed Contradictions. "
+        "After answering, ask ONE probing question about gaps, untested assumptions, or missing evidence — "
+        "but only when the topic warrants it (analysis, strategy, decisions). "
+        "Do not ask probing questions on trivial or casual messages.\n\n"
+
+        "## Context Surfacing\n"
+        "When you identify relevant context in the living document that the founder may not be thinking about, "
+        "append a brief section after your main answer:\n"
+        "---\n"
+        "**Related context**\n"
+        "- [relevant dismissed contradiction, feedback entry, or recent changelog activity]\n\n"
+        "Omit this section entirely when nothing is relevant. Do NOT surface context on every message. "
+        "Do NOT repeat context already mentioned earlier in the conversation.\n\n"
+
+        "## Feedback Echo\n"
+        "When a topic overlaps with entries in the Feedback Tracker, weave them into your response "
+        "naturally — mention the source name, type (investor/customer/advisor), and date. "
+        "For example: 'Sarah Chen (investor, 2026-02-10) raised a similar concern about branding.'\n\n"
+
+        "## Tone Calibration\n"
+        "- Current-state queries: factual, direct, cite the document\n"
+        "- Analysis/strategy queries: Socratic, opinionated, reference Decision Log trade-offs\n"
+        "- Historical queries: narrative, trace the evolution through Changelog entries\n"
+        "- Pitch queries: constructive, polished, frame strengths\n"
+        "- Casual/greetings: brief, friendly, no context surfacing\n\n"
+
+        "## Guardrails\n"
+        "- You NEVER block founders from making changes — you inform, not gatekeep.\n"
+        "- If asked to update or change something, acknowledge it and update immediately.\n"
+        "- Do NOT invent information not in the document.\n"
+        "- Do NOT surface related context on every message — only when genuinely relevant.\n"
+        "- Respond in plain markdown.\n\n"
     )
     if doc:
         base += f"<startup_brain>\n{doc}\n</startup_brain>"
@@ -125,6 +186,7 @@ def _build_claude_prompt(user_message: str, query_type: str):
 
     task_map = {
         "pitch": "pitch_generation",
+        "challenge": "strategic_analysis",
         "analysis": "strategic_analysis",
         "current_state": "general",
         "historical": "general",
@@ -257,6 +319,100 @@ def _apply_quick_note(note_text: str) -> str:
         return f"Could not save note: {e}"
 
 
+def _apply_hypothesis(user_message: str) -> str:
+    """
+    Add a new hypothesis to the living document and MongoDB.
+    Returns a confirmation message.
+    """
+    try:
+        from services.document_updater import (
+            read_living_document, write_living_document, _add_hypothesis, _git_commit,
+        )
+        from services.mongo_client import insert_claim, upsert_living_document
+        from datetime import datetime, timezone
+
+        hypothesis_text = _strip_hypothesis_prefix(user_message)
+        if not hypothesis_text:
+            return "Please provide a hypothesis after the 'hypothesis:' prefix."
+
+        date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        entry = (
+            f"- [{date_str}] **{hypothesis_text}**\n"
+            f"  Status: unvalidated | Test: [to be defined]\n"
+            f"  Evidence: ---"
+        )
+
+        doc = read_living_document()
+        doc = _add_hypothesis(doc, entry)
+        write_living_document(doc)
+        upsert_living_document(doc, metadata={"last_updated": date_str, "update_reason": "New hypothesis"})
+        _git_commit(f"Add hypothesis: {hypothesis_text[:50]}")
+
+        # Store in MongoDB as a hypothesis claim
+        try:
+            insert_claim({
+                "claim_text": hypothesis_text,
+                "claim_type": "hypothesis",
+                "confidence": "speculative",
+                "source_type": "hypothesis",
+                "who_said_it": "Founder",
+                "confirmed": True,
+                "status": "unvalidated",
+                "test_plan": "",
+                "created_at": datetime.now(timezone.utc),
+            })
+        except Exception:
+            pass  # MongoDB failure should not block
+
+        return (
+            f"Hypothesis tracked: **{hypothesis_text}**\n\n"
+            f"Status: unvalidated. You can update it later with `validated: {hypothesis_text[:30]}...` "
+            f"or `invalidated: {hypothesis_text[:30]}...` in chat, or use the sidebar."
+        )
+    except Exception as e:
+        return f"Could not track hypothesis: {e}"
+
+
+def _apply_hypothesis_status_update(user_message: str) -> str:
+    """
+    Update the status of an existing hypothesis.
+    Returns a confirmation message.
+    """
+    try:
+        from services.document_updater import (
+            read_living_document, write_living_document,
+            _update_hypothesis_status, _git_commit,
+        )
+        from services.mongo_client import update_hypothesis_status, upsert_living_document
+        from datetime import datetime, timezone
+
+        new_status, fragment = _strip_status_prefix(user_message)
+        if not fragment:
+            return f"Please provide the hypothesis text after '{new_status}:'."
+
+        date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+        # Update living document
+        doc = read_living_document()
+        updated_doc = _update_hypothesis_status(doc, fragment, new_status)
+        if updated_doc == doc:
+            return f"Could not find a hypothesis matching: **{fragment}**. Check the sidebar for exact text."
+
+        write_living_document(updated_doc)
+        upsert_living_document(updated_doc, metadata={"last_updated": date_str})
+        _git_commit(f"Hypothesis {new_status}: {fragment[:50]}")
+
+        # Update MongoDB
+        try:
+            update_hypothesis_status(fragment, new_status)
+        except Exception:
+            pass
+
+        return f"Hypothesis updated to **{new_status}**: {fragment}"
+    except Exception as e:
+        return f"Could not update hypothesis: {e}"
+
+
 def _handle_quick_action(text: str, query_type: str):
     """Process a quick-action button click as a user message."""
     with st.chat_message("user"):
@@ -349,6 +505,28 @@ def render_chat():
             with st.chat_message("assistant"):
                 with st.spinner("Noting..."):
                     response = _apply_quick_note(note_text)
+                st.markdown(response)
+            add_message("assistant", response)
+            invalidate_sidebar()
+            st.rerun()
+            return
+
+        # Handle hypothesis tracking
+        if _is_hypothesis(user_input):
+            with st.chat_message("assistant"):
+                with st.spinner("Tracking hypothesis..."):
+                    response = _apply_hypothesis(user_input)
+                st.markdown(response)
+            add_message("assistant", response)
+            invalidate_sidebar()
+            st.rerun()
+            return
+
+        # Handle hypothesis status updates
+        if _is_hypothesis_status_update(user_input):
+            with st.chat_message("assistant"):
+                with st.spinner("Updating hypothesis..."):
+                    response = _apply_hypothesis_status_update(user_input)
                 st.markdown(response)
             add_message("assistant", response)
             invalidate_sidebar()

@@ -84,6 +84,14 @@ Last updated: 2026-02-15
 **Changelog:**
 - 2026-02-10: Started investor outreach. No term sheets yet. Source: Investor meetings
 
+## Active Hypotheses
+- [2026-02-10] **Small nuclear plants have procurement cycles under 12 months**
+  Status: unvalidated | Test: Ask 3 plant operators directly
+  Evidence: ---
+- [2026-02-12] **LLM extraction accuracy exceeds 95% on nuclear PDFs**
+  Status: testing | Test: Run 50 sample documents through pipeline
+  Evidence: Initial batch of 10 docs showed 93% accuracy
+
 ## Decision Log
 
 ### 2026-02-05 — Per-Facility Annual Licensing Model
@@ -173,6 +181,27 @@ def sample_claims():
             "who_said_it": "",
             "topic_tags": ["go-to-market"],
             "confirmed": True,
+        },
+    ]
+
+
+@pytest.fixture
+def sample_hypotheses():
+    """Return a list of hypothesis dicts matching the parsed format."""
+    return [
+        {
+            "date": "2026-02-10",
+            "text": "Small nuclear plants have procurement cycles under 12 months",
+            "status": "unvalidated",
+            "test": "Ask 3 plant operators directly",
+            "evidence": "---",
+        },
+        {
+            "date": "2026-02-12",
+            "text": "LLM extraction accuracy exceeds 95% on nuclear PDFs",
+            "status": "testing",
+            "test": "Run 50 sample documents through pipeline",
+            "evidence": "Initial batch of 10 docs showed 93% accuracy",
         },
     ]
 

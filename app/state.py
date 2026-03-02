@@ -54,6 +54,7 @@ def init_session_state():
         # Book cross-check (temporary .md upload)
         "book_crosscheck_content": "",
         "book_crosscheck_filename": "",
+        "show_hypothesis_form": False,
     }
     for key, value in defaults.items():
         if key not in st.session_state:

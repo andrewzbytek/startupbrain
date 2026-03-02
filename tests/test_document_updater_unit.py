@@ -387,3 +387,91 @@ class TestUpdateDocumentUnit:
             result = update_document("new info", update_reason="session update")
             mock_git.assert_called_once()
             assert result["success"] is True
+
+
+# ---------------------------------------------------------------------------
+# _add_hypothesis tests
+# ---------------------------------------------------------------------------
+
+class TestAddHypothesisUnit:
+    """Tests for _add_hypothesis: adds entries to Active Hypotheses."""
+
+    def test_adds_to_existing_section(self, sample_living_document):
+        """Should add hypothesis content to the Active Hypotheses section."""
+        from services.document_updater import _add_hypothesis
+        entry = "- [2026-03-01] **Test hyp**\n  Status: unvalidated | Test: x\n  Evidence: ---"
+        result = _add_hypothesis(sample_living_document, entry)
+        assert "Test hyp" in result
+        assert "## Active Hypotheses" in result
+
+    def test_replaces_placeholder(self):
+        """Should replace '[No hypotheses tracked yet]' placeholder."""
+        from services.document_updater import _add_hypothesis
+        doc = "## Active Hypotheses\n[No hypotheses tracked yet]\n\n## Decision Log\n"
+        entry = "- [2026-03-01] **First hypothesis**\n  Status: unvalidated | Test: x\n  Evidence: ---"
+        result = _add_hypothesis(doc, entry)
+        assert "[No hypotheses tracked yet]" not in result
+        assert "First hypothesis" in result
+
+    def test_creates_section_if_missing(self):
+        """Should create Active Hypotheses section if it doesn't exist."""
+        from services.document_updater import _add_hypothesis
+        doc = "# Startup Brain\n\n## Decision Log\nContent."
+        entry = "- [2026-03-01] **New hyp**\n  Status: unvalidated | Test: x\n  Evidence: ---"
+        result = _add_hypothesis(doc, entry)
+        assert "## Active Hypotheses" in result
+        assert "New hyp" in result
+
+    def test_preserves_existing_entries(self, sample_living_document):
+        """Should preserve existing hypotheses when adding a new one."""
+        from services.document_updater import _add_hypothesis
+        entry = "- [2026-03-15] **Brand new**\n  Status: unvalidated | Test: y\n  Evidence: ---"
+        result = _add_hypothesis(sample_living_document, entry)
+        assert "Brand new" in result
+        # Existing hypotheses from sample doc should still be there
+        assert "procurement cycles" in result
+
+
+# ---------------------------------------------------------------------------
+# _update_hypothesis_status tests
+# ---------------------------------------------------------------------------
+
+class TestUpdateHypothesisStatusUnit:
+    """Tests for _update_hypothesis_status: updates hypothesis status in doc."""
+
+    def test_changes_status(self, sample_living_document):
+        """Should change the status of a matching hypothesis."""
+        from services.document_updater import _update_hypothesis_status
+        result = _update_hypothesis_status(
+            sample_living_document,
+            "Small nuclear plants have procurement cycles under 12 months",
+            "validated",
+        )
+        assert "Status: validated" in result
+
+    def test_appends_evidence(self):
+        """Should append evidence when provided."""
+        from services.document_updater import _update_hypothesis_status
+        doc = (
+            "## Active Hypotheses\n"
+            "- [2026-02-10] **Test hyp**\n"
+            "  Status: unvalidated | Test: test\n"
+            "  Evidence: ---\n"
+            "\n## Decision Log\n"
+        )
+        result = _update_hypothesis_status(doc, "Test hyp", "testing", "New evidence found")
+        assert "New evidence found" in result
+        assert "Status: testing" in result
+
+    def test_no_match_returns_unchanged(self):
+        """Should return unchanged doc when hypothesis not found."""
+        from services.document_updater import _update_hypothesis_status
+        doc = (
+            "## Active Hypotheses\n"
+            "- [2026-02-10] **Existing**\n"
+            "  Status: unvalidated | Test: t\n"
+            "  Evidence: ---\n"
+            "\n## Decision Log\n"
+        )
+        result = _update_hypothesis_status(doc, "Nonexistent", "validated")
+        assert result == doc

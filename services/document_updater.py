@@ -142,6 +142,8 @@ def apply_diff(document: str, diff_blocks: list) -> str:
             updated = _add_feedback(updated, content)
         elif action == "ADD_DISMISSED":
             updated = _add_dismissed(updated, content)
+        elif action == "ADD_HYPOTHESIS":
+            updated = _add_hypothesis(updated, content)
         elif action == "ADD_SECTION":
             updated = _add_section(updated, section, content)
 
@@ -239,6 +241,49 @@ def _add_dismissed(doc: str, dismissed_content: str) -> str:
         return updated
 
     return doc + "\n\n## Dismissed Contradictions\n" + dismissed_content + "\n"
+
+
+def _add_hypothesis(doc: str, hypothesis_content: str) -> str:
+    """Add a new entry to the Active Hypotheses section."""
+    pattern = re.compile(r"(## Active Hypotheses\n)(.*?)(\n## |\Z)", re.DOTALL)
+
+    def replacer(m):
+        existing = m.group(2).strip()
+        if existing == "[No hypotheses tracked yet]":
+            existing = ""
+        return m.group(1) + existing + "\n" + hypothesis_content + "\n" + m.group(3)
+
+    updated = pattern.sub(replacer, doc)
+    if updated != doc:
+        return updated
+
+    # If section missing, insert before Decision Log
+    if "## Decision Log" in doc:
+        return doc.replace("## Decision Log", "## Active Hypotheses\n" + hypothesis_content + "\n\n## Decision Log")
+    return doc + "\n\n## Active Hypotheses\n" + hypothesis_content + "\n"
+
+
+def _update_hypothesis_status(doc: str, hypothesis_fragment: str, new_status: str, evidence_update: str = "") -> str:
+    """Update the status of an existing hypothesis. Finds by bold text fragment."""
+    escaped = re.escape(hypothesis_fragment)
+    pattern = re.compile(
+        rf"(- \[\d{{4}}-\d{{2}}-\d{{2}}\] \*\*{escaped}\*\*\n\s+Status: )\w+( \| .*?\n\s+Evidence: )(.*?)(?=\n- \[|\n## |\Z)",
+        re.DOTALL,
+    )
+
+    def replacer(m):
+        result = m.group(1) + new_status + m.group(2)
+        if evidence_update:
+            current_evidence = m.group(3).strip()
+            if current_evidence == "---":
+                result += evidence_update
+            else:
+                result += current_evidence + "; " + evidence_update
+        else:
+            result += m.group(3)
+        return result
+
+    return pattern.sub(replacer, doc)
 
 
 def _add_section(doc: str, section: str, section_content: str) -> str:

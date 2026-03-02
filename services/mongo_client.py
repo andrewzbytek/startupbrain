@@ -258,6 +258,31 @@ def get_cost_log(limit: int = 500) -> list:
     return find_many("cost_log", sort_by="created_at", sort_order=-1, limit=limit)
 
 
+def get_hypotheses(status=None, limit=50):
+    """Retrieve hypothesis claims, optionally filtered by status."""
+    query = {"claim_type": "hypothesis"}
+    if status:
+        query["status"] = status
+    return find_many("claims", query=query, sort_by="created_at", sort_order=-1, limit=limit)
+
+
+def update_hypothesis_status(claim_text_fragment, new_status):
+    """Update the status of a hypothesis claim by text fragment match."""
+    import re
+    db = get_db()
+    if db is None:
+        return False
+    try:
+        escaped = re.escape(claim_text_fragment)
+        result = db["claims"].update_one(
+            {"claim_type": "hypothesis", "claim_text": {"$regex": escaped, "$options": "i"}},
+            {"$set": {"status": new_status, "updated_at": datetime.now(timezone.utc)}},
+        )
+        return result.modified_count > 0
+    except Exception:
+        return False
+
+
 def count_documents(collection_name: str, query: dict = None) -> int:
     """Count documents in a collection. Returns 0 on failure."""
     db = get_db()

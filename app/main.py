@@ -245,6 +245,40 @@ def render_checking_consistency():
                 msg = pipeline_result.get("document_update_message", "unknown reason")
                 progress.update_step(f"Document update issue: {msg}", status="error")
 
+            # Check if any confirmed claims relate to active hypotheses
+            try:
+                from services.mongo_client import get_hypotheses
+                active_hyps = get_hypotheses(status="unvalidated") + get_hypotheses(status="testing")
+                if active_hyps and confirmed_claims:
+                    # Simple keyword overlap check
+                    import re as _re
+                    _stop_words = {"the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
+                                   "have", "has", "had", "do", "does", "did", "will", "would", "could",
+                                   "should", "may", "might", "can", "shall", "to", "of", "in", "for",
+                                   "on", "with", "at", "by", "from", "as", "into", "through", "during",
+                                   "before", "after", "above", "below", "between", "out", "off", "over",
+                                   "under", "again", "further", "then", "once", "and", "but", "or", "nor",
+                                   "not", "no", "so", "than", "too", "very", "just", "about", "up", "that",
+                                   "this", "it", "we", "our", "they", "their", "them", "its", "per", "each"}
+
+                    def _significant_words(text):
+                        return {w for w in _re.findall(r"\w+", text.lower()) if len(w) > 2 and w not in _stop_words}
+
+                    relevant_hyps = []
+                    for hyp in active_hyps:
+                        hyp_words = _significant_words(hyp.get("claim_text", ""))
+                        for claim in confirmed_claims:
+                            claim_words = _significant_words(claim.get("claim_text", ""))
+                            if len(hyp_words & claim_words) >= 3:
+                                relevant_hyps.append(hyp.get("claim_text", ""))
+                                break
+
+                    if relevant_hyps:
+                        hyp_list = "\n".join(f"- {h[:80]}" for h in relevant_hyps[:3])
+                        st.info(f"These claims may relate to active hypotheses:\n{hyp_list}")
+            except Exception:
+                pass  # Hypothesis check is a nudge, never blocking
+
             # Determine if we have contradictions to resolve
             if has_contradictions:
                 pass2 = consistency_results.get("pass2", {})

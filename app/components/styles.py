@@ -30,4 +30,11 @@ def inject_custom_css():
     /* Status indicators */
     .status-green { color: #22C55E; }
     .status-white { color: #D1D5DB; }
+
+    /* Hypothesis status badges */
+    .hypothesis-badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 0.75rem; margin: 2px; font-weight: 600; }
+    .hypothesis-unvalidated { background-color: #FEF3C7; color: #92400E; }
+    .hypothesis-testing { background-color: #DBEAFE; color: #1E40AF; }
+    .hypothesis-validated { background-color: #D1FAE5; color: #065F46; }
+    .hypothesis-invalidated { background-color: #FEE2E2; color: #991B1B; }
     </style>""", unsafe_allow_html=True)

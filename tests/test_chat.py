@@ -39,6 +39,9 @@ from app.components.chat import (
     _is_quick_note,
     _strip_quick_note_prefix,
     _classify_query,
+    _is_hypothesis,
+    _is_hypothesis_status_update,
+    _get_system_prompt,
     TRANSCRIPT_SUGGEST_LENGTH,
 )
 
@@ -264,3 +267,132 @@ class TestStripQuickNotePrefix:
         # "quick note:" should match before "note:" would match on "quick note: text"
         result = _strip_quick_note_prefix("quick note: test content")
         assert result == "test content"
+
+
+# ---------------------------------------------------------------------------
+# _classify_query — "challenge" type
+# ---------------------------------------------------------------------------
+
+class TestClassifyQueryChallenge:
+    def test_challenge_keyword(self):
+        assert _classify_query("Challenge our pricing model") == "challenge"
+
+    def test_poke_holes(self):
+        assert _classify_query("Poke holes in our go-to-market") == "challenge"
+
+    def test_devils_advocate(self):
+        assert _classify_query("Play devil's advocate on our MVP scope") == "challenge"
+
+    def test_stress_test(self):
+        assert _classify_query("Stress test our assumptions") == "challenge"
+
+    def test_what_am_i_missing(self):
+        assert _classify_query("What am I missing about pricing?") == "challenge"
+
+    def test_what_are_we_missing(self):
+        assert _classify_query("What are we missing in our strategy?") == "challenge"
+
+    def test_pushback(self):
+        assert _classify_query("Give me some pushback on our target market") == "challenge"
+
+    def test_challenge_before_analysis(self):
+        # "challenge" should be detected before "analysis" keywords
+        # "challenge" contains no analysis keywords, just verify priority
+        assert _classify_query("challenge this strategy") == "challenge"
+
+    def test_existing_analysis_still_works(self):
+        assert _classify_query("Analyze our go-to-market strategy") == "analysis"
+
+    def test_existing_classifications_unchanged(self):
+        assert _classify_query("What is our current pricing?") == "current_state"
+        assert _classify_query("Prepare a pitch") == "pitch"
+        assert _classify_query("When did we change pricing?") == "historical"
+        assert _classify_query("Hello") == "general"
+
+
+# ---------------------------------------------------------------------------
+# System prompt — Socratic content
+# ---------------------------------------------------------------------------
+
+class TestSystemPromptSocratic:
+    def test_contains_socratic_pushback(self):
+        from unittest.mock import patch
+        with patch("services.document_updater.read_living_document", return_value="test doc"):
+            prompt = _get_system_prompt()
+            assert "Socratic Pushback" in prompt
+
+    def test_contains_context_surfacing(self):
+        from unittest.mock import patch
+        with patch("services.document_updater.read_living_document", return_value="test doc"):
+            prompt = _get_system_prompt()
+            assert "Related context" in prompt
+
+    def test_contains_feedback_echo(self):
+        from unittest.mock import patch
+        with patch("services.document_updater.read_living_document", return_value="test doc"):
+            prompt = _get_system_prompt()
+            assert "Feedback Echo" in prompt
+
+    def test_contains_never_block(self):
+        from unittest.mock import patch
+        with patch("services.document_updater.read_living_document", return_value="test doc"):
+            prompt = _get_system_prompt()
+            assert "NEVER block" in prompt
+
+    def test_contains_tone_calibration(self):
+        from unittest.mock import patch
+        with patch("services.document_updater.read_living_document", return_value="test doc"):
+            prompt = _get_system_prompt()
+            assert "Tone Calibration" in prompt
+
+    def test_wraps_doc_in_startup_brain_tags(self):
+        from unittest.mock import patch
+        with patch("services.document_updater.read_living_document", return_value="test doc content"):
+            prompt = _get_system_prompt()
+            assert "<startup_brain>" in prompt
+            assert "test doc content" in prompt
+            assert "</startup_brain>" in prompt
+
+    def test_includes_book_framework_when_loaded(self):
+        from unittest.mock import patch
+        import streamlit as _st
+        _st.session_state["book_crosscheck_content"] = "book content here"
+        with patch("services.document_updater.read_living_document", return_value="doc"):
+            prompt = _get_system_prompt()
+            assert "<book_framework>" in prompt
+            assert "book content here" in prompt
+        _st.session_state["book_crosscheck_content"] = ""
+
+    def test_no_book_framework_when_empty(self):
+        from unittest.mock import patch
+        import streamlit as _st
+        _st.session_state["book_crosscheck_content"] = ""
+        with patch("services.document_updater.read_living_document", return_value="doc"):
+            prompt = _get_system_prompt()
+            assert "<book_framework>" not in prompt
+
+
+# ---------------------------------------------------------------------------
+# _is_hypothesis / _is_hypothesis_status_update in chat.py
+# ---------------------------------------------------------------------------
+
+class TestIsHypothesisChat:
+    def test_hypothesis_prefix(self):
+        assert _is_hypothesis("hypothesis: test") is True
+
+    def test_normal_text_false(self):
+        assert _is_hypothesis("What is our hypothesis?") is False
+
+    def test_empty_false(self):
+        assert _is_hypothesis("") is False
+
+
+class TestIsHypothesisStatusUpdateChat:
+    def test_validated(self):
+        assert _is_hypothesis_status_update("validated: test") is True
+
+    def test_invalidated(self):
+        assert _is_hypothesis_status_update("invalidated: test") is True
+
+    def test_normal_false(self):
+        assert _is_hypothesis_status_update("test") is False

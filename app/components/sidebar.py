@@ -5,6 +5,7 @@ Renders startup state, changelog, feedback themes, cost tracking, and controls.
 
 import html
 import re
+from datetime import date, timedelta
 
 import streamlit as st
 
@@ -143,6 +144,208 @@ def _parse_feedback_by_source(doc: str) -> dict:
     return result
 
 
+_DATE_PATTERN = re.compile(r"(\d{4}-\d{2}-\d{2})")
+
+
+def _extract_date(text: str):
+    """Extract the first YYYY-MM-DD date from text. Returns date or None."""
+    m = _DATE_PATTERN.search(text)
+    if m:
+        try:
+            return date.fromisoformat(m.group(1))
+        except ValueError:
+            return None
+    return None
+
+
+def _parse_hypotheses(doc: str) -> list:
+    """
+    Parse Active Hypotheses from the living document.
+    Returns list of dicts: {date, text, status, test, evidence}
+    """
+    hypotheses = []
+    ah_match = re.search(r"## Active Hypotheses\n(.*?)(?=\n## |\Z)", doc, re.DOTALL)
+    if not ah_match:
+        return hypotheses
+
+    content = ah_match.group(1).strip()
+    if not content or content == "[No hypotheses tracked yet]":
+        return hypotheses
+
+    # Match entries like:
+    # - [2026-03-01] **hypothesis text**
+    #   Status: unvalidated | Test: some test plan
+    #   Evidence: ---
+    pattern = re.compile(
+        r"- \[(\d{4}-\d{2}-\d{2})\] \*\*(.+?)\*\*\n"
+        r"\s+Status: (\w+) \| Test: (.+?)\n"
+        r"\s+Evidence: (.+?)(?=\n- \[|\Z)",
+        re.DOTALL,
+    )
+
+    for m in pattern.finditer(content):
+        hypotheses.append({
+            "date": m.group(1).strip(),
+            "text": m.group(2).strip(),
+            "status": m.group(3).strip(),
+            "test": m.group(4).strip(),
+            "evidence": m.group(5).strip(),
+        })
+
+    return hypotheses
+
+
+# Section keywords for matching dismissed contradictions to sections
+_SECTION_KEYWORDS = {
+    "Target Market / Initial Customer": ["target", "market", "customer", "beachhead", "segment"],
+    "Value Proposition": ["value", "proposition", "product", "solution", "problem"],
+    "Pricing": ["pricing", "price", "cost", "fee", "licence", "subscription"],
+    "Business Model / Revenue Model": ["business", "model", "revenue", "saas", "licence"],
+    "Go-to-Market Strategy": ["go-to-market", "sales", "channel", "distribution", "marketing"],
+    "Technical Approach": ["technical", "tech", "architecture", "stack", "engineering"],
+    "Competitive Landscape": ["competitive", "competitor", "landscape", "alternative"],
+    "Moat / Defensibility": ["moat", "defensibility", "advantage", "barrier"],
+    "Key Risks": ["risk", "threat", "challenge", "concern"],
+    "Team / Hiring Plans": ["team", "hiring", "hire", "talent", "people"],
+    "Fundraising Status / Strategy": ["fundraising", "funding", "investor", "seed", "raise"],
+    "Problem We're Solving": ["problem", "pain", "need", "gap"],
+    "Why Now": ["timing", "trend", "regulation", "urgency"],
+    "Traction / Milestones": ["traction", "milestone", "progress", "metric"],
+    "Key Assumptions": ["assumption", "hypothesis", "believe", "expect"],
+    "Key Contacts / Prospects": ["contact", "prospect", "lead", "pipeline"],
+}
+
+
+def _find_changelog_tensions(sections: list, today) -> list:
+    """Find sections with 2+ changelog entries in the last 7 days."""
+    tensions = []
+    cutoff = today - timedelta(days=7)
+
+    for section in sections:
+        recent_dates = []
+        for entry in section.get("changelog_entries", []):
+            d = _extract_date(entry)
+            if d and d >= cutoff:
+                recent_dates.append(d)
+        if len(recent_dates) >= 2:
+            most_recent = max(recent_dates)
+            tensions.append({
+                "section_name": section["name"],
+                "reason": f"{len(recent_dates)} changes in 7 days",
+                "details": f"Section '{section['name']}' has been updated {len(recent_dates)} times since {cutoff.isoformat()}.",
+                "sort_date": most_recent,
+            })
+
+    return tensions
+
+
+def _find_dismissed_tensions(doc: str, today) -> list:
+    """Find recently dismissed contradictions (within 14 days)."""
+    tensions = []
+    cutoff = today - timedelta(days=14)
+
+    dm_match = re.search(r"## Dismissed Contradictions\n(.*?)(?:\Z)", doc, re.DOTALL)
+    if not dm_match:
+        return tensions
+
+    content = dm_match.group(1).strip()
+    if not content or content == "[No dismissed contradictions]":
+        return tensions
+
+    for line in content.split("\n"):
+        line = line.strip().lstrip("- ").strip()
+        if not line:
+            continue
+        d = _extract_date(line)
+        if not d or d < cutoff:
+            continue
+
+        # Match to section via keyword overlap
+        lower_line = line.lower()
+        matched_section = None
+        best_score = 0
+        for section_name, keywords in _SECTION_KEYWORDS.items():
+            score = sum(1 for kw in keywords if kw in lower_line)
+            if score > best_score:
+                best_score = score
+                matched_section = section_name
+
+        if not matched_section:
+            # Fallback: use first few words as section hint
+            matched_section = "General"
+
+        tensions.append({
+            "section_name": matched_section,
+            "reason": f"dismissed contradiction on {d.isoformat()}",
+            "details": line[:200],
+            "sort_date": d,
+        })
+
+    return tensions
+
+
+def _find_decision_tensions(doc: str, today) -> list:
+    """Find Decision Log entries under evaluation within 14 days."""
+    tensions = []
+    cutoff = today - timedelta(days=14)
+
+    dl_match = re.search(r"## Decision Log\n(.*?)(?=\n## |\Z)", doc, re.DOTALL)
+    if not dl_match:
+        return tensions
+
+    content = dl_match.group(1).strip()
+    if not content or content == "[No decisions recorded yet]":
+        return tensions
+
+    # Find decision entries with "Under evaluation" or "pending" or "revisit" in Status
+    # Decision entries start with "### DATE — Title"
+    for m in re.finditer(r"### (\d{4}-\d{2}-\d{2}) — (.+?)\n(.*?)(?=\n### |\Z)", content, re.DOTALL):
+        d = _extract_date(m.group(1))
+        if not d or d < cutoff:
+            continue
+        title = m.group(2).strip()
+        body = m.group(3)
+        status_match = re.search(r"\*\*Status:\*\*\s*(.+)", body)
+        if status_match:
+            status_text = status_match.group(1).strip().lower()
+            if any(kw in status_text for kw in ["under evaluation", "pending", "revisit"]):
+                tensions.append({
+                    "section_name": title,
+                    "reason": f"decision under evaluation since {d.isoformat()}",
+                    "details": f"Decision '{title}' has status: {status_match.group(1).strip()}",
+                    "sort_date": d,
+                })
+
+    return tensions
+
+
+def _parse_tensions(doc: str, today=None) -> list:
+    """
+    Detect areas of active instability in the living document.
+    Returns list of {section_name, reason, details, sort_date}.
+    """
+    if today is None:
+        today = date.today()
+
+    sections = _parse_current_state(doc)
+    tensions = []
+
+    tensions.extend(_find_changelog_tensions(sections, today))
+    tensions.extend(_find_dismissed_tensions(doc, today))
+    tensions.extend(_find_decision_tensions(doc, today))
+
+    # Deduplicate: if a section triggers multiple signals, keep the most recent
+    seen = {}
+    for t in tensions:
+        key = t["section_name"]
+        if key not in seen or t["sort_date"] > seen[key]["sort_date"]:
+            seen[key] = t
+
+    # Sort by date, most recent first
+    result = sorted(seen.values(), key=lambda t: t["sort_date"], reverse=True)
+    return result
+
+
 def _read_living_document() -> str:
     """Read the living document, returning empty string on failure."""
     try:
@@ -188,6 +391,65 @@ def render_sidebar():
             st.caption("No current state defined yet.")
 
         st.divider()
+
+        # --- Hypotheses ---
+        hypotheses = _parse_hypotheses(doc)
+        if hypotheses:
+            active = [h for h in hypotheses if h["status"] in ("unvalidated", "testing")]
+            resolved = [h for h in hypotheses if h["status"] in ("validated", "invalidated")]
+
+            st.subheader(f"Hypotheses ({len(active)} active)")
+
+            import html as html_mod
+            for h in active:
+                status_class = f"hypothesis-{h['status']}"
+                badge = f'<span class="hypothesis-badge {status_class}">{html.escape(h["status"])}</span>'
+                with st.expander(f"{badge} {html.escape(h['text'][:60])}", expanded=False):
+                    st.markdown(f"**Tracked:** {h['date']}")
+                    st.markdown(f"**Test:** {h['test']}")
+                    st.markdown(f"**Evidence:** {h['evidence']}")
+
+                    # Status update controls
+                    new_status = st.selectbox(
+                        "Update status",
+                        options=["unvalidated", "testing", "validated", "invalidated"],
+                        index=["unvalidated", "testing", "validated", "invalidated"].index(h["status"]),
+                        key=f"hyp_status_{h['text'][:20]}",
+                    )
+                    if st.button("Save", key=f"hyp_save_{h['text'][:20]}"):
+                        if new_status != h["status"]:
+                            try:
+                                from services.document_updater import (
+                                    read_living_document, write_living_document,
+                                    _update_hypothesis_status, _git_commit,
+                                )
+                                from services.mongo_client import update_hypothesis_status, upsert_living_document
+                                from datetime import datetime, timezone
+
+                                fresh_doc = read_living_document()
+                                updated = _update_hypothesis_status(fresh_doc, h["text"], new_status)
+                                if updated != fresh_doc:
+                                    write_living_document(updated)
+                                    date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+                                    upsert_living_document(updated, metadata={"last_updated": date_str})
+                                    _git_commit(f"Hypothesis {new_status}: {h['text'][:50]}")
+                                    try:
+                                        update_hypothesis_status(h["text"], new_status)
+                                    except Exception:
+                                        pass
+                                    st.session_state.sidebar_data = {}
+                                    st.rerun()
+                            except Exception as e:
+                                st.error(f"Update failed: {e}")
+
+            if resolved:
+                with st.expander(f"Resolved ({len(resolved)})", expanded=False):
+                    for h in resolved:
+                        status_class = f"hypothesis-{h['status']}"
+                        badge = f'<span class="hypothesis-badge {status_class}">{html.escape(h["status"])}</span>'
+                        st.markdown(f"{badge} **{html.escape(h['text'][:60])}** ({h['date']})", unsafe_allow_html=True)
+
+            st.divider()
 
         # --- External Feedback ---
         st.subheader("External Feedback")
@@ -251,6 +513,15 @@ def render_sidebar():
 
         st.divider()
 
+        # --- Active Tensions ---
+        tensions = _parse_tensions(doc)
+        if tensions:
+            st.subheader(f"Active Tensions ({len(tensions)})")
+            for t in tensions:
+                with st.expander(f"⚡ {t['section_name']} — {t['reason']}", expanded=False):
+                    st.markdown(t["details"])
+            st.divider()
+
         # --- Actions ---
         st.subheader("Actions")
 
@@ -280,6 +551,55 @@ def render_sidebar():
                         st.info("No discrepancies found.")
                 except Exception as e:
                     st.error(f"Audit failed: {e}")
+
+        # Track Hypothesis form
+        with st.expander("Track Hypothesis", expanded=st.session_state.get("show_hypothesis_form", False)):
+            with st.form("hypothesis_form", clear_on_submit=True):
+                hyp_text = st.text_input("Hypothesis", placeholder="e.g., Small plants have <12 month procurement cycles")
+                hyp_test = st.text_input("Test plan (optional)", placeholder="e.g., Ask 3 plant operators")
+                submitted = st.form_submit_button("Track")
+                if submitted and hyp_text.strip():
+                    try:
+                        from services.document_updater import (
+                            read_living_document, write_living_document, _add_hypothesis, _git_commit,
+                        )
+                        from services.mongo_client import insert_claim, upsert_living_document
+                        from datetime import datetime, timezone
+
+                        date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+                        test_plan = hyp_test.strip() if hyp_test.strip() else "[to be defined]"
+                        entry = (
+                            f"- [{date_str}] **{hyp_text.strip()}**\n"
+                            f"  Status: unvalidated | Test: {test_plan}\n"
+                            f"  Evidence: ---"
+                        )
+
+                        fresh_doc = read_living_document()
+                        updated = _add_hypothesis(fresh_doc, entry)
+                        write_living_document(updated)
+                        upsert_living_document(updated, metadata={"last_updated": date_str, "update_reason": "New hypothesis"})
+                        _git_commit(f"Add hypothesis: {hyp_text.strip()[:50]}")
+
+                        try:
+                            insert_claim({
+                                "claim_text": hyp_text.strip(),
+                                "claim_type": "hypothesis",
+                                "confidence": "speculative",
+                                "source_type": "hypothesis",
+                                "who_said_it": "Founder",
+                                "confirmed": True,
+                                "status": "unvalidated",
+                                "test_plan": test_plan,
+                                "created_at": datetime.now(timezone.utc),
+                            })
+                        except Exception:
+                            pass
+
+                        st.success(f"Tracking: {hyp_text.strip()}")
+                        st.session_state.sidebar_data = {}
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Could not track hypothesis: {e}")
 
         if doc:
             st.download_button(
@@ -358,3 +678,15 @@ def render_sidebar():
                 st.caption(f"RAG: {rag['claim_count']} / {rag['threshold']} claims")
         except Exception:
             pass
+
+        st.divider()
+
+        # --- Quick Commands ---
+        with st.expander("Quick Commands", expanded=False):
+            st.markdown(
+                "**Chat prefixes:**\n"
+                "- `note:` / `remember:` / `jot:` / `fyi:` — Quick note\n"
+                "- `hypothesis:` — Track a hypothesis\n"
+                "- `validated:` / `invalidated:` — Update hypothesis status\n"
+                "- `no,` / `actually,` / `correction:` — Direct correction"
+            )
