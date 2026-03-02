@@ -33,7 +33,7 @@ Last updated: [date]
 - [Awaiting first session]
 
 ### Business Model / Revenue Model
-**Current position:** Three-pronged revenue model: (1) Project-based fees as wedge product for initial customer entry, (2) Subscription/licensing for ongoing data access and interrogation - the "killer feature" enabling customers to query generated insights throughout plant lifecycle, (3) Forward deployment compensation where engineers work alongside asset owners. Cost structure includes operations, compute, customer acquisition (sales-driven), and labor costs primarily for forward-deployed engineers, customer success, sales engineering, plus small AI team (1-5 people), multidisciplinary engineering team, and outsourced legal. Future potential includes selling risk assessment data to insurance/banking as MGA-style benchmarks. Targets 5-10% of $150B US engineering market ($7.5-15B), potentially 2x including Europe.
+**Current position:** Two-pronged revenue model: (1) Project-based fees as wedge product for initial customer entry, (2) Subscription/licensing for ongoing data access and interrogation - the "killer feature" enabling customers to query generated insights throughout plant lifecycle. Cost structure includes operations, compute, customer acquisition (sales-driven), and labor costs for customer success, sales engineering, plus small AI team (1-5 people), multidisciplinary engineering team, and outsourced legal. Forward deployment compensation available as premium offering to prevent customer abuse but not core revenue stream. Future potential includes selling risk assessment data to insurance/banking as MGA-style benchmarks. Targets 5-10% of $150B US engineering market ($7.5-15B), potentially 2x including Europe.
 **Changelog:**
 - [Awaiting first session]
 - 2026-03-02: Positioned as AI-native EPCM with HazOp/LOPA wedge product, expanding to full engineering platform. Source: Co-founder discussion (Andrew, Danny)
@@ -41,6 +41,7 @@ Last updated: [date]
 - 2026-03-02: Clarified expansion timeline - HazOp/LOPA initially, design/procurement/construction medium-term, full lifecycle (operations/decommissioning) as 5-10 year vision. Source: Co-founder discussion (Andrew, Danny)
 ```
 - 2026-03-02: Detailed cost structure and revenue streams mapped - costs include operations, compute, CAC, labor (forward-deployed engineers, AI team). Revenue from project fees (wedge), data access subscriptions/licensing, forward deployment. Source: Co-founder discussion (Andrew, Danny)
+- 2026-03-02: Clarified forward deployment as premium offering, not core revenue stream. Main model focuses on project fees (wedge) and data access subscriptions/licensing. Source: Contradiction resolution discussion (Andrew, Danny)
 
 ### Pricing
 **Current position:** [Not yet defined]
