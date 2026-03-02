@@ -506,3 +506,72 @@ class TestVectorSearch:
         with patch.object(mc, "get_db", return_value=mock_db):
             result = mc.vector_search("claims", [0.1], "idx")
             assert result == []
+
+
+# ---------------------------------------------------------------------------
+# search_sessions tests
+# ---------------------------------------------------------------------------
+
+class TestSearchSessions:
+    """Tests for search_sessions: searches sessions with optional filters."""
+
+    def test_no_filters(self):
+        """Should delegate to find_many with empty query when no filters given."""
+        with patch.object(mc, "find_many", return_value=[]) as mock:
+            result = mc.search_sessions()
+            mock.assert_called_once_with(
+                "sessions", query={}, sort_by="created_at", sort_order=-1, limit=20
+            )
+            assert result == []
+
+    def test_session_type_filter(self):
+        """Should build a case-insensitive regex query on metadata.session_type."""
+        with patch.object(mc, "find_many", return_value=[]) as mock:
+            mc.search_sessions(session_type="Investor")
+            mock.assert_called_once_with(
+                "sessions",
+                query={"metadata.session_type": {"$regex": "Investor", "$options": "i"}},
+                sort_by="created_at",
+                sort_order=-1,
+                limit=20,
+            )
+
+    def test_date_range_filter(self):
+        """Should include session_date query with $gte and $lte when both dates given."""
+        with patch.object(mc, "find_many", return_value=[]) as mock:
+            mc.search_sessions(date_from="2026-01-01", date_to="2026-03-01")
+            mock.assert_called_once_with(
+                "sessions",
+                query={"session_date": {"$gte": "2026-01-01", "$lte": "2026-03-01"}},
+                sort_by="created_at",
+                sort_order=-1,
+                limit=20,
+            )
+
+
+# ---------------------------------------------------------------------------
+# get_session_claims tests
+# ---------------------------------------------------------------------------
+
+class TestGetSessionClaims:
+    """Tests for get_session_claims: retrieves claims for specific session IDs."""
+
+    def test_with_session_ids(self):
+        """Should build $in query and delegate to find_many."""
+        with patch.object(mc, "find_many", return_value=[{"claim": "c1"}]) as mock:
+            result = mc.get_session_claims(["id1", "id2"])
+            mock.assert_called_once_with(
+                "claims",
+                query={"session_id": {"$in": ["id1", "id2"]}},
+                sort_by="created_at",
+                sort_order=-1,
+                limit=100,
+            )
+            assert result == [{"claim": "c1"}]
+
+    def test_empty_list_returns_empty(self):
+        """Should return empty list without calling find_many when session_ids is empty."""
+        with patch.object(mc, "find_many", return_value=[]) as mock:
+            result = mc.get_session_claims([])
+            mock.assert_not_called()
+            assert result == []

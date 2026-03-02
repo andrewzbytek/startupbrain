@@ -3,6 +3,9 @@ Chat interface for Startup Brain.
 Handles conversation, query routing, and contradiction resolution UI.
 """
 
+import re
+from datetime import datetime, timedelta, timezone
+
 import streamlit as st
 
 from app.state import add_message, set_mode, reset_ingestion, invalidate_sidebar
@@ -10,6 +13,17 @@ from app.state import add_message, set_mode, reset_ingestion, invalidate_sidebar
 
 # Minimum transcript length to suggest ingestion flow
 TRANSCRIPT_SUGGEST_LENGTH = 500
+
+# Maps user keywords to MongoDB session_type values
+_SESSION_TYPE_MAP = {
+    "investor": "Investor",
+    "vc": "Investor",
+    "customer": "Customer interview",
+    "advisor": "Advisor",
+    "co-founder": "Co-founder",
+    "cofounder": "Co-founder",
+    "internal": "Internal",
+}
 
 
 def _is_likely_transcript(text: str) -> bool:
@@ -89,14 +103,84 @@ def _strip_status_prefix(text: str) -> tuple:
     return "", text.strip()
 
 
+def _extract_session_type_filter(lower: str):
+    """Scan for session type keywords in the message. Returns MongoDB session_type or None."""
+    for keyword, session_type in _SESSION_TYPE_MAP.items():
+        if keyword in lower:
+            return session_type
+    return None
+
+
+def _extract_date_filter(lower: str):
+    """
+    Parse date references from the message.
+    Returns {"from": "YYYY-MM-DD", "to": "YYYY-MM-DD"} or None.
+    """
+    # ISO date
+    iso_match = re.search(r'(\d{4}-\d{2}-\d{2})', lower)
+    if iso_match:
+        date_str = iso_match.group(1)
+        return {"from": date_str, "to": date_str}
+
+    # Month + day (e.g. "march 5th", "january 15")
+    months = {
+        "january": 1, "february": 2, "march": 3, "april": 4,
+        "may": 5, "june": 6, "july": 7, "august": 8,
+        "september": 9, "october": 10, "november": 11, "december": 12,
+    }
+    month_pattern = '|'.join(months.keys())
+    month_match = re.search(
+        r'(' + month_pattern + r')\s+(\d{1,2})(?:st|nd|rd|th)?', lower
+    )
+    if month_match:
+        month_num = months[month_match.group(1)]
+        day = int(month_match.group(2))
+        year = datetime.now(timezone.utc).year
+        date_str = f"{year}-{month_num:02d}-{day:02d}"
+        return {"from": date_str, "to": date_str}
+
+    # Relative: last week
+    now = datetime.now(timezone.utc)
+    if "last week" in lower:
+        week_ago = now - timedelta(days=7)
+        return {"from": week_ago.strftime("%Y-%m-%d"), "to": now.strftime("%Y-%m-%d")}
+
+    # Relative: this month
+    if "this month" in lower:
+        first_of_month = now.replace(day=1)
+        return {"from": first_of_month.strftime("%Y-%m-%d"), "to": now.strftime("%Y-%m-%d")}
+
+    return None
+
+
+def _extract_participant_filter(lower: str):
+    """Extract participant name from 'meeting with [name]' pattern. Returns name or None."""
+    match = re.search(r'meeting(?:s)?\s+with\s+([a-z]+(?:\s+[a-z]+)?)', lower)
+    if match:
+        return match.group(1).strip()
+    return None
+
+
 def _classify_query(text: str) -> str:
     """
     Classify user query for routing.
-    Returns: "current_state" | "historical" | "pitch" | "challenge" | "analysis" | "general"
+    Returns: "current_state" | "historical" | "pitch" | "recall" | "challenge" | "analysis" | "general"
     """
     lower = text.lower()
     if any(kw in lower for kw in ["what is our current", "what's our", "where are we on", "current position", "right now"]):
         return "current_state"
+    # Recall — check before pitch to avoid "investor" routing to pitch
+    _recall_keywords = [
+        "list all meetings", "list all sessions", "how many meetings",
+        "what meetings", "meeting with", "meetings with",
+        "what did we discuss", "summarize all",
+        "what did investors say", "what did customers say",
+        "who said", "who was the most", "recap",
+        "customer feedback", "investor feedback", "advisor feedback",
+        "all customer", "all investor",
+    ]
+    if any(kw in lower for kw in _recall_keywords):
+        return "recall"
     if any(kw in lower for kw in ["pitch", "investor", "deck", "slide", "one-pager", "elevator"]):
         return "pitch"
     if any(kw in lower for kw in ["challenge", "poke holes", "devil's advocate", "stress test", "what am i missing", "what are we missing", "pushback"]):
@@ -106,6 +190,119 @@ def _classify_query(text: str) -> str:
     if any(kw in lower for kw in ["when did we", "history", "evolution", "changed", "last time", "previous"]):
         return "historical"
     return "general"
+
+
+# ---------------------------------------------------------------------------
+# Recall context — fetch sessions/claims/feedback from MongoDB
+# ---------------------------------------------------------------------------
+
+_MAX_RECALL_CHARS = 8000
+
+
+def _format_recall_context(sessions, claims=None, feedback=None) -> str:
+    """Format sessions, claims, and feedback into XML context for the prompt."""
+    parts = ["<session_recall>", f"<session_count>{len(sessions)}</session_count>"]
+
+    if sessions:
+        parts.append("<sessions>")
+        for s in sessions:
+            meta = s.get("metadata", {})
+            date = s.get("session_date", s.get("created_at", ""))
+            if hasattr(date, "strftime"):
+                date = date.strftime("%Y-%m-%d")
+            stype = meta.get("session_type", "Unknown")
+            participants = meta.get("participants", "")
+            summary = s.get("summary", "")[:500]
+            tags = ", ".join(meta.get("tags", []))
+            entry = f"- [{date}] {stype}"
+            if participants:
+                entry += f" | Participants: {participants}"
+            if summary:
+                entry += f" | {summary}"
+            if tags:
+                entry += f" | Tags: {tags}"
+            parts.append(entry)
+        parts.append("</sessions>")
+
+    if claims:
+        parts.append("<claims>")
+        for c in claims[:30]:
+            ctype = c.get("claim_type", "claim")
+            text = c.get("claim_text", "")
+            who = c.get("who_said_it", "")
+            confidence = c.get("confidence", "")
+            entry = f"- [{ctype}] {text}"
+            if who:
+                entry += f" (by {who}"
+                if confidence:
+                    entry += f", {confidence}"
+                entry += ")"
+            parts.append(entry)
+        parts.append("</claims>")
+
+    if feedback:
+        parts.append("<feedback>")
+        for f in feedback[:10]:
+            source = f.get("source_type", "")
+            summary = f.get("summary", str(f.get("text", "")))[:200]
+            parts.append(f"- [{source}] {summary}")
+        parts.append("</feedback>")
+
+    parts.append("</session_recall>")
+
+    result = "\n".join(parts)
+    if len(result) > _MAX_RECALL_CHARS:
+        result = result[:_MAX_RECALL_CHARS] + "\n</session_recall>"
+    return result
+
+
+def _build_recall_context(user_message: str) -> str:
+    """Build recall context from MongoDB for a recall query. Returns XML string or empty."""
+    from services.mongo_client import is_mongo_available, search_sessions, get_session_claims, get_feedback
+
+    if not is_mongo_available():
+        return ""
+
+    lower = user_message.lower()
+    session_type = _extract_session_type_filter(lower)
+    date_filter = _extract_date_filter(lower)
+    participant = _extract_participant_filter(lower)
+
+    kwargs = {"limit": 20}
+    if session_type:
+        kwargs["session_type"] = session_type
+    if participant:
+        kwargs["participant"] = participant
+    if date_filter:
+        kwargs["date_from"] = date_filter.get("from")
+        kwargs["date_to"] = date_filter.get("to")
+
+    sessions = search_sessions(**kwargs)
+
+    if not sessions:
+        return "<session_recall><session_count>0</session_count></session_recall>"
+
+    # Fetch claims for detail queries
+    session_ids = []
+    for s in sessions:
+        sid = s.get("_id")
+        if sid:
+            session_ids.append(str(sid))
+    claims = get_session_claims(session_ids) if session_ids else []
+
+    # Fetch feedback when message mentions it
+    feedback_list = []
+    feedback_keywords = ["feedback", "what did investors say", "what did customers say", "what did advisors say"]
+    if any(kw in lower for kw in feedback_keywords):
+        feedback_source_map = {
+            "Investor": "investor",
+            "Customer interview": "customer",
+            "Advisor": "advisor",
+        }
+        source_type = feedback_source_map.get(session_type)
+        feedback_list = get_feedback(source_type=source_type)
+
+    return _format_recall_context(sessions, claims, feedback_list)
 
 
 def _get_system_prompt() -> str:
@@ -147,6 +344,9 @@ def _get_system_prompt() -> str:
         "- Analysis/strategy queries: Socratic, opinionated, reference Decision Log trade-offs\n"
         "- Historical queries: narrative, trace the evolution through Changelog entries\n"
         "- Pitch queries: constructive, polished, frame strengths\n"
+        "- Recall queries: when given <session_recall> data, answer based on that data. "
+        "Cite dates, participants, and session types. If no sessions match, say so. "
+        "Do not invent sessions not in the data.\n"
         "- Casual/greetings: brief, friendly, no context surfacing\n\n"
 
         "## Guardrails\n"
@@ -184,10 +384,17 @@ def _build_claude_prompt(user_message: str, query_type: str):
     else:
         full_prompt = user_message
 
+    # Inject recall context for recall queries
+    if query_type == "recall":
+        recall_context = _build_recall_context(user_message)
+        if recall_context:
+            full_prompt = f"{recall_context}\n\n{full_prompt}"
+
     task_map = {
         "pitch": "pitch_generation",
         "challenge": "strategic_analysis",
         "analysis": "strategic_analysis",
+        "recall": "general",
         "current_state": "general",
         "historical": "general",
         "general": "general",

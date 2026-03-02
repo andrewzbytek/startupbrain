@@ -43,6 +43,11 @@ from app.components.chat import (
     _is_hypothesis_status_update,
     _get_system_prompt,
     TRANSCRIPT_SUGGEST_LENGTH,
+    _extract_session_type_filter,
+    _extract_date_filter,
+    _extract_participant_filter,
+    _format_recall_context,
+    _MAX_RECALL_CHARS,
 )
 
 
@@ -396,3 +401,243 @@ class TestIsHypothesisStatusUpdateChat:
 
     def test_normal_false(self):
         assert _is_hypothesis_status_update("test") is False
+
+
+# ---------------------------------------------------------------------------
+# _classify_query — "recall" type
+# ---------------------------------------------------------------------------
+
+class TestClassifyQueryRecall:
+    def test_list_all_meetings(self):
+        assert _classify_query("list all meetings") == "recall"
+
+    def test_what_did_investors_say(self):
+        """'what did investors say' is a recall keyword — should NOT fall through to pitch."""
+        assert _classify_query("what did investors say") == "recall"
+
+    def test_what_did_customers_say(self):
+        assert _classify_query("what did customers say") == "recall"
+
+    def test_investor_feedback(self):
+        assert _classify_query("investor feedback") == "recall"
+
+    def test_meeting_with_name(self):
+        assert _classify_query("meeting with Sarah") == "recall"
+
+    def test_recap(self):
+        assert _classify_query("recap") == "recall"
+
+    def test_all_customer_meetings(self):
+        assert _classify_query("all customer meetings") == "recall"
+
+    def test_pitch_keyword_still_works(self):
+        """'Prepare a pitch for investors' has no recall keywords — falls through to pitch."""
+        assert _classify_query("Prepare a pitch for investors") == "pitch"
+
+    def test_investor_summary_still_pitch(self):
+        """'Draft an investor summary' has no recall keywords — falls through to pitch."""
+        assert _classify_query("Draft an investor summary") == "pitch"
+
+    def test_existing_current_state_unchanged(self):
+        assert _classify_query("What is our current pricing?") == "current_state"
+
+    def test_existing_analysis_unchanged(self):
+        assert _classify_query("Analyze our go-to-market strategy") == "analysis"
+
+    def test_existing_challenge_unchanged(self):
+        assert _classify_query("Challenge our pricing model") == "challenge"
+
+    def test_existing_general_unchanged(self):
+        assert _classify_query("Hello how are you") == "general"
+
+
+# ---------------------------------------------------------------------------
+# _extract_session_type_filter
+# ---------------------------------------------------------------------------
+
+class TestExtractSessionTypeFilter:
+    def test_investor_keyword(self):
+        assert _extract_session_type_filter("investor") == "Investor"
+
+    def test_vc_maps_to_investor(self):
+        assert _extract_session_type_filter("vc meetings") == "Investor"
+
+    def test_customer_maps_to_customer_interview(self):
+        assert _extract_session_type_filter("customer interviews") == "Customer interview"
+
+    def test_advisor_keyword(self):
+        assert _extract_session_type_filter("advisor") == "Advisor"
+
+    def test_no_match_returns_none(self):
+        assert _extract_session_type_filter("hello world") is None
+
+    def test_cofounder_keyword(self):
+        assert _extract_session_type_filter("cofounder sync") == "Co-founder"
+
+    def test_internal_keyword(self):
+        assert _extract_session_type_filter("internal discussion") == "Internal"
+
+
+# ---------------------------------------------------------------------------
+# _extract_date_filter
+# ---------------------------------------------------------------------------
+
+class TestExtractDateFilter:
+    def test_iso_date(self):
+        result = _extract_date_filter("meetings on 2026-03-05")
+        assert result == {"from": "2026-03-05", "to": "2026-03-05"}
+
+    def test_month_day_with_ordinal(self):
+        from unittest.mock import patch, MagicMock
+        from datetime import datetime as real_datetime, timezone
+
+        mock_now = real_datetime(2026, 3, 15, tzinfo=timezone.utc)
+        with patch("app.components.chat.datetime") as mock_dt:
+            mock_dt.now.return_value = mock_now
+            # re-import not needed since _extract_date_filter uses datetime at call time
+            result = _extract_date_filter("meetings in march 5th")
+        assert result == {"from": "2026-03-05", "to": "2026-03-05"}
+
+    def test_this_month_returns_range(self):
+        result = _extract_date_filter("this month")
+        assert result is not None
+        assert "from" in result
+        assert "to" in result
+        # "from" should be first of the current month (ends with -01)
+        assert result["from"].endswith("-01")
+
+    def test_last_week_returns_range(self):
+        result = _extract_date_filter("last week")
+        assert result is not None
+        assert "from" in result
+        assert "to" in result
+        # "from" should be earlier than "to"
+        assert result["from"] < result["to"]
+
+    def test_no_date_returns_none(self):
+        assert _extract_date_filter("hello world") is None
+
+    def test_iso_date_embedded_in_sentence(self):
+        result = _extract_date_filter("what happened on 2026-01-15 with the investor")
+        assert result == {"from": "2026-01-15", "to": "2026-01-15"}
+
+
+# ---------------------------------------------------------------------------
+# _extract_participant_filter
+# ---------------------------------------------------------------------------
+
+class TestExtractParticipantFilter:
+    def test_meeting_with_single_name(self):
+        assert _extract_participant_filter("meeting with sarah") == "sarah"
+
+    def test_meetings_with_two_names(self):
+        assert _extract_participant_filter("meetings with john doe") == "john doe"
+
+    def test_no_match_returns_none(self):
+        assert _extract_participant_filter("what happened yesterday") is None
+
+    def test_meeting_with_at_end_of_sentence(self):
+        result = _extract_participant_filter("show me the meeting with alex")
+        assert result == "alex"
+
+
+# ---------------------------------------------------------------------------
+# _format_recall_context
+# ---------------------------------------------------------------------------
+
+class TestFormatRecallContext:
+    def test_empty_sessions(self):
+        result = _format_recall_context([])
+        assert "<session_recall>" in result
+        assert "<session_count>0</session_count>" in result
+        assert "</session_recall>" in result
+
+    def test_sessions_with_data(self):
+        sessions = [
+            {
+                "session_date": "2026-03-01",
+                "summary": "Discussed pricing strategy",
+                "metadata": {
+                    "session_type": "Investor",
+                    "participants": "Sarah Chen",
+                    "tags": ["pricing"],
+                },
+            }
+        ]
+        result = _format_recall_context(sessions)
+        assert "<sessions>" in result
+        assert "Investor" in result
+        assert "Sarah Chen" in result
+        assert "Discussed pricing strategy" in result
+        assert "pricing" in result
+        assert "<session_count>1</session_count>" in result
+
+    def test_with_claims(self):
+        sessions = [{"session_date": "2026-03-01", "metadata": {}}]
+        claims = [
+            {
+                "claim_type": "decision",
+                "claim_text": "Pricing set to $500/month",
+                "who_said_it": "Andrew",
+                "confidence": "definite",
+            }
+        ]
+        result = _format_recall_context(sessions, claims=claims)
+        assert "<claims>" in result
+        assert "Pricing set to $500/month" in result
+        assert "Andrew" in result
+        assert "definite" in result
+        assert "</claims>" in result
+
+    def test_with_feedback(self):
+        sessions = [{"session_date": "2026-03-01", "metadata": {}}]
+        feedback = [
+            {"source_type": "investor", "summary": "Liked the pricing model"}
+        ]
+        result = _format_recall_context(sessions, feedback=feedback)
+        assert "<feedback>" in result
+        assert "investor" in result
+        assert "Liked the pricing model" in result
+        assert "</feedback>" in result
+
+    def test_respects_max_chars_limit(self):
+        # Create sessions that produce a very long context
+        sessions = []
+        for i in range(200):
+            sessions.append({
+                "session_date": f"2026-01-{(i % 28) + 1:02d}",
+                "summary": f"This is a very detailed summary for session number {i} " * 10,
+                "metadata": {
+                    "session_type": "Investor",
+                    "participants": f"Person {i}",
+                    "tags": [f"tag_{i}"],
+                },
+            })
+        result = _format_recall_context(sessions)
+        # Result should be truncated to _MAX_RECALL_CHARS + closing tag
+        assert len(result) <= _MAX_RECALL_CHARS + len("\n</session_recall>") + 10
+        # Should still end with the closing tag
+        assert result.rstrip().endswith("</session_recall>")
+
+    def test_session_with_datetime_object(self):
+        from datetime import datetime, timezone
+        sessions = [
+            {
+                "session_date": datetime(2026, 3, 1, tzinfo=timezone.utc),
+                "summary": "Test session",
+                "metadata": {"session_type": "Internal"},
+            }
+        ]
+        result = _format_recall_context(sessions)
+        assert "2026-03-01" in result
+
+    def test_session_falls_back_to_created_at(self):
+        sessions = [
+            {
+                "created_at": "2026-02-15",
+                "summary": "Fallback date test",
+                "metadata": {"session_type": "Advisor"},
+            }
+        ]
+        result = _format_recall_context(sessions)
+        assert "2026-02-15" in result

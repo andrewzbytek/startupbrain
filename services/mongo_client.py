@@ -283,6 +283,48 @@ def update_hypothesis_status(claim_text_fragment, new_status):
         return False
 
 
+def search_sessions(
+    session_type: str = None,
+    participant: str = None,
+    date_from: str = None,
+    date_to: str = None,
+    limit: int = 20,
+) -> list:
+    """
+    Search sessions with optional filters, all ANDed together.
+    Returns list of session documents, newest first.
+    """
+    query = {}
+    if session_type:
+        query["metadata.session_type"] = {"$regex": session_type, "$options": "i"}
+    if participant:
+        query["metadata.participants"] = {"$regex": participant, "$options": "i"}
+    date_query = {}
+    if date_from:
+        date_query["$gte"] = date_from
+    if date_to:
+        date_query["$lte"] = date_to
+    if date_query:
+        query["session_date"] = date_query
+    return find_many("sessions", query=query, sort_by="created_at", sort_order=-1, limit=limit)
+
+
+def get_session_claims(session_ids: list, limit: int = 100) -> list:
+    """
+    Get claims for specific session IDs.
+    Returns empty list if session_ids is empty.
+    """
+    if not session_ids:
+        return []
+    return find_many(
+        "claims",
+        query={"session_id": {"$in": session_ids}},
+        sort_by="created_at",
+        sort_order=-1,
+        limit=limit,
+    )
+
+
 def count_documents(collection_name: str, query: dict = None) -> int:
     """Count documents in a collection. Returns 0 on failure."""
     db = get_db()
