@@ -11,10 +11,11 @@ Last updated: [date]
 - 2026-03-02: Added infrastructure spending context - U.S. spends $1.5T annually on infrastructure with 10% ($150B) being engineering. Source: Co-founder discussion (Andrew, Danny)
 
 ### Target Market / Initial Customer
-**Current position:** Oil and gas, power generation (nuclear), hydro, and gas behind the meter industries.
+**Current position:** Oil and gas, power generation (nuclear), hydro, and gas behind the meter industries. We achieve fast learning cycles by being horizontal within these industries - using HAZOP and LOPA as wedge that requires companies to give us comprehensive facility information. Horizontal approach means focusing on documentation and engineering (EPCM model) without touching construction - starting with HAZOP/LOPA, expanding to P&ID, then procurement, but never building actual power plants or operating them. This differs from vertical approaches like Unlimited Industries that go from design to construction to handover.
 **Changelog:**
 - [Awaiting first session]
 - 2026-03-02: Defined target industries as oil and gas, power generation (nuclear), hydro, and gas behind the meter. Source: Co-founder discussion (Andrew, Danny)
+- 2026-03-02: Clarified horizontal vs vertical approach - horizontal EPCM model (documentation/engineering only) vs vertical EPC model (design through construction). HAZOP/LOPA wedge enables comprehensive facility information access for fast learning cycles. Source: Contradiction resolution discussion (Andrew, Danny)
 
 ### Value Proposition
 **Current position:** AI-native engineering platform that allows 5 engineers to do what traditionally took 100. Can process HazOp and LOPA risk assessments in 20 minutes vs 3,000 hours with good accuracy. Enables iterative solutions (monthly/yearly reassessments) vs traditional waterfall approaches. Provides interactive reports where clients can query design decisions ("Why does this valve have to close so fast?") and preserves engineering knowledge so plant operators understand design rationale even if original engineers leave. AI models can now ingest P&IDs, material specs, and engineering codes and produce PE-level calculations. HAZOP is the narrowest wedge that forces full-system ingestion and unlocks everything downstream - once they structure HAZOP, they have a system model of the plant, which is incredibly valuable. With the system model, they can automate ~50% of downstream engineering tasks today, moving toward ~70% within 12 months. This automation breaks the billable hour business model. Engineers hate doing HAZOP because it is manual, repetitive, and politically sensitive, but it forces understanding of the entire facility.
@@ -74,12 +75,13 @@ Last updated: [date]
 - [Awaiting first session]
 
 ### Moat / Defensibility
-**Current position:** Data network effects from ingesting thousands of customer files will accumulate proprietary knowledge and enable faster iteration. Bringing iterative software approaches to traditionally waterfall engineering processes. The moat is not just the AI model itself, but also deep context, judgement, trust and accountability. Every facility they ingest deepens their understanding of risk patterns, code interpretation, equipment configurations, procurement timelines, and failure modes. This cross-project intelligence context compounds and becomes more valuable over time. The defensibility comes from both the accumulated technical knowledge in the AI model and the deep relationships built through context, judgment, trust, and accountability as the company grows stronger.
+**Current position:** Data network effects from ingesting thousands of customer files will accumulate proprietary knowledge and enable faster iteration. Bringing iterative software approaches to traditionally waterfall engineering processes. The moat is not just the AI model itself, but also deep context, judgement, trust and accountability. Every facility they ingest deepens their understanding of risk patterns, code interpretation, equipment configurations, procurement timelines, and failure modes. This cross-project intelligence context compounds and becomes more valuable over time. The defensibility comes from both the accumulated technical knowledge in the AI model and the deep relationships built through context, judgment, trust, and accountability as the company grows stronger. Competitive advantage through horizontal AI-native approach with fast iteration cycles - our work is so fast that we can work with unlimited customers simultaneously, keeping knowledge flywheel spinning. Knowledge aggregation across many projects and thousands of engineers vs competitors with isolated knowledge (classical EPCs ~200 engineers, consultancies, in-house teams limited to single companies).
 **Changelog:**
 - [Awaiting first session]
 - 2026-03-02: Identified data network effects and iterative process advantage as key defensibility. Source: Co-founder discussion (Andrew, Danny)
 - 2026-03-02: Refined moat as deep context/judgment/trust vs AI model itself. Cross-project intelligence compounds understanding of risk patterns, codes, equipment, procurement, failure modes. Source: Co-founder discussion (Andrew, Danny)
 - 2026-03-02: Clarified moat includes both AI model accumulation AND deep context/judgment/trust - not either-or but both technical and relational defensibility. Source: Contradiction resolution discussion (Andrew, Danny)
+- 2026-03-02: Added horizontal AI-native positioning enabling unlimited simultaneous customers and knowledge aggregation advantage vs competitors with isolated knowledge bases. Source: Co-founder discussion (Danny, Andrew)
 
 ### Key Assumptions
 - It's statistically almost guaranteed that we will uncover missed risks in existing company assessments
@@ -117,6 +119,11 @@ Last updated: [date]
 
 ## Active Hypotheses
 [No hypotheses tracked yet]
+
+### Competitive Landscape
+**Current position:** Competition maps across two key dimensions: (1) AI-native vs old school companies, and (2) short/fast vs long/slow learning cycles. We are positioned as AI-native with very short learning cycles through horizontal approach using HAZOP/LOPA wedge that requires comprehensive facility information. This enables working with unlimited customers simultaneously, keeping our knowledge flywheel spinning. Second competitive dimension is aggregated vs isolated knowledge - our knowledge compounds across many projects and thousands of engineers. Competitors include: Unlimited Industries (vertical approach, slow learning cycles due to working with few customers), classical EPCs/EPCMs (~200 engineers, limited projects, knowledge lost over time), small engineering consultancies (more isolated knowledge than EPCs), and asset owner in-house teams (most isolated knowledge, single company focus, not AI-native).
+**Changelog:**
+- 2026-03-02: Mapped competitive landscape across AI-native vs old school and learning cycle speed dimensions. Identified horizontal vs vertical approach advantages and aggregated vs isolated knowledge positioning. Source: Co-founder discussion (Danny, Andrew)
 
 ## Decision Log
 
@@ -225,6 +232,13 @@ The biggest value of HAZOP and LOPA is that it's a wedge that we can later use t
 Once we are in and once we have the data, we can also tell them, well, we can also run checks of HAZOP and LOPA not only on the concept but also on your P&ID, and then we can later say, oh, we can also help you with the procurement, or we can also help you with HAZOP and LOPA during operations. We will basically build trust and capture the entire engineering stack eventually.
 **Context:** Contradiction resolution during ingestion.
 **Participants:** Andrew, Danny
+
+### 2026-03-02 — Resolved: Current State → Target Market / Initial Customer
+**Decision:** Updated to: We achieve fast learning cycles by being horizontal and finding a wedge (Hasob and Lopa) that requires companies to give us comprehensive information.
+**Alternatives considered:** Keep previous position
+**Why alternatives were rejected:** So what we meant by the horizontal approach is that we will target specific industries like oil and gas, power generation, and hydro and gas, and that will be our focus on the industries. Within those industries, we will not do a vertical approach, which means from design to procurement to construction to operation (EPC). We will do a horizontal approach (EPCM), which means that we will work only on the documentation and engineering and will not touch construction. That means we'll start with HAZOP and LOPA, then P&ID, then procurement, but we'll never touch construction, or will never be the person who will build the actual power plant or operate it. We will not do the Unlimited Industries startup play, which is from the very design to handing over the entire power plant and building it themselves.
+**Context:** Contradiction resolution during ingestion.
+**Participants:** Danny, Andrew
 
 ## Feedback Tracker
 
