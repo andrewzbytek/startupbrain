@@ -70,9 +70,9 @@ Last updated: [date]
 - 2026-03-02: Positioned as AI-native engineering company for energy/power, HAZOP/LOPA as ingestion wedge for system model creation. Source: Co-founder discussion (Andrew, Danny)
 
 ### Competitive Landscape
-**Current position:** [Not yet defined]
+**Current position:** Competition maps across two key dimensions: (1) AI-native vs old school companies, and (2) short/fast vs long/slow learning cycles. We are positioned as AI-native with very short learning cycles through horizontal approach using HAZOP/LOPA wedge that requires comprehensive facility information. This enables working with unlimited customers simultaneously, keeping our knowledge flywheel spinning. Second competitive dimension is aggregated vs isolated knowledge - our knowledge compounds across many projects and thousands of engineers. Competitors include: Unlimited Industries (vertical approach, slow learning cycles due to working with few customers), classical EPCs/EPCMs (~200 engineers, limited projects, knowledge lost over time), small engineering consultancies (more isolated knowledge than EPCs), and asset owner in-house teams (most isolated knowledge, single company focus, not AI-native).
 **Changelog:**
-- [Awaiting first session]
+- 2026-03-02: Mapped competitive landscape across AI-native vs old school and learning cycle speed dimensions. Identified horizontal vs vertical approach advantages and aggregated vs isolated knowledge positioning. Source: Co-founder discussion (Danny, Andrew)
 
 ### Moat / Defensibility
 **Current position:** Data network effects from ingesting thousands of customer files will accumulate proprietary knowledge and enable faster iteration. Bringing iterative software approaches to traditionally waterfall engineering processes. The moat is not just the AI model itself, but also deep context, judgement, trust and accountability. Every facility they ingest deepens their understanding of risk patterns, code interpretation, equipment configurations, procurement timelines, and failure modes. This cross-project intelligence context compounds and becomes more valuable over time. The defensibility comes from both the accumulated technical knowledge in the AI model and the deep relationships built through context, judgment, trust, and accountability as the company grows stronger. Competitive advantage through horizontal AI-native approach with fast iteration cycles - our work is so fast that we can work with unlimited customers simultaneously, keeping knowledge flywheel spinning. Knowledge aggregation across many projects and thousands of engineers vs competitors with isolated knowledge (classical EPCs ~200 engineers, consultancies, in-house teams limited to single companies).
@@ -119,11 +119,6 @@ Last updated: [date]
 
 ## Active Hypotheses
 [No hypotheses tracked yet]
-
-### Competitive Landscape
-**Current position:** Competition maps across two key dimensions: (1) AI-native vs old school companies, and (2) short/fast vs long/slow learning cycles. We are positioned as AI-native with very short learning cycles through horizontal approach using HAZOP/LOPA wedge that requires comprehensive facility information. This enables working with unlimited customers simultaneously, keeping our knowledge flywheel spinning. Second competitive dimension is aggregated vs isolated knowledge - our knowledge compounds across many projects and thousands of engineers. Competitors include: Unlimited Industries (vertical approach, slow learning cycles due to working with few customers), classical EPCs/EPCMs (~200 engineers, limited projects, knowledge lost over time), small engineering consultancies (more isolated knowledge than EPCs), and asset owner in-house teams (most isolated knowledge, single company focus, not AI-native).
-**Changelog:**
-- 2026-03-02: Mapped competitive landscape across AI-native vs old school and learning cycle speed dimensions. Identified horizontal vs vertical approach advantages and aggregated vs isolated knowledge positioning. Source: Co-founder discussion (Danny, Andrew)
 
 ## Decision Log
 

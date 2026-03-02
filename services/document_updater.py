@@ -365,8 +365,47 @@ def _update_hypothesis_status(doc: str, hypothesis_fragment: str, new_status: st
 
 
 def _add_section(doc: str, section: str, section_content: str) -> str:
-    """Add an entirely new section to Current State."""
-    # Insert before "## Decision Log"
+    """Add an entirely new section to Current State.
+
+    If the section already exists (even with placeholder content like
+    '[Not yet defined]'), replace it instead of creating a duplicate.
+    Inserts inside ## Current State, before the first ## boundary after it.
+    """
+    # Extract subsection name from "Current State → Foo" or content header
+    subsection = ""
+    if " → " in section:
+        _, subsection = section.split(" → ", 1)
+    else:
+        header_match = re.search(r"^### (.+)", section_content)
+        if header_match:
+            subsection = header_match.group(1).strip()
+
+    # If the subsection already exists in the document, replace it in-place
+    if subsection:
+        existing_pattern = re.compile(
+            rf"(### {re.escape(subsection)}\n)(.*?)(\n###|\n## |\Z)",
+            re.DOTALL,
+        )
+        match = existing_pattern.search(doc)
+        if match:
+            # Strip the header from section_content if it duplicates the existing one
+            content_body = section_content
+            header_line = f"### {subsection}"
+            if content_body.strip().startswith(header_line):
+                content_body = content_body.strip()[len(header_line):].lstrip("\n")
+            return existing_pattern.sub(
+                match.group(1) + content_body + "\n" + match.group(3),
+                doc,
+            )
+
+    # Section doesn't exist — insert at end of ## Current State
+    # Find the first ## heading after ## Current State
+    cs_match = re.search(r"\n(## (?!Current State))", doc)
+    if cs_match:
+        insert_pos = cs_match.start()
+        return doc[:insert_pos] + "\n" + section_content + "\n" + doc[insert_pos:]
+
+    # Fallback: insert before ## Decision Log
     if "## Decision Log" in doc:
         return doc.replace("## Decision Log", section_content + "\n\n## Decision Log")
     return doc + "\n\n" + section_content + "\n"
