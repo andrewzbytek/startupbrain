@@ -25,10 +25,11 @@ Last updated: [date]
 - 2026-03-02: Added AI capability details - can ingest P&IDs, material specs, engineering codes for PE-level calculations. HAZOP as wedge creating system model enabling 50-70% task automation. Source: Co-founder discussion (Andrew, Danny)
 
 ### Why Now
-**Current position:** AI transforming engineering is inevitable, not optional. Long term, every infrastructure asset will have a continuously maintained system model tracking risk, compliance, changes, and assumptions.
+**Current position:** AI transforming engineering is inevitable, not optional. Long term, every infrastructure asset will have a continuously maintained system model tracking risk, compliance, changes, and assumptions. Demand for power has skyrocketed for the first time in history, driving unprecedented demand for infrastructure. AI can now interpret engineering drawings and this capability is only getting better, allowing them to accelerate the critical path and reduce risk. Everyone who doesn't use this technology will go bankrupt. Google just bought a nuclear power plant because they need a reliable power source. The Middle East and Russia being a mess makes alternative power sources less available. Society has gotten used to AI as the new standard and is no longer scared of using it - companies are no longer scared of using AI technology.
 **Changelog:**
 - [Awaiting first session]
 - 2026-03-02: AI transformation of engineering positioned as inevitable. Vision of universal system models for all infrastructure assets. Source: Co-founder discussion (Andrew, Danny)
+- 2026-03-02: Added market timing context - unprecedented power demand, AI capability maturity for engineering drawings, geopolitical factors reducing alternative energy sources, societal acceptance of AI technology. Source: Co-founder discussion (Andrew, Danny)
 
 ### Traction / Milestones
 **Current position:** Already in active discussions with a major oil company and a power developer.
