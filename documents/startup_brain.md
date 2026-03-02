@@ -33,13 +33,14 @@ Last updated: [date]
 - [Awaiting first session]
 
 ### Business Model / Revenue Model
-**Current position:** Fixed-fee lifecycle contracts replacing traditional billable hours model. Initially focused on HazOp/LOPA risk assessments, with expansion planned into design improvements, procurement, and construction management. Long-term vision (5-10 years) includes full lifecycle revenue spanning design, construction, operations, and decommissioning. Disrupts traditional EPCM one-off fees ($50K-$500K per project) with continuous engagement model starting from risk assessment wedge.
+**Current position:** Three-pronged revenue model: (1) Project-based fees as wedge product for initial customer entry, (2) Subscription/licensing for ongoing data access and interrogation - the "killer feature" enabling customers to query generated insights throughout plant lifecycle, (3) Forward deployment compensation where engineers work alongside asset owners. Cost structure includes operations, compute, customer acquisition (sales-driven), and labor costs primarily for forward-deployed engineers, customer success, sales engineering, plus small AI team (1-5 people), multidisciplinary engineering team, and outsourced legal. Future potential includes selling risk assessment data to insurance/banking as MGA-style benchmarks. Targets 5-10% of $150B US engineering market ($7.5-15B), potentially 2x including Europe.
 **Changelog:**
 - [Awaiting first session]
 - 2026-03-02: Positioned as AI-native EPCM with HazOp/LOPA wedge product, expanding to full engineering platform. Source: Co-founder discussion (Andrew, Danny)
 - 2026-03-02: Refined to fixed-fee lifecycle model vs traditional billable hours. Added interactive reports and knowledge preservation components. Source: Co-founder discussion (Andrew, Danny)
 - 2026-03-02: Clarified expansion timeline - HazOp/LOPA initially, design/procurement/construction medium-term, full lifecycle (operations/decommissioning) as 5-10 year vision. Source: Co-founder discussion (Andrew, Danny)
 ```
+- 2026-03-02: Detailed cost structure and revenue streams mapped - costs include operations, compute, CAC, labor (forward-deployed engineers, AI team). Revenue from project fees (wedge), data access subscriptions/licensing, forward deployment. Source: Co-founder discussion (Andrew, Danny)
 
 ### Pricing
 **Current position:** [Not yet defined]
@@ -89,9 +90,10 @@ Last updated: [date]
 - [Awaiting first session]
 
 ### Team / Hiring Plans
-**Current position:** [Not yet defined]
+**Current position:** Andrew as CEO (external focus: sales, vision, regulators, travel), Danny as CPTO (internal operations: integrating sales, AI team, industrial experts, administration). Early hires prioritize forward-deployed engineers, customer success managers, account executives, sales engineering. Core AI team kept small (1-5 top people). Multidisciplinary engineering team (mechanical, electrical, infrastructure). Legal outsourced.
 **Changelog:**
 - [Awaiting first session]
+- 2026-03-02: Defined CEO/CPTO roles and hiring priorities - forward-deployed engineers, customer success, sales engineering, small AI team, multidisciplinary engineers. Source: Co-founder discussion (Andrew, Danny)
 
 ### Key Contacts / Prospects
 **Current position:** [Not yet defined]
@@ -99,9 +101,10 @@ Last updated: [date]
 - [Awaiting first session]
 
 ### Fundraising Status / Strategy
-**Current position:** [Not yet defined]
+**Current position:** Two-stage approach: First raise from friendly VCs (Danny's network + Andrew's European contacts) to build momentum, then approach Tier 1 VCs with existing commitments as social proof. Focus on SBC entrepreneurs and targeted outreach to close rounds quickly. Currently building customer relationships and logos without formal LOIs.
 **Changelog:**
 - [Awaiting first session]
+- 2026-03-02: Defined friendly VC → Tier 1 VC fundraising strategy, focusing on customer logos before LOIs. Source: Co-founder discussion (Andrew, Danny)
 
 ## Active Hypotheses
 [No hypotheses tracked yet]
@@ -147,6 +150,28 @@ Last updated: [date]
 
 - [2026-03-02] Updated Current State → Business Model / Revenue Model: Revenue will come throughout the entire plant lifecycle: design, construction, operations, and potentially decommissioning.
   Reason: So while this is a little bit of a contradiction, I want to explain. What we meant by that is that initially we'll do HazOp and LOPA risk assessments, and future expansion will be into design improvements, procurement, construction management with risk-based polarization. From a VC perspective, or from the very future big vision perspective, we can eventually expand into construction and operations and the commissioning, but maybe that's like five or ten years out, so it should be only like a visionary claim.
+
+### 2026-03-02 — Three-Pronged Revenue Model
+**Decision:** Structure revenue around (1) project-based fees as wedge, (2) data access subscriptions/licensing as core value, (3) forward deployment compensation.
+**Alternatives considered:** Pure project fees, pure SaaS subscription, consulting model
+**Why alternatives were rejected:** Single revenue stream limits growth potential. Data interrogation is the "killer feature" that provides lifecycle value. Forward deployment creates deep customer relationships and premium pricing.
+**Context:** Mapping comprehensive business model beyond initial wedge product.
+**Participants:** Andrew, Danny
+
+### 2026-03-02 — Andrew CEO / Danny CPTO Role Division
+**Decision:** Andrew as CEO focused on external (sales, vision, regulators, travel), Danny as CPTO focused on internal operations and team integration.
+**Alternatives considered:** Co-CEO structure, Danny as CTO only, role flexibility
+**Why alternatives were rejected:** Clear external/internal division prevents overlap and plays to strengths. CPTO role emphasizes product focus alongside technical leadership.
+**Context:** Defining leadership structure for fundraising and operations.
+**Participants:** Andrew, Danny
+
+### 2026-03-02 — Customer Logos Before LOIs Strategy
+**Decision:** Focus on building relationships and securing customer interest/logos before pursuing formal letters of intent.
+**Alternatives considered:** Immediate LOI pursuit, pilot project contracts, formal partnerships
+**Why alternatives were rejected:** Relationships and demonstrated interest provide flexibility while building credibility. Premature LOI requests could damage early relationships.
+**Context:** Defining customer development approach for fundraising validation.
+**Participants:** Andrew, Danny
+```
 
 ## Feedback Tracker
 
