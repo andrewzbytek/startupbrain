@@ -23,6 +23,9 @@ Compare each new claim against the full living document. Identify any new claim 
 5. **Flag revisited rejections** — if the new claim appears to revisit something in the Decision Log marked as rejected.
 6. **Do not evaluate severity** — that is Pass 2's job.
 7. **Session context** — The `<session_type>` gives context about where these claims originated. Include this context when describing tensions — a claim from a customer interview carries different weight than one from internal brainstorming.
+8. **Decision Log does NOT immunize sections** — The Decision Log records past resolutions. If a new claim contradicts the **Current position** in a `## Current State` section, flag it as a contradiction EVEN IF the Decision Log shows prior resolutions on that same section. Past resolutions settled past tensions; a new claim can introduce a NEW tension against the current position. Multiple prior resolutions on a section should make you MORE suspicious, not less — it indicates a contested area.
+9. **Compare against Current position, not Decision Log narrative** — Your primary comparison target is the `**Current position:**` text in each section. The Decision Log provides historical context but is NOT the authority on the current state. A new claim that reframes, repositions, or subtly shifts the meaning of a Current position IS a contradiction even if it sounds thematically similar.
+10. **Flag framing shifts** — If a new claim uses fundamentally different language to describe the same concept (e.g., "engineering services retainer" vs "SaaS subscription", "trust and judgment" vs "data network effects", "ingestion engine" vs "product"), flag it. Different framing implies different strategy even when the surface topic overlaps.
 
 ## Output Format
 

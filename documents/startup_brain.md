@@ -4,11 +4,10 @@ Last updated: [date]
 ## Current State
 
 ### Problem We're Solving
-**Current position:** Power shortage caused by infrastructure bottlenecks. We accelerate critical path processes and reduce risk by uncovering hidden problems that traditional engineering processes cannot find. The U.S. spends approximately $1.5T per year on infrastructure, with roughly 10% ($150B annually) being engineering costs. At Final Investment Decision, only approximately 30% of engineering work is completed, with the majority happening after billions are already committed.
+**Current position:** Power shortage caused by infrastructure bottlenecks. We accelerate critical path processes and reduce risk by uncovering hidden problems that traditional engineering processes cannot find.
 **Changelog:**
 - [Awaiting first session]
 - 2026-03-02: Defined as power shortage caused by infrastructure bottlenecks, solved by accelerating processes and uncovering hidden risks. Source: Co-founder discussion (Andrew, Danny)
-- 2026-03-02: Added infrastructure spending context ($150B/year engineering costs) and FID engineering completion stats (30% at decision point). Source: Co-founder discussion (Andrew, Danny)
 
 ### Target Market / Initial Customer
 **Current position:** Oil and gas, power generation (nuclear), hydro, and gas behind the meter industries.
@@ -17,12 +16,11 @@ Last updated: [date]
 - 2026-03-02: Defined target industries as oil and gas, power generation (nuclear), hydro, and gas behind the meter. Source: Co-founder discussion (Andrew, Danny)
 
 ### Value Proposition
-**Current position:** AI-native engineering platform that allows 5 engineers to do what traditionally took 100. Can process HazOp and LOPA risk assessments in 20 minutes vs 3,000 hours with good accuracy. Enables iterative solutions (monthly/yearly reassessments) vs traditional waterfall approaches. Provides interactive reports where clients can query design decisions ("Why does this valve have to close so fast?") and preserves engineering knowledge so plant operators understand design rationale even if original engineers leave. AI models can now ingest P&IDs, material specs, and engineering codes and produce PE-level calculations. HAZOP and LOPA is the narrowest wedge that forces full-system ingestion and unlocks everything downstream. Once we structure HAZOP, we create a system model of the plant which is the real valuable asset. Can automate approximately 50% of downstream engineering tasks today, moving toward 70% within 12 months.
+**Current position:** AI-native engineering platform that allows 5 engineers to do what traditionally took 100. Can process HazOp and LOPA risk assessments in 20 minutes vs 3,000 hours with good accuracy. Enables iterative solutions (monthly/yearly reassessments) vs traditional waterfall approaches. Provides interactive reports where clients can query design decisions ("Why does this valve have to close so fast?") and preserves engineering knowledge so plant operators understand design rationale even if original engineers leave.
 **Changelog:**
 - [Awaiting first session]
 - 2026-03-02: Defined as 20x efficiency gain (5 vs 100 engineers), 150x speed improvement (20 minutes vs 3,000 hours), plus iterative capabilities. Source: Co-founder discussion (Andrew, Danny)
 - 2026-03-02: Added interactive reports capability and knowledge preservation value props. Source: Co-founder discussion (Andrew, Danny)
-- 2026-03-02: Added AI capability specifics (P&ID ingestion, PE-level calculations) and automation metrics (50% today, 70% within 12 months). Clarified HAZOP as ingestion wedge to create system model asset. Source: Co-founder discussion (Andrew, Danny)
 
 ### Why Now
 **Current position:** [Not yet defined]
@@ -30,13 +28,12 @@ Last updated: [date]
 - [Awaiting first session]
 
 ### Traction / Milestones
-**Current position:** In active discussions with a major oil company and a power developer for lighthouse deployments.
+**Current position:** [Not yet defined]
 **Changelog:**
 - [Awaiting first session]
-- 2026-03-02: Active discussions with major oil company and power developer for lighthouse deployments. Source: Co-founder discussion (Andrew, Danny)
 
 ### Business Model / Revenue Model
-**Current position:** Charge a fixed fee to structure and automate HAZOP as entry point, but the real value is maintaining the system model over the project life as recurring revenue. This automation approach breaks the billable hour business model in engineering. As engineering gets cheaper through automation, the percentage of engineering completed before FID should move from 30% toward 60-70%. Cost structure includes operations, compute, customer acquisition (sales-driven), and labor costs for customer success, sales engineering, plus small AI team (1-5 people), multidisciplinary engineering team, and outsourced legal. Forward deployment compensation available as premium offering to prevent customer abuse but not core revenue stream. Future potential includes selling risk assessment data to insurance/banking as MGA-style benchmarks. Targets 5-10% of $150B US engineering market ($7.5-15B), potentially 2x including Europe.
+**Current position:** Two-pronged revenue model: (1) Fixed-fee project contracts as entry point (customers are accustomed to this model), (2) Subscription or licensing fees for ongoing AI-powered data access and interrogation - the core value proposition enabling customers to query insights, simplify construction, and streamline operations throughout plant lifecycle. Cost structure includes operations, compute, customer acquisition (sales-driven), and labor costs for customer success, sales engineering, plus small AI team (1-5 people), multidisciplinary engineering team, and outsourced legal. Forward deployment compensation available as premium offering to prevent customer abuse but not core revenue stream. Future potential includes selling risk assessment data to insurance/banking as MGA-style benchmarks. Targets 5-10% of $150B US engineering market ($7.5-15B), potentially 2x including Europe.
 **Changelog:**
 - [Awaiting first session]
 - 2026-03-02: Positioned as AI-native EPCM with HazOp/LOPA wedge product, expanding to full engineering platform. Source: Co-founder discussion (Andrew, Danny)
@@ -45,7 +42,6 @@ Last updated: [date]
 - 2026-03-02: Detailed cost structure and revenue streams mapped - costs include operations, compute, CAC, labor (forward-deployed engineers, AI team). Revenue from project fees (wedge), data access subscriptions/licensing, forward deployment. Source: Co-founder discussion (Andrew, Danny)
 - 2026-03-02: Clarified forward deployment as premium offering, not core revenue stream. Main model focuses on project fees (wedge) and data access subscriptions/licensing. Source: Contradiction resolution discussion (Andrew, Danny)
 - 2026-03-02: Clarified core revenue model - fixed-fee contracts as entry point, subscription/licensing for AI-powered data access as primary value. Source: Contradiction resolution discussion (Andrew, Danny)
-- 2026-03-02: Clarified HAZOP as ingestion engine with system model maintenance as recurring revenue. Added FID engineering completion projection (30% to 60-70%) and billable hour disruption positioning. Source: Co-founder discussion (Andrew, Danny)
 
 ### Pricing
 **Current position:** [Not yet defined]
@@ -53,19 +49,17 @@ Last updated: [date]
 - [Awaiting first session]
 
 ### Go-to-Market Strategy
-**Current position:** Offer free partial HazOp reassessments to target companies. Sales approach: "We uncovered 10 things; we'll give you five for free. For the complete assessment, you need to buy the full solution." Strategy relies on statistical likelihood of uncovering missed risks that will create urgency. Positioning strategy: tool is so superior at risk assessment that not using it constitutes negligence. Holy grail outcome is regulator declaring non-adoption as negligence. Engineers hate doing HAZOP because it is manual, repetitive, and politically sensitive, but it forces understanding of the entire facility.
+**Current position:** Offer free partial HazOp reassessments to target companies. Sales approach: "We uncovered 10 things; we'll give you five for free. For the complete assessment, you need to buy the full solution." Strategy relies on statistical likelihood of uncovering missed risks that will create urgency. Positioning strategy: tool is so superior at risk assessment that not using it constitutes negligence. Holy grail outcome is regulator declaring non-adoption as negligence.
 **Changelog:**
 - [Awaiting first session]
 - 2026-03-02: Defined free partial assessment strategy with 50% value preview model. Source: Co-founder discussion (Andrew, Danny)
 - 2026-03-02: Added negligence positioning strategy and regulatory holy grail outcome. Source: Co-founder discussion (Andrew, Danny)
-- 2026-03-02: Added engineer pain point context - HAZOP is manual, repetitive, politically sensitive but forces full facility understanding. Source: Co-founder discussion (Andrew, Danny)
 
 ### Technical Approach
-**Current position:** AI-native platform that ingests customer files to accumulate knowledge and iterate faster. Processes internal company data for risk assessments, ensures design safety, suggests edits, and verifies compliance with regulations and bylaws. HAZOP is the ingestion engine, not the business - the system model is the real asset. Long term, every infrastructure asset will have a continuously maintained system model tracking risk, compliance, changes, and assumptions.
+**Current position:** AI-native platform that ingests customer files to accumulate knowledge and iterate faster. Processes internal company data for risk assessments, ensures design safety, suggests edits, and verifies compliance with regulations and bylaws.
 **Changelog:**
 - [Awaiting first session]
 - 2026-03-02: Defined as AI platform with knowledge accumulation from customer file ingestion, compliance verification capabilities. Source: Co-founder discussion (Andrew, Danny)
-- 2026-03-02: Clarified HAZOP as ingestion engine vs business model, with system model as core asset. Added long-term vision of continuously maintained system models for all infrastructure. Source: Co-founder discussion (Andrew, Danny)
 
 ### Competitive Landscape
 **Current position:** [Not yet defined]
@@ -73,11 +67,10 @@ Last updated: [date]
 - [Awaiting first session]
 
 ### Moat / Defensibility
-**Current position:** Moat is not the AI model itself, but deep context, judgment, trust and accountability that compounds across projects. Every facility we ingest deepens our understanding of risk patterns, code interpretation, equipment configurations, procurement timelines, and failure modes. Data network effects from ingesting thousands of customer files will accumulate proprietary knowledge and enable faster iteration. Bringing iterative software approaches to traditionally waterfall engineering processes. Uniquely positioned due to the combination of deep engineering context and AI-native architecture.
+**Current position:** Data network effects from ingesting thousands of customer files will accumulate proprietary knowledge and enable faster iteration. Bringing iterative software approaches to traditionally waterfall engineering processes.
 **Changelog:**
 - [Awaiting first session]
 - 2026-03-02: Identified data network effects and iterative process advantage as key defensibility. Source: Co-founder discussion (Andrew, Danny)
-- 2026-03-02: Refined defensibility from data network effects to cross-project intelligence compound (context, judgment, trust, accountability). Added unique positioning claim combining engineering context with AI-native architecture. Source: Co-founder discussion (Andrew, Danny)
 
 ### Key Assumptions
 - It's statistically almost guaranteed that we will uncover missed risks in existing company assessments
@@ -109,11 +102,10 @@ Last updated: [date]
 - [Awaiting first session]
 
 ### Fundraising Status / Strategy
-**Current position:** Raising a focused round to deepen the ingestion layer, expand agentic workflows, and secure lighthouse deployments. Two-stage approach: First raise from friendly VCs (Danny's network + Andrew's European contacts) to build momentum, then approach Tier 1 VCs with existing commitments as social proof. Focus on SBC entrepreneurs and targeted outreach to close rounds quickly. Currently building customer relationships and logos without formal LOIs.
+**Current position:** Two-stage approach: First raise from friendly VCs (Danny's network + Andrew's European contacts) to build momentum, then approach Tier 1 VCs with existing commitments as social proof. Focus on SBC entrepreneurs and targeted outreach to close rounds quickly. Currently building customer relationships and logos without formal LOIs.
 **Changelog:**
 - [Awaiting first session]
 - 2026-03-02: Defined friendly VC → Tier 1 VC fundraising strategy, focusing on customer logos before LOIs. Source: Co-founder discussion (Andrew, Danny)
-- 2026-03-02: Defined fundraising use of funds - deepen ingestion layer, expand agentic workflows, secure lighthouse deployments. Source: Co-founder discussion (Andrew, Danny)
 
 ## Active Hypotheses
 [No hypotheses tracked yet]
@@ -204,27 +196,6 @@ Last updated: [date]
 **Alternatives considered:** Keep previous position
 **Why alternatives were rejected:** Fixed-fee contracts serve as entry point because customers are used to them. The biggest advantage is the software's AI-powered ability to help engineers understand data — they'll pay subscription/licensing for access to query insights, simplify construction, and streamline operations.
 **Context:** Contradiction resolution during ingestion.
-**Participants:** Andrew, Danny
-
-### 2026-03-02 — HAZOP as Ingestion Engine Strategy
-**Decision:** Position HAZOP/LOPA as the narrowest wedge that forces full-system ingestion to create system model asset, rather than HAZOP as the primary business.
-**Alternatives considered:** HAZOP as primary revenue driver, other engineering workflows as wedge
-**Why alternatives were rejected:** HAZOP is manual, repetitive work that engineers hate but it forces understanding of entire facility. The real value is the system model created through ingestion, which enables downstream workflow automation and recurring revenue.
-**Context:** Refining core business model and value proposition around AI-native engineering platform.
-**Participants:** Andrew, Danny
-
-### 2026-03-02 — Breaking the Billable Hour Model
-**Decision:** Structure business to disrupt traditional engineering billable hour model through 50-70% task automation.
-**Alternatives considered:** Work within existing billable hour framework, pure efficiency gains
-**Why alternatives were rejected:** AI automation makes billable hours obsolete. Fixed-fee project work with recurring system model maintenance captures more value and aligns with customer outcomes vs time spent.
-**Context:** Positioning against traditional EPCM industry economics and demonstrating AI-native advantages.
-**Participants:** Andrew, Danny
-
-### 2026-03-02 — Cross-Project Intelligence as Moat
-**Decision:** Build defensibility through deep context, judgment, trust and accountability that compounds across projects rather than just data network effects.
-**Alternatives considered:** Pure AI model superiority, data volume advantages, speed/efficiency positioning
-**Why alternatives were rejected:** AI models themselves are commoditizing. True defensibility comes from accumulated judgment across risk patterns, code interpretation, equipment configurations, procurement timelines, and failure modes that builds trust and accountability.
-**Context:** Defining sustainable competitive advantages in AI-native engineering market.
 **Participants:** Andrew, Danny
 
 ## Feedback Tracker

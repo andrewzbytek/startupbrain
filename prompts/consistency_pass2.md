@@ -31,6 +31,20 @@ For each potential contradiction from Pass 1:
 
 **Session type affects severity:** A claim from a formal decision session or customer interview that contradicts the living document is more likely Critical. A claim from internal notes or brainstorming that explores an alternative is more likely Notable or Minor — it may represent thinking-out-loud rather than a real strategic shift.
 
+## Prior Resolutions Do NOT Reduce Severity
+
+**CRITICAL**: If a section has prior contradiction resolutions in the Decision Log, that does NOT make new contradictions on that section less severe. A section that has been revised multiple times is a CONTESTED area — new tensions there are MORE likely to be strategically significant, not less.
+
+Do NOT downgrade a contradiction because:
+- The Decision Log shows the section was previously revised
+- The new claim sounds thematically similar to existing content
+- The new claim could be interpreted as a "refinement" of the current position
+
+DO flag as Critical when a new claim:
+- Uses fundamentally different framing for the same concept (e.g., "system model maintenance" vs "subscription for data access")
+- Shifts the moat/defensibility thesis (e.g., "trust and accountability" vs "data network effects")
+- Recharacterizes a core element (e.g., describing a product as "not the business" when the Decision Log treats it as a product)
+
 ## Dismissed Contradictions Rule
 
 If a potential contradiction from Pass 1 corresponds to an entry in the Dismissed Contradictions section of the living document, remove it from the output entirely. Do not surface already-dismissed items.
