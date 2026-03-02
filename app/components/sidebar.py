@@ -614,6 +614,16 @@ def render_sidebar():
                 mime="text/markdown",
                 use_container_width=True,
             )
+            # Full context export (living doc + session history + claims)
+            from services.export import generate_context_export
+            context_export = generate_context_export()
+            st.download_button(
+                "Download Full Context",
+                data=context_export,
+                file_name="startup_context_export.md",
+                mime="text/markdown",
+                use_container_width=True,
+            )
 
         st.divider()
 
