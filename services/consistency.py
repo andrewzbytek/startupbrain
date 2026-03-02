@@ -282,8 +282,9 @@ def _get_rag_evidence(claims: list) -> list:
     # Fetch recent claims from MongoDB to provide evidence context
     recent_claims = get_claims(limit=50)
     for claim in recent_claims[:10]:
+        _ca = claim.get("created_at", "")
         evidence.append({
-            "source_date": str(claim.get("created_at", "")[:10] if isinstance(claim.get("created_at"), str) else ""),
+            "source_date": _ca[:10] if isinstance(_ca, str) else (_ca.strftime("%Y-%m-%d") if hasattr(_ca, 'strftime') else ""),
             "source_type": claim.get("source_type", "session"),
             "relevant_excerpt": claim.get("claim_text", ""),
         })
@@ -291,8 +292,9 @@ def _get_rag_evidence(claims: list) -> list:
     # Fetch recent sessions for additional context
     recent_sessions = get_sessions(limit=5)
     for session in recent_sessions[:3]:
+        _ca = session.get("created_at", "")
         evidence.append({
-            "source_date": str(session.get("created_at", "")[:10] if isinstance(session.get("created_at"), str) else ""),
+            "source_date": _ca[:10] if isinstance(_ca, str) else (_ca.strftime("%Y-%m-%d") if hasattr(_ca, 'strftime') else ""),
             "source_type": session.get("metadata", {}).get("session_type", "session"),
             "relevant_excerpt": session.get("summary", session.get("transcript", ""))[:500],
         })

@@ -695,3 +695,56 @@ class TestBudgetProtection:
             mock_sonnet.assert_called_once()
             mock_opus.assert_not_called()
             assert result["model"] == "claude-sonnet-4-20250514"
+
+
+# ---------------------------------------------------------------------------
+# _get_rag_evidence — source_date with datetime objects
+# ---------------------------------------------------------------------------
+
+class TestGetRagEvidenceSourceDate:
+    """Verify _get_rag_evidence correctly formats source_date for both strings and datetime objects."""
+
+    def test_source_date_from_string(self):
+        from datetime import datetime, timezone
+        mock_claims = [{"created_at": "2026-02-15T10:00:00Z", "claim_text": "test", "source_type": "session"}]
+        with patch("services.mongo_client.get_claims", return_value=mock_claims), \
+             patch("services.mongo_client.get_sessions", return_value=[]), \
+             patch("services.mongo_client.vector_search_text", side_effect=Exception("not available")):
+            from services.consistency import _get_rag_evidence
+            evidence = _get_rag_evidence([])
+        assert len(evidence) >= 1
+        assert evidence[0]["source_date"] == "2026-02-15"
+
+    def test_source_date_from_datetime_object(self):
+        from datetime import datetime, timezone
+        dt = datetime(2026, 2, 15, 10, 0, 0, tzinfo=timezone.utc)
+        mock_claims = [{"created_at": dt, "claim_text": "test", "source_type": "session"}]
+        with patch("services.mongo_client.get_claims", return_value=mock_claims), \
+             patch("services.mongo_client.get_sessions", return_value=[]), \
+             patch("services.mongo_client.vector_search_text", side_effect=Exception("not available")):
+            from services.consistency import _get_rag_evidence
+            evidence = _get_rag_evidence([])
+        assert len(evidence) >= 1
+        assert evidence[0]["source_date"] == "2026-02-15"
+
+    def test_source_date_from_missing_field(self):
+        mock_claims = [{"claim_text": "test", "source_type": "session"}]
+        with patch("services.mongo_client.get_claims", return_value=mock_claims), \
+             patch("services.mongo_client.get_sessions", return_value=[]), \
+             patch("services.mongo_client.vector_search_text", side_effect=Exception("not available")):
+            from services.consistency import _get_rag_evidence
+            evidence = _get_rag_evidence([])
+        assert len(evidence) >= 1
+        assert evidence[0]["source_date"] == ""
+
+    def test_session_source_date_from_datetime(self):
+        from datetime import datetime, timezone
+        dt = datetime(2026, 3, 1, 12, 0, 0, tzinfo=timezone.utc)
+        mock_sessions = [{"created_at": dt, "summary": "Test session", "metadata": {"session_type": "Co-founder discussion"}}]
+        with patch("services.mongo_client.get_claims", return_value=[]), \
+             patch("services.mongo_client.get_sessions", return_value=mock_sessions), \
+             patch("services.mongo_client.vector_search_text", side_effect=Exception("not available")):
+            from services.consistency import _get_rag_evidence
+            evidence = _get_rag_evidence([])
+        assert len(evidence) >= 1
+        assert evidence[0]["source_date"] == "2026-03-01"

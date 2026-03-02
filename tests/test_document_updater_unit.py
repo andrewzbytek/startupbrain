@@ -475,3 +475,50 @@ class TestUpdateHypothesisStatusUnit:
         )
         result = _update_hypothesis_status(doc, "Nonexistent", "validated")
         assert result == doc
+
+
+# ---------------------------------------------------------------------------
+# _update_position — backslash safety (regression test for regex injection)
+# ---------------------------------------------------------------------------
+
+class TestUpdatePositionBackslashSafety:
+    """Verify _update_position handles content with backslashes correctly."""
+
+    def test_backslash_in_content_not_interpreted_as_regex(self):
+        from services.document_updater import _update_position
+        doc = (
+            "## Current State\n\n"
+            "### Pricing\n"
+            "**Current position:** Old price\n"
+            "**Changelog:**\n"
+            "- 2026-01-01: Initial\n"
+        )
+        new_content = "**Current position:** Files stored at C:\\new\\folder per facility\n"
+        result = _update_position(doc, "Current State → Pricing", new_content)
+        assert "C:\\new\\folder" in result
+        assert "Old price" not in result
+
+    def test_dollar_signs_in_content(self):
+        from services.document_updater import _update_position
+        doc = (
+            "## Current State\n\n"
+            "### Pricing\n"
+            "**Current position:** Old\n"
+            "**Changelog:**\n"
+        )
+        new_content = "**Current position:** $50,000 per facility (\\1 discount)\n"
+        result = _update_position(doc, "Current State → Pricing", new_content)
+        assert "$50,000" in result
+        assert "\\1 discount" in result
+
+    def test_content_ending_with_digit(self):
+        from services.document_updater import _update_position
+        doc = (
+            "## Current State\n\n"
+            "### Pricing\n"
+            "**Current position:** Old\n"
+            "**Changelog:**\n"
+        )
+        new_content = "**Current position:** Price is £123\n"
+        result = _update_position(doc, "Current State → Pricing", new_content)
+        assert "£123" in result

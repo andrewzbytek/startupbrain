@@ -75,11 +75,14 @@ def extract_claims(
         if claim["claim_text"]:
             claims.append(claim)
 
+    extraction_failed = len(raw) > 10 and not session_summary and not claims
+
     return {
         "session_summary": session_summary,
         "topic_tags": topic_tags,
         "claims": claims,
         "raw": raw,
+        "extraction_failed": extraction_failed,
     }
 
 

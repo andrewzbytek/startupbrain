@@ -314,7 +314,7 @@ def _apply_quick_note(note_text: str) -> str:
             section = result.get("message", "")
             return f"Noted — {section}"
         else:
-            return f"Note saved, but document update had an issue: {result.get('message', 'unknown error')}"
+            return f"Note may not have been saved — document update failed: {result.get('message', 'unknown error')}"
     except Exception as e:
         return f"Could not save note: {e}"
 
@@ -349,8 +349,9 @@ def _apply_hypothesis(user_message: str) -> str:
         _git_commit(f"Add hypothesis: {hypothesis_text[:50]}")
 
         # Store in MongoDB as a hypothesis claim
+        db_synced = False
         try:
-            insert_claim({
+            result = insert_claim({
                 "claim_text": hypothesis_text,
                 "claim_type": "hypothesis",
                 "confidence": "speculative",
@@ -361,14 +362,18 @@ def _apply_hypothesis(user_message: str) -> str:
                 "test_plan": "",
                 "created_at": datetime.now(timezone.utc),
             })
+            db_synced = result is not None
         except Exception:
-            pass  # MongoDB failure should not block
+            db_synced = False
 
-        return (
+        confirmation = (
             f"Hypothesis tracked: **{hypothesis_text}**\n\n"
             f"Status: unvalidated. You can update it later with `validated: {hypothesis_text[:30]}...` "
             f"or `invalidated: {hypothesis_text[:30]}...` in chat, or use the sidebar."
         )
+        if not db_synced:
+            confirmation += " (note: database sync pending)"
+        return confirmation
     except Exception as e:
         return f"Could not track hypothesis: {e}"
 

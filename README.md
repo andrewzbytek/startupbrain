@@ -31,7 +31,7 @@ startupbrain/
 │   ├── main.py                 # Entry point + page routing (state machine)
 │   ├── state.py                # Session state, mode transitions, constants
 │   └── components/
-│       ├── chat.py             # Chat interface, quick notes, contradiction resolution
+│       ├── chat.py             # Chat interface, quick notes, hypothesis tracking, contradiction resolution
 │       ├── claim_editor.py     # Claim confirmation/editing UI
 │       ├── progress.py         # Pipeline progress + step indicator
 │       ├── sidebar.py          # Dashboard sidebar (current view, feedback, actions, download)
@@ -59,7 +59,7 @@ startupbrain/
 │   └── whiteboard.md           # Whiteboard photo extraction (vision)
 ├── documents/
 │   └── startup_brain.md        # The living document (git-tracked, mirrored to MongoDB)
-├── tests/                      # 647 unit tests, 28 integration tests
+├── tests/                      # 721 unit tests, 45 integration tests
 │   ├── conftest.py             # Shared fixtures and sample data
 │   ├── test_transcripts/       # Sample transcripts for testing
 │   └── test_*.py               # Test modules (one per service/component)
@@ -108,7 +108,10 @@ Paste transcript → Select session type → [Optional: upload whiteboard]
 - **Semantic RAG** — Atlas Vector Search with Voyage AI automated embedding for consistency evidence (graceful fallback to time-based)
 - **Direct corrections** — "no, actually X" runs a lightweight consistency check before applying (informational only)
 - **Quick notes** — prefix-based (`note:`, `remember:`, `jot:`, `fyi:`) lightweight doc updates without full ingestion pipeline
+- **Hypothesis tracking** — prefix-based (`hypothesis:`, `validated:`, `invalidated:`) testable assumption tracking with sidebar status management
 - **Living document download** — one-click download from sidebar Actions
+- **Socratic chat** — system prompt references Decision Log dates, dismissed contradictions, and Feedback Tracker entries for context-rich responses
+- **Sidebar tensions** — surfaces areas of active instability (changelog churn, recent dismissals, decisions under evaluation)
 - **Explicit decision tracking** — contradiction resolution writes Decision Log and Dismissed Contradictions entries directly
 
 ### State Machine
@@ -147,7 +150,7 @@ python -m pytest tests/ -m integration
 python -m pytest tests/ -v --tb=short -m "not integration"
 ```
 
-647 unit tests across 22 test files. All service and component tests run fully offline with mocks.
+721 unit tests + 45 integration tests across 23 test files. All service and component tests run fully offline with mocks.
 
 ## Deployment
 

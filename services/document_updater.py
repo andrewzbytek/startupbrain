@@ -164,8 +164,10 @@ def _update_position(doc: str, section: str, new_position_content: str) -> str:
             rf"(\*\*Current position:\*\*.*?)(\n\*\*Changelog|\n###|\Z)",
             re.DOTALL,
         )
-        replacement = rf"\g<1>{new_position_content}\3"
-        updated = pattern.sub(replacement, doc)
+        def replacer(m):
+            return m.group(1) + new_position_content + m.group(3)
+
+        updated = pattern.sub(replacer, doc)
         if updated != doc:
             return updated
 

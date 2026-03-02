@@ -365,3 +365,72 @@ class TestExtractEmptyTranscript:
 
         assert result["claims"] == [], "Malformed XML should yield empty claims, not crash"
         assert result["session_summary"] == ""
+        assert result["extraction_failed"] is True, "Non-empty response with no parsed output should flag extraction_failed"
+
+
+# ---------------------------------------------------------------------------
+# extraction_failed flag
+# ---------------------------------------------------------------------------
+
+class TestExtractionFailedFlag:
+    """Verify extract_claims sets extraction_failed correctly."""
+
+    def test_extraction_failed_when_response_is_non_xml(self):
+        mock_response = {
+            "text": "Sorry, I cannot extract claims from this input.",
+            "tokens_in": 50,
+            "tokens_out": 30,
+            "model": "claude-sonnet-4-20250514",
+        }
+
+        with patch("services.claude_client.call_sonnet", return_value=mock_response), \
+             patch("services.claude_client.load_prompt", return_value="mock prompt"):
+            from services.ingestion import extract_claims
+            result = extract_claims("Some transcript text")
+
+        assert result["extraction_failed"] is True
+
+    def test_extraction_not_failed_when_claims_found(self):
+        mock_response = {
+            "text": (
+                "<extraction_output>"
+                "<session_summary>A summary</session_summary>"
+                "<topic_tags><tag>pricing</tag></topic_tags>"
+                "<claims><claim>"
+                "<claim_text>Price is £50K</claim_text>"
+                "<claim_type>decision</claim_type>"
+                "<confidence>definite</confidence>"
+                "<who_said_it>Alex</who_said_it>"
+                "<topic_tags><tag>pricing</tag></topic_tags>"
+                "</claim></claims>"
+                "</extraction_output>"
+            ),
+            "tokens_in": 100,
+            "tokens_out": 80,
+            "model": "claude-sonnet-4-20250514",
+        }
+
+        with patch("services.claude_client.call_sonnet", return_value=mock_response), \
+             patch("services.claude_client.load_prompt", return_value="mock prompt"):
+            from services.ingestion import extract_claims
+            result = extract_claims("Some transcript text")
+
+        assert result["extraction_failed"] is False
+        assert len(result["claims"]) == 1
+
+    def test_extraction_not_failed_when_response_empty(self):
+        mock_response = {
+            "text": "",
+            "tokens_in": 50,
+            "tokens_out": 0,
+            "model": "claude-sonnet-4-20250514",
+        }
+
+        with patch("services.claude_client.call_sonnet", return_value=mock_response), \
+             patch("services.claude_client.load_prompt", return_value="mock prompt"):
+            from services.ingestion import extract_claims
+            result = extract_claims("Some text")
+
+        # Empty response (len <= 10) should NOT flag extraction_failed
+        # because it's a different failure mode (API returned nothing)
+        assert result["extraction_failed"] is False
