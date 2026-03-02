@@ -149,8 +149,12 @@ Last updated: [date]
 **Context:** Differentiating from traditional EPCM deliverables and creating lifecycle value.
 **Participants:** Andrew, Danny
 
-- [2026-03-02] Updated Current State → Business Model / Revenue Model: Revenue will come throughout the entire plant lifecycle: design, construction, operations, and potentially decommissioning.
-  Reason: So while this is a little bit of a contradiction, I want to explain. What we meant by that is that initially we'll do HazOp and LOPA risk assessments, and future expansion will be into design improvements, procurement, construction management with risk-based polarization. From a VC perspective, or from the very future big vision perspective, we can eventually expand into construction and operations and the commissioning, but maybe that's like five or ten years out, so it should be only like a visionary claim.
+### 2026-03-02 — Resolved: Current State → Business Model / Revenue Model
+**Decision:** Updated to: Revenue will come throughout the entire plant lifecycle: design, construction, operations, and potentially decommissioning.
+**Alternatives considered:** Keep previous position
+**Why alternatives were rejected:** Initially we'll do HazOp and LOPA risk assessments, and future expansion will be into design improvements, procurement, construction management with risk-based polarization. From a VC perspective, the full lifecycle vision (construction, operations, decommissioning) is 5-10 years out, so it should be only a visionary claim.
+**Context:** Contradiction resolution during ingestion.
+**Participants:** Andrew, Danny
 
 ### 2026-03-02 — Three-Pronged Revenue Model
 **Decision:** Structure revenue around (1) project-based fees as wedge, (2) data access subscriptions/licensing as core value, (3) forward deployment compensation.
@@ -172,10 +176,13 @@ Last updated: [date]
 **Why alternatives were rejected:** Relationships and demonstrated interest provide flexibility while building credibility. Premature LOI requests could damage early relationships.
 **Context:** Defining customer development approach for fundraising validation.
 **Participants:** Andrew, Danny
-```
 
-- [2026-03-02] Updated Current State → Business Model / Revenue Model: Forward deployment compensation, where engineers work alongside asset owners, is the core of the revenue model.
-  Reason: The forward deployment revenue was really more an exploratory possible future premium offering, but for simplicity let's not really include it in the revenue stream. We can just keep it as a note or as a potential future visionary revenue stream. It's more that our users or customers don't abuse us or take advantage of us, so we charge them for the forward deployed engineer. It's not the core business, so we should not really put it as the core thing and really push it into the background.
+### 2026-03-02 — Resolved: Current State → Business Model / Revenue Model
+**Decision:** Updated to: Forward deployment compensation is a premium offering, not core revenue.
+**Alternatives considered:** Keep forward deployment as core revenue stream
+**Why alternatives were rejected:** Forward deployment revenue is an exploratory possible future premium offering. It's more about preventing customer abuse than a core business driver. Core revenue should focus on project fees (wedge) and data access subscriptions/licensing.
+**Context:** Contradiction resolution during ingestion.
+**Participants:** Andrew, Danny
 
 ### 2026-03-02 — Subscription/Licensing as Core Revenue Model
 **Decision:** Structure revenue with fixed-fee project contracts as entry point, then subscription or licensing fees for ongoing AI-powered data access as the primary value driver.
@@ -183,10 +190,13 @@ Last updated: [date]
 **Why alternatives were rejected:** Customers expect fixed-fee contracts for initial engagement. The software's biggest advantage is AI-powered data interrogation for construction and operations simplification - this ongoing value requires recurring revenue model.
 **Context:** Clarifying primary vs secondary revenue streams and customer value proposition.
 **Participants:** Andrew, Danny
-```
 
-- [2026-03-02] Updated Current State → Business Model / Revenue Model: Data access will be monetized through either subscription or licensing models.
-  Reason: This is actually a pretty critical shift, and we talked about this with my co-founder a lot! We need to use the fixed fee contract as an entry point because the customers are really used to it. The biggest advantage of the software itself is the software's ability to help people, help the engineers understand the data, so they will be paying a subscription or licensing fee to have access to our powerful AI. They can use it to simplify the construction, to simplify the operations. This is an important update.
+### 2026-03-02 — Resolved: Current State → Business Model / Revenue Model
+**Decision:** Updated to: Data access will be monetized through either subscription or licensing models.
+**Alternatives considered:** Keep previous position
+**Why alternatives were rejected:** Fixed-fee contracts serve as entry point because customers are used to them. The biggest advantage is the software's AI-powered ability to help engineers understand data — they'll pay subscription/licensing for access to query insights, simplify construction, and streamline operations.
+**Context:** Contradiction resolution during ingestion.
+**Participants:** Andrew, Danny
 
 ## Feedback Tracker
 
