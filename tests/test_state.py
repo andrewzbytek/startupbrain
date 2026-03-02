@@ -80,6 +80,7 @@ class TestInitSessionState:
             "evolution_result", "ingestion_session_type",
             "book_crosscheck_content", "book_crosscheck_filename",
             "show_hypothesis_form",
+            "deferred_writer", "_batch_committed", "_has_pending_ingestion",
         }
         assert expected_keys == set(mock_st.session_state.keys())
 

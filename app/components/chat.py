@@ -844,14 +844,14 @@ def render_contradiction_resolution():
     with col_update:
         if st.button("Update to new", type="primary", use_container_width=True, key=f"resolve_update_{idx}"):
             with st.spinner("Updating document..."):
-                _resolve_contradiction(contradiction, "update", new_claim_text, "")
+                _resolve_contradiction_deferred(contradiction, "update", new_claim_text, "")
             _advance_contradiction()
         st.caption("Replace the current position with the new claim")
 
     with col_keep:
         if st.button("Keep current", use_container_width=True, key=f"resolve_keep_{idx}"):
             with st.spinner("Logging decision..."):
-                _resolve_contradiction(contradiction, "keep", "", "")
+                _resolve_contradiction_deferred(contradiction, "keep", "", "")
             _advance_contradiction()
         st.caption("Dismiss the new claim and keep what we have")
 
@@ -872,10 +872,84 @@ def render_contradiction_resolution():
         if st.button("Submit explanation", key=f"submit_explain_{idx}", type="primary"):
             if explanation.strip():
                 with st.spinner("Updating document with your explanation..."):
-                    _resolve_contradiction(contradiction, "explain", new_claim_text, explanation.strip())
+                    _resolve_contradiction_deferred(contradiction, "explain", new_claim_text, explanation.strip())
                 _advance_contradiction()
             else:
                 st.error("Please enter an explanation before submitting.")
+
+
+def _resolve_contradiction_deferred(contradiction: dict, action: str, new_claim: str, explanation: str):
+    """
+    Apply a contradiction resolution using the DeferredWriter (in-memory only).
+    All disk/MongoDB/git writes are deferred to batch_commit().
+    """
+    writer = st.session_state.get("deferred_writer")
+    if writer is None:
+        st.warning("No deferred writer found — falling back to immediate write.")
+        _resolve_contradiction(contradiction, action, new_claim, explanation)
+        return
+
+    try:
+        from datetime import datetime, timezone
+
+        date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        section = contradiction.get("existing_section", "Unknown Section")
+        tension = contradiction.get("tension_description", "")
+        participants = st.session_state.get("ingestion_participants", "Founders")
+        idx = st.session_state.get("contradiction_index", 0)
+
+        if action == "update":
+            new_info = (
+                f"Contradiction resolved ({date_str}): Updating {section}.\n"
+                f"New position: {new_claim}\n"
+                f"Tension was: {tension}"
+            )
+            reason = f"Contradiction resolved — updated {section} ({date_str})"
+            writer.apply_document_update_deferred(new_info, update_reason=reason)
+
+            decision_entry = (
+                f"### {date_str} — Resolved: {section}\n"
+                f"**Decision:** Updated to: {new_claim}\n"
+                f"**Alternatives considered:** Keep previous position\n"
+                f"**Why alternatives were rejected:** New information contradicted existing position. {tension}\n"
+                f"**Context:** Contradiction resolution during ingestion.\n"
+                f"**Participants:** {participants}"
+            )
+            writer.apply_decision_log_deferred(decision_entry)
+
+        elif action == "keep":
+            dismissed_entry = (
+                f"- [{date_str}] Dismissed: \"{contradiction.get('new_claim', '')}\"\n"
+                f"  Kept: {contradiction.get('existing_position', '')}\n"
+                f"  Section: {section}"
+            )
+            writer.apply_dismissed_deferred(dismissed_entry)
+
+        else:  # explain
+            new_info = (
+                f"Contradiction resolved with explanation ({date_str}): Updating {section}.\n"
+                f"New position: {new_claim}\n"
+                f"Explanation: {explanation}\n"
+                f"Tension was: {tension}"
+            )
+            reason = f"Contradiction resolved with explanation — {section} ({date_str})"
+            writer.apply_document_update_deferred(new_info, update_reason=reason)
+
+            decision_entry = (
+                f"### {date_str} — Resolved: {section}\n"
+                f"**Decision:** Updated to: {new_claim}\n"
+                f"**Alternatives considered:** Keep previous position\n"
+                f"**Why alternatives were rejected:** {explanation}\n"
+                f"**Context:** Contradiction resolution during ingestion.\n"
+                f"**Participants:** {participants}"
+            )
+            writer.apply_decision_log_deferred(decision_entry)
+
+        writer.record_contradiction_resolution(idx, action, new_claim, explanation)
+        writer.save_checkpoint()
+
+    except Exception as e:
+        st.warning(f"Could not apply deferred resolution: {e}")
 
 
 def _resolve_contradiction(contradiction: dict, action: str, new_claim: str, explanation: str):

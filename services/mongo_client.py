@@ -26,6 +26,7 @@ COLLECTIONS = [
     "book_frameworks",
     "living_document",
     "cost_log",
+    "pending_ingestion",
 ]
 
 
@@ -323,6 +324,22 @@ def get_session_claims(session_ids: list, limit: int = 100) -> list:
         sort_order=-1,
         limit=limit,
     )
+
+
+def upsert_pending_ingestion(doc: dict) -> bool:
+    """Upsert the pending ingestion checkpoint. Uses fixed _id='pending'."""
+    update = {"$set": {k: v for k, v in doc.items() if k != "_id"}}
+    return update_one("pending_ingestion", {"_id": "pending"}, update, upsert=True)
+
+
+def get_pending_ingestion() -> Optional[dict]:
+    """Retrieve the pending ingestion checkpoint, or None if none exists."""
+    return find_one("pending_ingestion", {"_id": "pending"})
+
+
+def delete_pending_ingestion() -> bool:
+    """Delete the pending ingestion checkpoint."""
+    return delete_one("pending_ingestion", {"_id": "pending"})
 
 
 def count_documents(collection_name: str, query: dict = None) -> int:

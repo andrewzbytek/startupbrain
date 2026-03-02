@@ -55,6 +55,10 @@ def init_session_state():
         "book_crosscheck_content": "",
         "book_crosscheck_filename": "",
         "show_hypothesis_form": False,
+        # Deferred writes / crash recovery
+        "deferred_writer": None,
+        "_batch_committed": False,
+        "_has_pending_ingestion": False,
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -102,3 +106,5 @@ def reset_ingestion():
     st.session_state.whiteboard_text = ""
     st.session_state.ingestion_session_type = ""
     st.session_state.pipeline_result = {}
+    st.session_state.deferred_writer = None
+    st.session_state._batch_committed = False

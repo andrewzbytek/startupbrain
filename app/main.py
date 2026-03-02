@@ -18,6 +18,17 @@ from app.state import init_session_state, set_mode, reset_ingestion, invalidate_
 # Initialize session state on every rerun
 init_session_state()
 
+# --- Crash recovery: check for pending ingestion checkpoint ---
+if not st.session_state.get("_has_pending_ingestion") and st.session_state.get("deferred_writer") is None:
+    try:
+        from services.deferred_writer import load_pending_ingestion
+        _pending_writer = load_pending_ingestion()
+        if _pending_writer is not None:
+            st.session_state.deferred_writer = _pending_writer
+            st.session_state._has_pending_ingestion = True
+    except Exception:
+        pass  # MongoDB unavailable — no crash recovery
+
 from app.components.styles import inject_custom_css
 inject_custom_css()
 
@@ -179,8 +190,8 @@ def render_ingesting():
 
 def render_checking_consistency():
     """
-    Run consistency check and transition to resolving_contradiction or done.
-    This mode auto-advances — it shows progress and then transitions.
+    Run consistency check with deferred writes.
+    LLM calls run eagerly; all disk/MongoDB/git writes are deferred to batch_commit().
     """
     st.header("Checking Consistency")
     render_step_indicator(3)
@@ -199,24 +210,28 @@ def render_checking_consistency():
 
     progress = IngestionProgress()
     try:
-        with progress.start("Running ingestion pipeline..."):
-            # Step 1: Store session
-            progress.update_step("Storing session...", status="running")
-            from services.ingestion import store_session
-            session_id = store_session(
-                transcript,
+        with progress.start("Running ingestion pipeline (deferred writes)..."):
+            # Step 1: Initialize DeferredWriter — snapshot document, NO writes
+            progress.update_step("Preparing deferred pipeline...", status="running")
+            from services.deferred_writer import DeferredWriter
+            writer = DeferredWriter()
+            writer.initialize(
+                transcript=transcript,
+                confirmed_claims=confirmed_claims,
                 metadata=metadata,
                 session_summary=session_summary,
                 topic_tags=topic_tags,
+                session_type=session_type,
             )
-            st.session_state.current_session_id = session_id
-            progress.update_step("Session stored", status="complete")
+            writer.stage = "consistency_check"
+            progress.update_step("Pipeline initialized", status="complete")
 
-            # Step 2: Run consistency check
+            # Step 2: Run consistency check (read-only — no writes)
             progress.update_step("Checking consistency (Pass 1 of 2)...", status="running")
             from services.consistency import run_consistency_check
             consistency_results = run_consistency_check(confirmed_claims, session_type=session_type)
             st.session_state.consistency_results = consistency_results
+            writer.consistency_results = consistency_results
 
             has_critical = consistency_results.get("has_critical", False)
             has_contradictions = consistency_results.get("has_contradictions", False)
@@ -226,38 +241,54 @@ def render_checking_consistency():
             else:
                 progress.update_step("Consistency check complete", status="complete")
 
-            # Step 3: Update living document
-            progress.update_step("Updating living document...", status="running")
-            from services.ingestion import run_ingestion_pipeline
-            pipeline_result = run_ingestion_pipeline(
-                transcript=transcript,
-                confirmed_claims=confirmed_claims,
-                session_id=session_id or "",
-                metadata=metadata,
-                session_summary=session_summary,
-            )
-            claims_stored = pipeline_result.get("claims_stored", 0)
-            doc_updated = pipeline_result.get("document_updated", False)
-            changes_applied = pipeline_result.get("changes_applied", 0)
-            doc_update_msg = pipeline_result.get("document_update_message", "")
+            # Step 3: Update living document IN MEMORY (LLM runs, no file/git writes)
+            progress.update_step("Generating document updates (deferred)...", status="running")
+            from datetime import datetime, timezone
+            date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            if session_type:
+                update_reason = f"{session_type} — {date_str}"
+            else:
+                update_reason = f"Session {date_str}"
+            if participants:
+                update_reason += f" ({participants})"
 
-            # Store pipeline result for the done screen
-            st.session_state.pipeline_result = pipeline_result
+            claims_text_parts = [f"Session summary: {session_summary}", "", "Confirmed claims:"]
+            for i, claim in enumerate(confirmed_claims, 1):
+                claims_text_parts.append(
+                    f"{i}. [{claim.get('claim_type', 'claim')}] {claim.get('claim_text', '')} "
+                    f"(confidence: {claim.get('confidence', 'definite')})"
+                )
+            new_info = "\n".join(claims_text_parts)
 
-            if doc_updated:
+            doc_result = writer.apply_document_update_deferred(new_info, update_reason=update_reason)
+            changes_applied = doc_result.get("changes_applied", 0)
+
+            # Store pipeline result preview for the done screen
+            st.session_state.pipeline_result = {
+                "document_updated": doc_result.get("success", False),
+                "document_update_message": doc_result.get("message", ""),
+                "changes_applied": changes_applied,
+                "claims_stored": 0,  # Will be set after batch_commit
+            }
+
+            if doc_result.get("success"):
                 progress.update_step(
-                    f"Living document updated — {changes_applied} section(s) changed, {claims_stored} claims stored",
+                    f"Document updates prepared — {changes_applied} section(s) staged",
                     status="complete",
                 )
             else:
-                progress.update_step(f"Document update failed: {doc_update_msg}", status="error")
+                progress.update_step(f"Document update failed: {doc_result.get('message', '')}", status="error")
+
+            # Step 4: Checkpoint to MongoDB
+            writer.stage = "awaiting_resolution" if has_contradictions else "ready_to_commit"
+            writer.save_checkpoint()
+            st.session_state.deferred_writer = writer
 
             # Check if any confirmed claims relate to active hypotheses
             try:
                 from services.mongo_client import get_hypotheses
                 active_hyps = get_hypotheses(status="unvalidated") + get_hypotheses(status="testing")
                 if active_hyps and confirmed_claims:
-                    # Simple keyword overlap check
                     import re as _re
                     _stop_words = {"the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
                                    "have", "has", "had", "do", "does", "did", "will", "would", "could",
@@ -292,13 +323,11 @@ def render_checking_consistency():
                 contradictions = pass2.get("retained", []) if pass2 else []
                 st.session_state.contradictions = contradictions
                 st.session_state.contradiction_index = 0
-                summary = consistency_results.get("summary", "")
-                progress.complete(f"Consistency check found issues. Review required.")
+                progress.complete("Consistency check found issues. Review required.")
                 st.info(f"Found {len(contradictions)} contradiction(s) to review.")
                 set_mode("resolving_contradiction")
             else:
-                progress.complete("All done. Session ingested.")
-                # Invalidate sidebar cache
+                progress.complete("All checks passed. Committing...")
                 invalidate_sidebar()
                 set_mode("done")
 
@@ -314,19 +343,39 @@ def render_checking_consistency():
 
 
 def render_done():
-    """Success summary screen after ingestion completes."""
+    """Success summary screen after ingestion completes. Runs batch commit on first render."""
     st.header("Session Ingested")
     render_step_indicator(4)
 
     consistency_results = st.session_state.get("consistency_results", {})
     claims = st.session_state.get("pending_claims", [])
-    session_id = st.session_state.get("current_session_id", "")
     pipeline_result = st.session_state.get("pipeline_result", {})
+
+    # --- Batch commit: write everything at once ---
+    writer = st.session_state.get("deferred_writer")
+    batch_committed = st.session_state.get("_batch_committed", False)
+
+    if writer is not None and not batch_committed:
+        with st.spinner("Committing all changes..."):
+            commit_result = writer.batch_commit()
+        st.session_state._batch_committed = True
+
+        if commit_result.get("success"):
+            # Update pipeline_result with actual values from commit
+            pipeline_result["claims_stored"] = commit_result.get("claims_stored", 0)
+            pipeline_result["session_id"] = commit_result.get("session_id", "")
+            pipeline_result["document_updated"] = commit_result.get("document_updated", pipeline_result.get("document_updated", False))
+            st.session_state.pipeline_result = pipeline_result
+            st.session_state.current_session_id = commit_result.get("session_id", "")
+        else:
+            st.error(f"Batch commit failed: {commit_result.get('message', 'unknown error')}")
+            st.info("Your checkpoint is preserved. The system will offer to resume on next load.")
 
     doc_updated = pipeline_result.get("document_updated", False)
     changes_applied = pipeline_result.get("changes_applied", 0)
     claims_stored = pipeline_result.get("claims_stored", 0)
     doc_update_msg = pipeline_result.get("document_update_message", "")
+    session_id = st.session_state.get("current_session_id", "")
 
     if doc_updated:
         st.success("Session ingested successfully. Living document updated.")
@@ -375,7 +424,59 @@ st.title("Startup Brain")
 
 mode = st.session_state.get("mode", "chat")
 
-if mode == "chat":
+# --- Crash recovery UI (intercepts chat mode when pending checkpoint exists) ---
+if st.session_state.get("_has_pending_ingestion") and mode == "chat":
+    writer = st.session_state.get("deferred_writer")
+    if writer is not None:
+        st.warning("A previous ingestion was interrupted before completing.")
+        col_info1, col_info2, col_info3 = st.columns(3)
+        with col_info1:
+            st.metric("Stage", writer.stage)
+        with col_info2:
+            st.metric("Claims", len(writer.confirmed_claims))
+        with col_info3:
+            st.metric("Resolutions", len(writer.contradiction_resolutions))
+
+        col_resume, col_discard = st.columns(2)
+        with col_resume:
+            if st.button("Resume", type="primary", use_container_width=True, key="resume_pending"):
+                st.session_state.pending_claims = writer.confirmed_claims
+                st.session_state.current_transcript = writer.transcript
+                st.session_state.ingestion_participants = writer.metadata.get("participants", "")
+                st.session_state.ingestion_topic = writer.metadata.get("topic", "")
+                st.session_state.ingestion_session_type = writer.session_type
+                st.session_state.ingestion_session_summary = writer.session_summary
+                st.session_state.ingestion_topic_tags = writer.topic_tags
+                st.session_state.consistency_results = writer.consistency_results
+                st.session_state._has_pending_ingestion = False
+
+                if writer.stage == "ready_to_commit":
+                    set_mode("done")
+                elif writer.stage == "awaiting_resolution":
+                    resolved_count = len(writer.contradiction_resolutions)
+                    st.session_state.contradiction_index = resolved_count
+                    pass2 = (writer.consistency_results or {}).get("pass2", {})
+                    contradictions = pass2.get("retained", []) if pass2 else []
+                    st.session_state.contradictions = contradictions
+                    if resolved_count >= len(contradictions):
+                        set_mode("done")
+                    else:
+                        set_mode("resolving_contradiction")
+                else:
+                    set_mode("done")
+                st.rerun()
+
+        with col_discard:
+            if st.button("Discard", use_container_width=True, key="discard_pending"):
+                writer.rollback()
+                st.session_state._has_pending_ingestion = False
+                st.session_state.deferred_writer = None
+                st.rerun()
+    else:
+        st.session_state._has_pending_ingestion = False
+        render_chat()
+
+elif mode == "chat":
     render_chat()
 
 elif mode == "ingesting":
@@ -394,7 +495,6 @@ elif mode == "done":
     render_done()
 
 else:
-    # Fallback — unknown mode, reset to chat
     st.warning(f"Unknown mode: {mode}. Resetting to chat.")
     set_mode("chat")
     st.rerun()
