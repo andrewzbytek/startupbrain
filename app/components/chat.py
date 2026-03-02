@@ -11,6 +11,11 @@ import streamlit as st
 from app.state import add_message, set_mode, reset_ingestion, invalidate_sidebar
 
 
+def _escape_latex(text: str) -> str:
+    """Escape dollar signs so Streamlit doesn't render them as LaTeX math."""
+    return text.replace("$", "\\$")
+
+
 # Minimum transcript length to suggest ingestion flow
 TRANSCRIPT_SUGGEST_LENGTH = 500
 
@@ -801,15 +806,15 @@ def render_contradiction_resolution():
         section = contradiction.get("existing_section", "")
         if section:
             st.caption(f"Section: {section}")
-        st.write(contradiction.get("existing_position", "_Not found_"))
+        st.write(_escape_latex(contradiction.get("existing_position", "_Not found_")))
 
     with col2:
         st.subheader("New claim")
-        st.write(contradiction.get("new_claim", "_Not found_"))
+        st.write(_escape_latex(contradiction.get("new_claim", "_Not found_")))
 
     tension = contradiction.get("tension_description", "") or contradiction.get("evidence_summary", "")
     if tension:
-        st.info(f"**Why this matters:** {tension}")
+        st.info(_escape_latex(f"**Why this matters:** {tension}"))
 
     # Check if this is a revisited rejection
     if contradiction.get("is_revisited_rejection"):
@@ -828,13 +833,13 @@ def render_contradiction_resolution():
                     with st.expander("Deep Analysis (Opus)", expanded=True):
                         headline = analysis.get("headline", "")
                         if headline:
-                            st.markdown(f"> {headline}")
+                            st.markdown(f"> {_escape_latex(headline)}")
                         implications = analysis.get("downstream_implications", "")
                         if implications:
-                            st.markdown(f"> **Downstream implications:** {implications}")
+                            st.markdown(f"> **Downstream implications:** {_escape_latex(implications)}")
                         observation = analysis.get("analyst_observation", "")
                         if observation:
-                            st.info(observation)
+                            st.info(_escape_latex(observation))
                     break
 
     # Resolution buttons

@@ -12,6 +12,11 @@ import streamlit as st
 from app.state import set_mode
 
 
+def _escape_latex(text: str) -> str:
+    """Escape dollar signs so Streamlit doesn't render them as LaTeX math."""
+    return text.replace("$", "\\$")
+
+
 def _parse_current_state(doc: str) -> list:
     """
     Parse Current State sections from startup_brain.md.
@@ -386,7 +391,7 @@ def render_sidebar():
                     pos = "_Not yet defined_"
                 icon = "🟢" if pos and pos != "_Not yet defined_" else "⚪"
                 with st.expander(f"{icon} {section['name']}", expanded=False):
-                    st.markdown(pos)
+                    st.markdown(_escape_latex(pos))
         else:
             st.caption("No current state defined yet.")
 
@@ -519,7 +524,7 @@ def render_sidebar():
             st.subheader(f"Active Tensions ({len(tensions)})")
             for t in tensions:
                 with st.expander(f"⚡ {t['section_name']} — {t['reason']}", expanded=False):
-                    st.markdown(t["details"])
+                    st.markdown(_escape_latex(t["details"]))
             st.divider()
 
         # --- Actions ---
@@ -635,7 +640,7 @@ def render_sidebar():
                 with st.expander("Evolution Narrative", expanded=True):
                     narrative = evo.get("narrative", "")
                     if narrative:
-                        st.markdown(narrative)
+                        st.markdown(_escape_latex(narrative))
                     inflection_points = evo.get("key_inflection_points", [])
                     if inflection_points:
                         st.markdown("**Key Inflection Points**")
@@ -646,7 +651,7 @@ def render_sidebar():
                             st.caption(f"**{date}** — {what}" + (f" _{why}_" if why else ""))
                     current_pos = evo.get("current_position_summary", "")
                     if current_pos:
-                        st.info(f"**Current position:** {current_pos}")
+                        st.info(f"**Current position:** {_escape_latex(current_pos)}")
         else:
             st.caption("No topics found in living document.")
 
