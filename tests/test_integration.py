@@ -1875,3 +1875,250 @@ class TestRollbackIntegration:
         """Verify rollback_last_session is importable from deferred_writer."""
         from services.deferred_writer import rollback_last_session
         assert callable(rollback_last_session)
+
+
+# ===========================================================================
+# PHASE 10 — Contact CRM Integration
+# ===========================================================================
+
+class TestContactCRMIntegration:
+    """Integration tests for Key Contacts / Prospects CRM feature.
+
+    Tests real LLM calls to verify generate_diff() emits ADD_CONTACT and
+    UPDATE_CONTACT actions, and that the full pipeline works end-to-end.
+    """
+
+    def test_single_contact_diff_generation(self):
+        """generate_diff with a single new contact should produce ADD_CONTACT block."""
+        from services.document_updater import generate_diff, parse_diff_output
+
+        doc = """# Startup Brain
+
+## Current State
+
+### Key Contacts / Prospects
+[No contacts tracked yet]
+
+## Decision Log
+[No decisions recorded yet]
+
+## Feedback Tracker
+[No feedback recorded yet]
+
+## Dismissed Contradictions
+[No dismissed contradictions]
+"""
+        new_info = (
+            "Contact update from founder: Met Natalie Park from BCDC Energy Fund at "
+            "a conference. She's a partner focused on energy infrastructure. "
+            "Want to schedule an intro meeting."
+        )
+
+        raw_diff = generate_diff(doc, new_info, update_reason="Contact note")
+
+        assert isinstance(raw_diff, str) and len(raw_diff) > 0
+
+        blocks = parse_diff_output(raw_diff)
+        assert len(blocks) > 0, f"Should produce diff blocks. Raw: {raw_diff[:500]}"
+
+        # Should contain at least one ADD_CONTACT action
+        contact_blocks = [b for b in blocks if b["action"] == "ADD_CONTACT"]
+        assert len(contact_blocks) >= 1, (
+            f"Expected ADD_CONTACT block. Got actions: "
+            f"{[b['action'] for b in blocks]}. Raw: {raw_diff[:500]}"
+        )
+
+        # Verify content has the expected contact fields
+        content = contact_blocks[0]["content"]
+        assert "Natalie" in content, f"Contact name missing. Content: {content}"
+        assert "**" in content, f"Name should be bold. Content: {content}"
+
+    def test_batch_contacts_diff_generation(self):
+        """generate_diff with multiple contacts in one input should produce multiple ADD_CONTACT blocks."""
+        from services.document_updater import generate_diff, parse_diff_output
+
+        doc = """# Startup Brain
+
+## Current State
+
+### Key Contacts / Prospects
+[No contacts tracked yet]
+
+## Decision Log
+[No decisions recorded yet]
+
+## Feedback Tracker
+[No feedback recorded yet]
+
+## Dismissed Contradictions
+[No dismissed contradictions]
+"""
+        new_info = (
+            "Contact update from founder: VCs to meet: "
+            "1) Natalie from BCDC Fund, 2) Katherine from VC United, "
+            "3) Georgia from United Ventures"
+        )
+
+        raw_diff = generate_diff(doc, new_info, update_reason="Contact note")
+
+        assert isinstance(raw_diff, str) and len(raw_diff) > 0
+
+        blocks = parse_diff_output(raw_diff)
+        contact_blocks = [b for b in blocks if b["action"] == "ADD_CONTACT"]
+
+        assert len(contact_blocks) >= 2, (
+            f"Expected at least 2 ADD_CONTACT blocks for 3 contacts. "
+            f"Got {len(contact_blocks)}. Actions: {[b['action'] for b in blocks]}. "
+            f"Raw: {raw_diff[:800]}"
+        )
+
+        # Verify at least two of the three names appear
+        all_content = " ".join(b["content"] for b in contact_blocks)
+        names_found = sum(1 for name in ["Natalie", "Katherine", "Georgia"]
+                         if name in all_content)
+        assert names_found >= 2, (
+            f"Expected at least 2 of 3 names. Found {names_found}. Content: {all_content[:500]}"
+        )
+
+    def test_update_contact_diff_generation(self):
+        """generate_diff with existing contact should produce UPDATE_CONTACT block."""
+        from services.document_updater import generate_diff, parse_diff_output
+
+        doc = """# Startup Brain
+
+## Current State
+
+### Key Contacts / Prospects
+- [2026-02-10] **Natalie Park** (BCDC Energy Fund)
+  Role: Partner | Type: investor | Status: identified
+  Context: Met at energy conference. Interested in infrastructure tech.
+  Last interaction: 2026-02-10 — Initial meeting at conference
+  Next step: Schedule follow-up call
+
+## Decision Log
+[No decisions recorded yet]
+
+## Feedback Tracker
+[No feedback recorded yet]
+
+## Dismissed Contradictions
+[No dismissed contradictions]
+"""
+        new_info = (
+            "Contact update from founder: Met Natalie Park from BCDC. She loved the demo. "
+            "Wants to see pilot data before committing. Follow up by March 15."
+        )
+
+        raw_diff = generate_diff(doc, new_info, update_reason="Contact note")
+
+        assert isinstance(raw_diff, str) and len(raw_diff) > 0
+
+        blocks = parse_diff_output(raw_diff)
+        assert len(blocks) > 0, f"Should produce diff blocks. Raw: {raw_diff[:500]}"
+
+        # Should produce UPDATE_CONTACT (not ADD_CONTACT for existing Natalie)
+        update_blocks = [b for b in blocks if b["action"] == "UPDATE_CONTACT"]
+        add_blocks = [b for b in blocks if b["action"] == "ADD_CONTACT"]
+
+        # Either UPDATE_CONTACT for Natalie, or at minimum no duplicate ADD_CONTACT
+        has_update = len(update_blocks) >= 1
+        has_natalie_add = any("Natalie" in b["content"] for b in add_blocks)
+
+        assert has_update or not has_natalie_add, (
+            f"Should UPDATE_CONTACT for existing Natalie, not ADD_CONTACT. "
+            f"Got: {[b['action'] for b in blocks]}. Raw: {raw_diff[:500]}"
+        )
+
+        # Verify update content mentions the demo or pilot
+        if update_blocks:
+            content = update_blocks[0]["content"]
+            assert "Natalie" in content, f"Update should reference Natalie. Content: {content}"
+
+    def test_contact_add_and_apply_end_to_end(self):
+        """Full pipeline: generate diff for new contact, parse, apply to document."""
+        from services.document_updater import generate_diff, parse_diff_output, apply_diff
+
+        doc = """# Startup Brain
+
+## Current State
+
+### Key Contacts / Prospects
+[No contacts tracked yet]
+
+### Fundraising Status / Strategy
+**Current position:** Pre-seed, self-funded.
+**Changelog:**
+- 2026-02-01: Initial. Source: Session 1
+
+## Decision Log
+[No decisions recorded yet]
+
+## Feedback Tracker
+[No feedback recorded yet]
+
+## Dismissed Contradictions
+[No dismissed contradictions]
+"""
+        new_info = (
+            "Contact update from founder: Sarah Chen from Beacon Capital is a partner "
+            "interested in compliance tech. Met at a conference."
+        )
+
+        raw_diff = generate_diff(doc, new_info, update_reason="Contact note")
+        blocks = parse_diff_output(raw_diff)
+
+        assert len(blocks) > 0, f"Should produce blocks. Raw: {raw_diff[:500]}"
+
+        # Apply the diff
+        updated = apply_diff(doc, blocks)
+
+        # Placeholder should be replaced
+        assert "[No contacts tracked yet]" not in updated, (
+            f"Placeholder should be replaced. Updated doc snippet: "
+            f"{updated[updated.find('Key Contacts'):updated.find('Key Contacts')+300]}"
+        )
+
+        # Sarah should appear
+        assert "Sarah" in updated or "Chen" in updated, (
+            f"Contact should appear in document. Updated: {updated[:500]}"
+        )
+
+        # Fundraising section should survive
+        assert "Fundraising Status" in updated, "Other sections should be preserved"
+
+    def test_contact_verify_accepts_valid_contact(self):
+        """verify_diff should accept a well-formed ADD_CONTACT block."""
+        from services.document_updater import verify_diff
+
+        doc = """# Startup Brain
+
+## Current State
+
+### Key Contacts / Prospects
+[No contacts tracked yet]
+
+## Decision Log
+[No decisions recorded yet]
+
+## Feedback Tracker
+[No feedback recorded yet]
+
+## Dismissed Contradictions
+[No dismissed contradictions]
+"""
+        proposed_diff = """SECTION: Key Contacts / Prospects
+ACTION: ADD_CONTACT
+CONTENT:
+- [2026-03-02] **Natalie Park** (BCDC Energy Fund)
+  Role: Partner | Type: investor | Status: identified
+  Context: Met at energy conference. Interested in infrastructure tech.
+  Last interaction: 2026-03-02 — Initial meeting at conference
+  Next step: Schedule follow-up call
+"""
+        new_info = "Met Natalie Park from BCDC Energy Fund at a conference."
+
+        result = verify_diff(doc, proposed_diff, new_info)
+
+        assert result["verified"], (
+            f"Valid ADD_CONTACT should verify. Issues: {result.get('issues', [])}"
+        )
