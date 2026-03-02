@@ -33,11 +33,13 @@ Last updated: [date]
 - [Awaiting first session]
 
 ### Business Model / Revenue Model
-**Current position:** Fixed-fee lifecycle contracts replacing traditional billable hours model. Revenue spans entire plant lifecycle: design, construction, operations, and decommissioning. Core offering includes HazOp/LOPA risk assessments, interactive reports with queryable design decisions, and knowledge preservation system. Disrupts traditional EPCM one-off fees ($50K-$500K per project) with continuous engagement model.
+**Current position:** Fixed-fee lifecycle contracts replacing traditional billable hours model. Initially focused on HazOp/LOPA risk assessments, with expansion planned into design improvements, procurement, and construction management. Long-term vision (5-10 years) includes full lifecycle revenue spanning design, construction, operations, and decommissioning. Disrupts traditional EPCM one-off fees ($50K-$500K per project) with continuous engagement model starting from risk assessment wedge.
 **Changelog:**
 - [Awaiting first session]
 - 2026-03-02: Positioned as AI-native EPCM with HazOp/LOPA wedge product, expanding to full engineering platform. Source: Co-founder discussion (Andrew, Danny)
 - 2026-03-02: Refined to fixed-fee lifecycle model vs traditional billable hours. Added interactive reports and knowledge preservation components. Source: Co-founder discussion (Andrew, Danny)
+- 2026-03-02: Clarified expansion timeline - HazOp/LOPA initially, design/procurement/construction medium-term, full lifecycle (operations/decommissioning) as 5-10 year vision. Source: Co-founder discussion (Andrew, Danny)
+```
 
 ### Pricing
 **Current position:** [Not yet defined]
