@@ -33,7 +33,7 @@ Last updated: [date]
 - [Awaiting first session]
 
 ### Business Model / Revenue Model
-**Current position:** Two-pronged revenue model: (1) Project-based fees as wedge product for initial customer entry, (2) Subscription/licensing for ongoing data access and interrogation - the "killer feature" enabling customers to query generated insights throughout plant lifecycle. Cost structure includes operations, compute, customer acquisition (sales-driven), and labor costs for customer success, sales engineering, plus small AI team (1-5 people), multidisciplinary engineering team, and outsourced legal. Forward deployment compensation available as premium offering to prevent customer abuse but not core revenue stream. Future potential includes selling risk assessment data to insurance/banking as MGA-style benchmarks. Targets 5-10% of $150B US engineering market ($7.5-15B), potentially 2x including Europe.
+**Current position:** Two-pronged revenue model: (1) Fixed-fee project contracts as entry point (customers are accustomed to this model), (2) Subscription or licensing fees for ongoing AI-powered data access and interrogation - the core value proposition enabling customers to query insights, simplify construction, and streamline operations throughout plant lifecycle. Cost structure includes operations, compute, customer acquisition (sales-driven), and labor costs for customer success, sales engineering, plus small AI team (1-5 people), multidisciplinary engineering team, and outsourced legal. Forward deployment compensation available as premium offering to prevent customer abuse but not core revenue stream. Future potential includes selling risk assessment data to insurance/banking as MGA-style benchmarks. Targets 5-10% of $150B US engineering market ($7.5-15B), potentially 2x including Europe.
 **Changelog:**
 - [Awaiting first session]
 - 2026-03-02: Positioned as AI-native EPCM with HazOp/LOPA wedge product, expanding to full engineering platform. Source: Co-founder discussion (Andrew, Danny)
@@ -42,6 +42,7 @@ Last updated: [date]
 ```
 - 2026-03-02: Detailed cost structure and revenue streams mapped - costs include operations, compute, CAC, labor (forward-deployed engineers, AI team). Revenue from project fees (wedge), data access subscriptions/licensing, forward deployment. Source: Co-founder discussion (Andrew, Danny)
 - 2026-03-02: Clarified forward deployment as premium offering, not core revenue stream. Main model focuses on project fees (wedge) and data access subscriptions/licensing. Source: Contradiction resolution discussion (Andrew, Danny)
+- 2026-03-02: Clarified core revenue model - fixed-fee contracts as entry point, subscription/licensing for AI-powered data access as primary value. Source: Contradiction resolution discussion (Andrew, Danny)
 
 ### Pricing
 **Current position:** [Not yet defined]
@@ -176,6 +177,14 @@ Last updated: [date]
 
 - [2026-03-02] Updated Current State → Business Model / Revenue Model: Forward deployment compensation, where engineers work alongside asset owners, is the core of the revenue model.
   Reason: The forward deployment revenue was really more an exploratory possible future premium offering, but for simplicity let's not really include it in the revenue stream. We can just keep it as a note or as a potential future visionary revenue stream. It's more that our users or customers don't abuse us or take advantage of us, so we charge them for the forward deployed engineer. It's not the core business, so we should not really put it as the core thing and really push it into the background.
+
+### 2026-03-02 — Subscription/Licensing as Core Revenue Model
+**Decision:** Structure revenue with fixed-fee project contracts as entry point, then subscription or licensing fees for ongoing AI-powered data access as the primary value driver.
+**Alternatives considered:** Project fees as primary revenue, pure subscription model, consulting approach
+**Why alternatives were rejected:** Customers expect fixed-fee contracts for initial engagement. The software's biggest advantage is AI-powered data interrogation for construction and operations simplification - this ongoing value requires recurring revenue model.
+**Context:** Clarifying primary vs secondary revenue streams and customer value proposition.
+**Participants:** Andrew, Danny
+```
 
 ## Feedback Tracker
 
