@@ -21,7 +21,6 @@ Last updated: [date]
 - [Awaiting first session]
 - 2026-03-02: Defined as 20x efficiency gain (5 vs 100 engineers), 150x speed improvement (20 minutes vs 3,000 hours), plus iterative capabilities. Source: Co-founder discussion (Andrew, Danny)
 - 2026-03-02: Added interactive reports capability and knowledge preservation value props. Source: Co-founder discussion (Andrew, Danny)
-- 2026-03-02: Refined positioning - HAZOP as ingestion wedge to create system models enabling 50% automation of downstream engineering tasks today, 70% within 12 months. Source: Co-founder discussion (Andrew, Danny)
 
 ### Why Now
 **Current position:** [Not yet defined]
@@ -29,9 +28,7 @@ Last updated: [date]
 - [Awaiting first session]
 
 ### Traction / Milestones
-**Current position:** In active discussions with a major oil company and a power developer. Seeking lighthouse deployments where they can own the HAZOP workflow and expand from there.
-**Changelog:**
-- 2026-03-02: Active discussions with major oil company and power developer for lighthouse deployments. Source: Co-founder discussion (Andrew, Danny)
+**Current position:** [Not yet defined]
 **Changelog:**
 - [Awaiting first session]
 
@@ -45,8 +42,6 @@ Last updated: [date]
 - 2026-03-02: Detailed cost structure and revenue streams mapped - costs include operations, compute, CAC, labor (forward-deployed engineers, AI team). Revenue from project fees (wedge), data access subscriptions/licensing, forward deployment. Source: Co-founder discussion (Andrew, Danny)
 - 2026-03-02: Clarified forward deployment as premium offering, not core revenue stream. Main model focuses on project fees (wedge) and data access subscriptions/licensing. Source: Contradiction resolution discussion (Andrew, Danny)
 - 2026-03-02: Clarified core revenue model - fixed-fee contracts as entry point, subscription/licensing for AI-powered data access as primary value. Source: Contradiction resolution discussion (Andrew, Danny)
-- 2026-03-02: Added market sizing - targeting $150B annual U.S. infrastructure engineering market (10% of $1.5T infrastructure spending), with global market being multiples larger. Source: Co-founder discussion (Andrew, Danny)
-- 2026-03-02: Clarified HAZOP as ingestion wedge, not the business - system model created from HAZOP is the actual asset enabling downstream automation. Source: Co-founder discussion (Andrew, Danny)
 
 ### Pricing
 **Current position:** [Not yet defined]
@@ -76,7 +71,6 @@ Last updated: [date]
 **Changelog:**
 - [Awaiting first session]
 - 2026-03-02: Identified data network effects and iterative process advantage as key defensibility. Source: Co-founder discussion (Andrew, Danny)
-- 2026-03-02: Refined moat definition - not the AI model itself, but deep context, judgement, trust and accountability that compounds across facilities and risk patterns. Source: Co-founder discussion (Andrew, Danny)
 
 ### Key Assumptions
 - It's statistically almost guaranteed that we will uncover missed risks in existing company assessments
@@ -87,12 +81,6 @@ Last updated: [date]
 - Finding bugs in current designs creates urgency due to potential lawsuits or criminal liability
 - Streamlined workflows alone are insufficient - must reduce risk below baseline to create urgency
 - Superior risk assessment can be positioned as industry standard, making non-adoption negligent
-- AI models can now ingest P&IDs, material specs, and engineering codes and produce PE-level calculations
-- HAZOP forces full-system ingestion and unlocks everything downstream
-- With system model from HAZOP, can automate 50% of downstream engineering tasks today, 70% within 12 months
-- When 70% of engineering tasks can be automated, billing purely by hour becomes structurally unstable
-- At FID only 30% of engineering is complete; as engineering gets cheaper this should move to 60-70%
-- Every infrastructure asset will eventually have continuously maintained system model
 
 ### Open Questions
 [Not yet defined]
@@ -208,27 +196,6 @@ Last updated: [date]
 **Alternatives considered:** Keep previous position
 **Why alternatives were rejected:** Fixed-fee contracts serve as entry point because customers are used to them. The biggest advantage is the software's AI-powered ability to help engineers understand data — they'll pay subscription/licensing for access to query insights, simplify construction, and streamline operations.
 **Context:** Contradiction resolution during ingestion.
-**Participants:** Andrew, Danny
-
-### 2026-03-02 — HAZOP as Ingestion Wedge Strategy
-**Decision:** Position HAZOP as ingestion wedge that creates system models enabling downstream engineering automation, not as the core business itself.
-**Alternatives considered:** HAZOP as standalone product, full engineering platform from start
-**Why alternatives were rejected:** HAZOP forces full-system ingestion and creates the system model asset that unlocks 50% automation of downstream tasks today, 70% within 12 months. The system model is the real value, not HAZOP itself.
-**Context:** Refining product strategy and value proposition for AI-native engineering platform.
-**Participants:** Andrew, Danny
-
-### 2026-03-02 — Target $150B U.S. Infrastructure Engineering Market
-**Decision:** Focus on the $150B annual U.S. infrastructure engineering market (10% of $1.5T total infrastructure spending).
-**Alternatives considered:** Smaller niche markets, international focus first
-**Why alternatives were rejected:** At FID only 30% of engineering is complete with billions already committed, creating massive inefficiency. Global market is multiples larger for future expansion.
-**Context:** Defining total addressable market and expansion strategy.
-**Participants:** Andrew, Danny
-
-### 2026-03-02 — Break Billable Hour Model with Automation
-**Decision:** Use AI automation to break the traditional billable hour business model in engineering.
-**Alternatives considered:** Work within existing billable hour framework, hybrid model
-**Why alternatives were rejected:** When 70% of engineering tasks can be automated, billing purely by hour becomes structurally unstable. 5 engineers producing output of 100 through 95% automation of prep and calculations is transformative.
-**Context:** Positioning against traditional EPCM industry economics.
 **Participants:** Andrew, Danny
 
 ## Feedback Tracker
