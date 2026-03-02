@@ -16,10 +16,11 @@ Last updated: [date]
 - 2026-03-02: Defined target industries as oil and gas, power generation (nuclear), hydro, and gas behind the meter. Source: Co-founder discussion (Andrew, Danny)
 
 ### Value Proposition
-**Current position:** AI-native engineering platform that allows 5 engineers to do what traditionally took 100. Can process HazOp and LOPA risk assessments in 20 minutes vs 3,000 hours with good accuracy. Enables iterative solutions (monthly/yearly reassessments) vs traditional waterfall approaches.
+**Current position:** AI-native engineering platform that allows 5 engineers to do what traditionally took 100. Can process HazOp and LOPA risk assessments in 20 minutes vs 3,000 hours with good accuracy. Enables iterative solutions (monthly/yearly reassessments) vs traditional waterfall approaches. Provides interactive reports where clients can query design decisions ("Why does this valve have to close so fast?") and preserves engineering knowledge so plant operators understand design rationale even if original engineers leave.
 **Changelog:**
 - [Awaiting first session]
 - 2026-03-02: Defined as 20x efficiency gain (5 vs 100 engineers), 150x speed improvement (20 minutes vs 3,000 hours), plus iterative capabilities. Source: Co-founder discussion (Andrew, Danny)
+- 2026-03-02: Added interactive reports capability and knowledge preservation value props. Source: Co-founder discussion (Andrew, Danny)
 
 ### Why Now
 **Current position:** [Not yet defined]
@@ -32,10 +33,11 @@ Last updated: [date]
 - [Awaiting first session]
 
 ### Business Model / Revenue Model
-**Current position:** AI-native EPCM (Engineering, Procurement, Construction Management) company positioning. Initial wedge product is HazOp and LOPA risk assessments. Future expansion into design improvements, procurement, and construction management with risk-based prioritization.
+**Current position:** Fixed-fee lifecycle contracts replacing traditional billable hours model. Revenue spans entire plant lifecycle: design, construction, operations, and decommissioning. Core offering includes HazOp/LOPA risk assessments, interactive reports with queryable design decisions, and knowledge preservation system. Disrupts traditional EPCM one-off fees ($50K-$500K per project) with continuous engagement model.
 **Changelog:**
 - [Awaiting first session]
 - 2026-03-02: Positioned as AI-native EPCM with HazOp/LOPA wedge product, expanding to full engineering platform. Source: Co-founder discussion (Andrew, Danny)
+- 2026-03-02: Refined to fixed-fee lifecycle model vs traditional billable hours. Added interactive reports and knowledge preservation components. Source: Co-founder discussion (Andrew, Danny)
 
 ### Pricing
 **Current position:** [Not yet defined]
@@ -43,10 +45,11 @@ Last updated: [date]
 - [Awaiting first session]
 
 ### Go-to-Market Strategy
-**Current position:** Offer free partial HazOp reassessments to target companies. Sales approach: "We uncovered 10 things; we'll give you five for free. For the complete assessment, you need to buy the full solution." Strategy relies on statistical likelihood of uncovering missed risks that will create urgency.
+**Current position:** Offer free partial HazOp reassessments to target companies. Sales approach: "We uncovered 10 things; we'll give you five for free. For the complete assessment, you need to buy the full solution." Strategy relies on statistical likelihood of uncovering missed risks that will create urgency. Positioning strategy: tool is so superior at risk assessment that not using it constitutes negligence. Holy grail outcome is regulator declaring non-adoption as negligence.
 **Changelog:**
 - [Awaiting first session]
 - 2026-03-02: Defined free partial assessment strategy with 50% value preview model. Source: Co-founder discussion (Andrew, Danny)
+- 2026-03-02: Added negligence positioning strategy and regulatory holy grail outcome. Source: Co-founder discussion (Andrew, Danny)
 
 ### Technical Approach
 **Current position:** AI-native platform that ingests customer files to accumulate knowledge and iterate faster. Processes internal company data for risk assessments, ensures design safety, suggests edits, and verifies compliance with regulations and bylaws.
@@ -70,6 +73,10 @@ Last updated: [date]
 - Companies will panic when we uncover critical problems, creating urgency for full solution
 - Insurance companies will value our risk assessment capabilities
 - Iterative solutions always win over waterfall approaches in engineering
+- AI will kill billable hours in the EPCM industry
+- Finding bugs in current designs creates urgency due to potential lawsuits or criminal liability
+- Streamlined workflows alone are insufficient - must reduce risk below baseline to create urgency
+- Superior risk assessment can be positioned as industry standard, making non-adoption negligent
 
 ### Open Questions
 [Not yet defined]
@@ -113,6 +120,27 @@ Last updated: [date]
 **Alternatives considered:** Traditional enterprise sales, freemium model, consulting approach
 **Why alternatives were rejected:** Free partial assessments create immediate value demonstration and urgency when risks are uncovered. Statistical likelihood of finding missed risks makes this a reliable strategy.
 **Context:** Defining go-to-market approach for risk assessment platform.
+**Participants:** Andrew, Danny
+
+### 2026-03-02 — Fixed-Fee Lifecycle Model vs Billable Hours
+**Decision:** Charge fixed fees per project throughout plant lifecycle instead of traditional billable hours model.
+**Alternatives considered:** Billable hours like traditional EPCM, subscription model, equity/outcome sharing
+**Why alternatives were rejected:** AI makes billable hours obsolete. Fixed fees align with delivering outcomes vs time spent. Lifecycle approach captures more value than one-off projects.
+**Context:** Analyzing how to disrupt traditional EPCM industry economics ($50K-$500K one-off fees).
+**Participants:** Andrew, Danny
+
+### 2026-03-02 — Superior Risk Assessment as Core Positioning
+**Decision:** Position the tool as so superior at risk assessment that not using it constitutes negligence.
+**Alternatives considered:** Efficiency/speed positioning, cost savings focus, general AI automation
+**Why alternatives were rejected:** Streamlined workflows are "nice to have" without urgency. Risk assessment creates hair-on-fire problems when bugs are found in existing designs. Potential legal liability creates urgency.
+**Context:** Defining competitive positioning strategy for market disruption.
+**Participants:** Andrew, Danny
+
+### 2026-03-02 — Interactive Reports and Knowledge Preservation
+**Decision:** Provide interactive reports where clients can query design decisions and preserve engineering knowledge beyond individual engineers.
+**Alternatives considered:** Static reports like traditional EPCM, documentation systems, training programs
+**Why alternatives were rejected:** Static reports lose context when engineers leave. Interactive system preserves institutional knowledge and adds ongoing value throughout plant operations.
+**Context:** Differentiating from traditional EPCM deliverables and creating lifecycle value.
 **Participants:** Andrew, Danny
 
 ## Feedback Tracker
