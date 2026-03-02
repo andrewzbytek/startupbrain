@@ -40,7 +40,9 @@ startupbrain/
 │   ├── claude_client.py        # Anthropic API wrapper (Sonnet/Opus routing, cost tracking)
 │   ├── consistency.py          # 3-pass consistency engine (the core feature)
 │   ├── cost_tracker.py         # Monthly cost tracking with budget alerts
+│   ├── deferred_writer.py      # Batched writes, crash recovery, session rollback
 │   ├── document_updater.py     # Living document diff-and-verify updates
+│   ├── export.py               # Full context export (living doc + sessions + claims)
 │   ├── feedback.py             # Feedback patterns, evolution narratives, pitch generation
 │   ├── ingestion.py            # Transcript → claims → storage pipeline
 │   └── mongo_client.py         # MongoDB Atlas client (sessions, claims, feedback, vector search)
@@ -59,7 +61,7 @@ startupbrain/
 │   └── whiteboard.md           # Whiteboard photo extraction (vision)
 ├── documents/
 │   └── startup_brain.md        # The living document (git-tracked, mirrored to MongoDB)
-├── tests/                      # 721 unit tests, 45 integration tests
+├── tests/                      # 839 unit tests, 45 integration tests
 │   ├── conftest.py             # Shared fixtures and sample data
 │   ├── test_transcripts/       # Sample transcripts for testing
 │   └── test_*.py               # Test modules (one per service/component)
@@ -110,9 +112,12 @@ Paste transcript → Select session type → [Optional: upload whiteboard]
 - **Quick notes** — prefix-based (`note:`, `remember:`, `jot:`, `fyi:`) lightweight doc updates without full ingestion pipeline
 - **Hypothesis tracking** — prefix-based (`hypothesis:`, `validated:`, `invalidated:`) testable assumption tracking with sidebar status management
 - **Living document download** — one-click download from sidebar Actions
+- **Full context export** — "Download Full Context" button exports living document + all session history with claims as a single MD file for sharing with external LLMs or advisors
+- **Session rollback** — `rollback_last_session()` one-command rollback of the most recent session (MongoDB cleanup + git revert)
 - **Socratic chat** — system prompt references Decision Log dates, dismissed contradictions, and Feedback Tracker entries for context-rich responses
 - **Sidebar tensions** — surfaces areas of active instability (changelog churn, recent dismissals, decisions under evaluation)
 - **Explicit decision tracking** — contradiction resolution writes Decision Log and Dismissed Contradictions entries directly
+- **Enrichment-based updates** — diff engine enriches existing positions by adding new information while preserving all existing specific details (numbers, names, amounts)
 
 ### State Machine
 
@@ -150,7 +155,7 @@ python -m pytest tests/ -m integration
 python -m pytest tests/ -v --tb=short -m "not integration"
 ```
 
-721 unit tests + 45 integration tests across 23 test files. All service and component tests run fully offline with mocks.
+839 unit tests + 45 integration tests across 24 test files. All service and component tests run fully offline with mocks.
 
 ## Deployment
 
