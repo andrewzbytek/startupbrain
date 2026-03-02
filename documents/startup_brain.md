@@ -186,6 +186,9 @@ Last updated: [date]
 **Participants:** Andrew, Danny
 ```
 
+- [2026-03-02] Updated Current State → Business Model / Revenue Model: Data access will be monetized through either subscription or licensing models.
+  Reason: This is actually a pretty critical shift, and we talked about this with my co-founder a lot! We need to use the fixed fee contract as an entry point because the customers are really used to it. The biggest advantage of the software itself is the software's ability to help people, help the engineers understand the data, so they will be paying a subscription or licensing fee to have access to our powerful AI. They can use it to simplify the construction, to simplify the operations. This is an important update.
+
 ## Feedback Tracker
 
 ### Recurring Themes
