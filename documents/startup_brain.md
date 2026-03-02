@@ -174,6 +174,9 @@ Last updated: [date]
 **Participants:** Andrew, Danny
 ```
 
+- [2026-03-02] Updated Current State → Business Model / Revenue Model: Forward deployment compensation, where engineers work alongside asset owners, is the core of the revenue model.
+  Reason: The forward deployment revenue was really more an exploratory possible future premium offering, but for simplicity let's not really include it in the revenue stream. We can just keep it as a note or as a potential future visionary revenue stream. It's more that our users or customers don't abuse us or take advantage of us, so we charge them for the forward deployed engineer. It's not the core business, so we should not really put it as the core thing and really push it into the background.
+
 ## Feedback Tracker
 
 ### Recurring Themes
