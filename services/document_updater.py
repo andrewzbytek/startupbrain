@@ -130,7 +130,8 @@ def apply_diff(document: str, diff_blocks: list) -> str:
     """
     Apply parsed diff blocks to the document.
     Handles UPDATE_POSITION, ADD_CHANGELOG, ADD_DECISION, ADD_FEEDBACK,
-    ADD_DISMISSED, ADD_SECTION actions.
+    ADD_DISMISSED, ADD_HYPOTHESIS, ADD_CONTACT, UPDATE_CONTACT,
+    ADD_SECTION actions.
 
     Returns the updated document string.
     """
@@ -153,6 +154,12 @@ def apply_diff(document: str, diff_blocks: list) -> str:
             updated = _add_dismissed(updated, content)
         elif action == "ADD_HYPOTHESIS":
             updated = _add_hypothesis(updated, content)
+        elif action == "ADD_CONTACT":
+            updated = _add_contact(updated, content)
+        elif action == "UPDATE_CONTACT":
+            name_match = re.search(r"\*\*(.+?)\*\*", content)
+            if name_match:
+                updated = _update_contact(updated, name_match.group(1), content)
         elif action == "ADD_SECTION":
             updated = _add_section(updated, section, content)
 
@@ -287,6 +294,51 @@ def _add_hypothesis(doc: str, hypothesis_content: str) -> str:
     if "## Decision Log" in doc:
         return doc.replace("## Decision Log", "## Active Hypotheses\n" + hypothesis_content + "\n\n## Decision Log")
     return doc + "\n\n## Active Hypotheses\n" + hypothesis_content + "\n"
+
+
+def _add_contact(doc: str, contact_content: str) -> str:
+    """Add a new entry to the Key Contacts / Prospects section under Current State."""
+    # Match ### Key Contacts / Prospects within ## Current State
+    pattern = re.compile(
+        r"(### Key Contacts / Prospects\n)(.*?)(\n###|\n## |\Z)",
+        re.DOTALL,
+    )
+
+    def replacer(m):
+        existing = m.group(2).strip()
+        # Replace placeholder or old format with Current position/Changelog
+        if existing == "[No contacts tracked yet]":
+            existing = ""
+        elif "**Current position:**" in existing and "**Changelog:**" in existing:
+            # Old format — replace entirely
+            existing = ""
+        if existing:
+            return m.group(1) + existing + "\n" + contact_content + "\n" + m.group(3)
+        return m.group(1) + contact_content + "\n" + m.group(3)
+
+    updated = pattern.sub(replacer, doc)
+    if updated != doc:
+        return updated
+
+    # If section missing, insert before Decision Log
+    if "## Decision Log" in doc:
+        return doc.replace(
+            "## Decision Log",
+            "### Key Contacts / Prospects\n" + contact_content + "\n\n## Decision Log",
+        )
+    return doc + "\n\n### Key Contacts / Prospects\n" + contact_content + "\n"
+
+
+def _update_contact(doc: str, contact_name: str, updated_fields: str) -> str:
+    """Update an existing contact entry by name (case-insensitive match on bold name)."""
+    escaped_name = re.escape(contact_name)
+    # Match from "- [date] **Name**" through to the next "- [" entry or section/doc boundary
+    pattern = re.compile(
+        rf"- \[\d{{4}}-\d{{2}}-\d{{2}}\] \*\*{escaped_name}\*\*.*?(?=\n- \[|\n###|\n## |\Z)",
+        re.DOTALL | re.IGNORECASE,
+    )
+    updated = pattern.sub(updated_fields.strip(), doc)
+    return updated
 
 
 def _update_hypothesis_status(doc: str, hypothesis_fragment: str, new_status: str, evidence_update: str = "") -> str:

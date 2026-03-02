@@ -105,9 +105,7 @@ Last updated: [date]
 - 2026-03-02: Defined CEO/CPTO roles and hiring priorities - forward-deployed engineers, customer success, sales engineering, small AI team, multidisciplinary engineers. Source: Co-founder discussion (Andrew, Danny)
 
 ### Key Contacts / Prospects
-**Current position:** [Not yet defined]
-**Changelog:**
-- [Awaiting first session]
+[No contacts tracked yet]
 
 ### Fundraising Status / Strategy
 **Current position:** Two-stage approach: First raise from friendly VCs (Danny's network + Andrew's European contacts) to build momentum, then approach Tier 1 VCs with existing commitments as social proof. Focus on SBC entrepreneurs and targeted outreach to close rounds quickly. Currently building customer relationships and logos without formal LOIs. Raising a focused round to deepen the ingestion layer, expand agentic workflows, and secure lighthouse deployments.

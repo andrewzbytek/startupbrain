@@ -79,6 +79,18 @@ Last updated: 2026-02-15
 **Changelog:**
 - 2026-02-05: First hire decision: nuclear domain expert. Source: Session 2
 
+### Key Contacts / Prospects
+- [2026-02-10] **Sarah Chen** (Beacon Capital)
+  Role: Partner | Type: investor | Status: in-conversation
+  Context: Met at nuclear energy conference. Interested in compliance tech.
+  Last interaction: 2026-02-10 — Positive on technical approach, wants first customer before investing
+  Next step: Send demo after first customer signed
+- [2026-02-14] **Marcus Webb** (Frontier Ventures)
+  Role: Managing Director | Type: investor | Status: identified
+  Context: Warm intro from Sarah Chen. Focus on deep tech investments.
+  Last interaction: 2026-02-14 — Questioned unit economics, wants live demo
+  Next step: Schedule live demo
+
 ### Fundraising Status / Strategy
 **Current position:** Pre-seed, self-funded. Targeting seed round after first paying customer. Need warm intros to nuclear-focused investors.
 **Changelog:**

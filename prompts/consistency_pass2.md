@@ -31,6 +31,8 @@ For each potential contradiction from Pass 1:
 
 **Session type affects severity:** A claim from a formal decision session or customer interview that contradicts the living document is more likely Critical. A claim from internal notes or brainstorming that explores an alternative is more likely Notable or Minor — it may represent thinking-out-loud rather than a real strategic shift.
 
+**Contact status changes** — Contradictions that ONLY involve Key Contacts / Prospects status progression (e.g., contact moved from "identified" to "in-conversation") should be filtered as Minor. Contact pipeline movement is normal business activity, not a strategic shift.
+
 ## Prior Resolutions Do NOT Reduce Severity
 
 **CRITICAL**: If a section has prior contradiction resolutions in the Decision Log, that does NOT make new contradictions on that section less severe. A section that has been revised multiple times is a CONTESTED area — new tensions there are MORE likely to be strategically significant, not less.

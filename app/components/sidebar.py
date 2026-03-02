@@ -200,6 +200,53 @@ def _parse_hypotheses(doc: str) -> list:
     return hypotheses
 
 
+def _parse_contacts(doc: str) -> list:
+    """
+    Parse Key Contacts / Prospects from the living document.
+    Returns list of dicts: {date, name, org, role, type, status, context, last_interaction, next_step}
+    """
+    contacts = []
+    cs_match = re.search(r"## Current State\n(.*?)(?=\n## |\Z)", doc, re.DOTALL)
+    if not cs_match:
+        return contacts
+
+    kc_match = re.search(
+        r"### Key Contacts / Prospects\n(.*?)(?=\n### |\n## |\Z)",
+        cs_match.group(1),
+        re.DOTALL,
+    )
+    if not kc_match:
+        return contacts
+
+    content = kc_match.group(1).strip()
+    if not content or content == "[No contacts tracked yet]":
+        return contacts
+
+    pattern = re.compile(
+        r"- \[(\d{4}-\d{2}-\d{2})\] \*\*(.+?)\*\*\s*\((.+?)\)\n"
+        r"\s+Role: (.+?) \| Type: (\w+) \| Status: ([\w-]+)\n"
+        r"\s+Context: (.+?)\n"
+        r"\s+Last interaction: (.+?)\n"
+        r"\s+Next step: (.+?)(?=\n- \[|\Z)",
+        re.DOTALL,
+    )
+
+    for m in pattern.finditer(content):
+        contacts.append({
+            "date": m.group(1).strip(),
+            "name": m.group(2).strip(),
+            "org": m.group(3).strip(),
+            "role": m.group(4).strip(),
+            "type": m.group(5).strip(),
+            "status": m.group(6).strip(),
+            "context": m.group(7).strip(),
+            "last_interaction": m.group(8).strip(),
+            "next_step": m.group(9).strip(),
+        })
+
+    return contacts
+
+
 # Section keywords for matching dismissed contradictions to sections
 _SECTION_KEYWORDS = {
     "Target Market / Initial Customer": ["target", "market", "customer", "beachhead", "segment"],
@@ -456,6 +503,44 @@ def render_sidebar():
 
             st.divider()
 
+        # --- Contacts ---
+        contacts = _parse_contacts(doc)
+        if contacts:
+            active_contacts = [c for c in contacts if c["status"] not in ("closed", "inactive")]
+            st.subheader(f"Contacts ({len(active_contacts)} active)")
+
+            # Group by type
+            type_groups = {}
+            type_labels = {
+                "investor": "Investors",
+                "prospect": "Prospects",
+                "hire": "Hires",
+                "advisor": "Advisors",
+                "partner": "Partners",
+            }
+            for c in active_contacts:
+                ctype = c["type"]
+                label = type_labels.get(ctype, ctype.title())
+                if label not in type_groups:
+                    type_groups[label] = []
+                type_groups[label].append(c)
+
+            for group_label, group_contacts in type_groups.items():
+                with st.expander(f"{group_label} ({len(group_contacts)})", expanded=False):
+                    for c in group_contacts:
+                        status_color = {
+                            "identified": "blue",
+                            "in-conversation": "orange",
+                            "engaged": "green",
+                            "pilot": "green",
+                        }.get(c["status"], "gray")
+                        st.markdown(f"**{html.escape(c['name'])}** ({html.escape(c['org'])})")
+                        st.caption(f"Status: {c['status']} | {c['role']}")
+                        st.caption(f"Last: {c['last_interaction']}")
+                        st.caption(f"Next: {c['next_step']}")
+
+            st.divider()
+
         # --- External Feedback ---
         st.subheader("External Feedback")
         feedback_by_source = _parse_feedback_by_source(doc)
@@ -701,6 +786,7 @@ def render_sidebar():
             st.markdown(
                 "**Chat prefixes:**\n"
                 "- `note:` / `remember:` / `jot:` / `fyi:` — Quick note\n"
+                "- `contact:` / `prospect:` / `lead:` — Track a contact\n"
                 "- `hypothesis:` — Track a hypothesis\n"
                 "- `validated:` / `invalidated:` — Update hypothesis status\n"
                 "- `no,` / `actually,` / `correction:` — Direct correction"

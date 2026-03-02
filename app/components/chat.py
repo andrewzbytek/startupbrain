@@ -78,6 +78,23 @@ def _strip_quick_note_prefix(text: str) -> str:
     return text.strip()
 
 
+def _is_contact(text: str) -> bool:
+    """Detect contact prefixes like 'contact:', 'prospect:', 'lead:'."""
+    lower = text.lower().strip()
+    prefixes = ("contact:", "prospect:", "lead:")
+    return any(lower.startswith(p) for p in prefixes)
+
+
+def _strip_contact_prefix(text: str) -> str:
+    """Strip the contact prefix from the message."""
+    lower = text.lower().strip()
+    prefixes = ("contact:", "prospect:", "lead:")
+    for p in prefixes:
+        if lower.startswith(p):
+            return text.strip()[len(p):].strip()
+    return text.strip()
+
+
 def _is_hypothesis(text: str) -> bool:
     """Detect hypothesis prefix like 'hypothesis: ...'."""
     lower = text.lower().strip()
@@ -531,6 +548,43 @@ def _apply_quick_note(note_text: str) -> str:
         return f"Could not save note: {e}"
 
 
+def _apply_contact(contact_text: str) -> str:
+    """
+    Apply a contact note to the living document.
+    Same lightweight path as quick notes — skips extraction and consistency check.
+    Stores a claim in MongoDB with source_type='contact_note'.
+    """
+    try:
+        from services.document_updater import update_document
+        from services.mongo_client import insert_claim
+        from datetime import datetime, timezone
+
+        result = update_document(
+            new_info=f"Contact update from founder: {contact_text}",
+            update_reason="Contact note",
+        )
+
+        try:
+            insert_claim({
+                "claim_text": contact_text,
+                "claim_type": "claim",
+                "confidence": "definite",
+                "source_type": "contact_note",
+                "who_said_it": "Founder",
+                "confirmed": True,
+                "created_at": datetime.now(timezone.utc),
+            })
+        except Exception:
+            pass
+
+        if result.get("success"):
+            return f"Contact noted — {result.get('message', '')}"
+        else:
+            return f"Contact may not have been saved — {result.get('message', 'unknown error')}"
+    except Exception as e:
+        return f"Could not save contact: {e}"
+
+
 def _apply_hypothesis(user_message: str) -> str:
     """
     Add a new hypothesis to the living document and MongoDB.
@@ -722,6 +776,18 @@ def render_chat():
             with st.chat_message("assistant"):
                 with st.spinner("Noting..."):
                     response = _apply_quick_note(note_text)
+                st.markdown(response)
+            add_message("assistant", response)
+            invalidate_sidebar()
+            st.rerun()
+            return
+
+        # Handle contact notes
+        if _is_contact(user_input):
+            contact_text = _strip_contact_prefix(user_input)
+            with st.chat_message("assistant"):
+                with st.spinner("Updating contacts..."):
+                    response = _apply_contact(contact_text)
                 st.markdown(response)
             add_message("assistant", response)
             invalidate_sidebar()

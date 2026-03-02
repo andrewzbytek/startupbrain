@@ -61,3 +61,6 @@ If there are blocking issues:
 - [ ] Would a human applying these changes produce a coherent, well-formed markdown document? (BLOCKING)
 - [ ] Are the key themes from the new information captured? (NON-BLOCKING — note in `<notes>` if incomplete)
 - [ ] Does any UPDATE_POSITION lose specific details from the original position? Compare original vs proposed — every specific detail must be preserved unless contradicted. (BLOCKING — detail loss)
+- [ ] Does each ADD_CONTACT include required fields: Name (bold), Organization, Type, Status, Context, Next step? (BLOCKING)
+- [ ] Does any ADD_CONTACT use the name of a contact already present in Key Contacts / Prospects? Should be UPDATE_CONTACT instead. (BLOCKING)
+- [ ] Is CRM data (contact status, interaction history) confined to Key Contacts / Prospects? Strategic insights from contact interactions may also update other sections. (NON-BLOCKING)
