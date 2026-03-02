@@ -68,6 +68,14 @@ def render_ingesting():
             key="topic_input",
         )
 
+    from datetime import date as _date
+    session_date = st.date_input(
+        "Session date",
+        value=st.session_state.get("ingestion_session_date") or _date.today(),
+        key="session_date_input",
+        help="Set to a past date if ingesting a session that happened earlier.",
+    )
+
     from app.state import SESSION_TYPES
     col_type, col_custom = st.columns(2)
     with col_type:
@@ -144,6 +152,7 @@ def render_ingesting():
                 st.session_state.current_transcript = transcript.strip()
                 st.session_state.ingestion_participants = participants.strip()
                 st.session_state.ingestion_topic = topic.strip()
+                st.session_state.ingestion_session_date = session_date
 
                 # Resolve session type
                 final_session_type = custom_type.strip() if session_type == "Other" else session_type
@@ -202,10 +211,13 @@ def render_checking_consistency():
     session_summary = st.session_state.get("ingestion_session_summary", "")
     topic_tags = st.session_state.get("ingestion_topic_tags", [])
     session_type = st.session_state.get("ingestion_session_type", "")
+    session_date_val = st.session_state.get("ingestion_session_date")
+    session_date_str = session_date_val.isoformat() if session_date_val else ""
     metadata = {
         "participants": participants,
         "topic": st.session_state.get("ingestion_topic", ""),
         "session_type": session_type,
+        "session_date": session_date_str,
     }
 
     progress = IngestionProgress()
@@ -244,7 +256,7 @@ def render_checking_consistency():
             # Step 3: Update living document IN MEMORY (LLM runs, no file/git writes)
             progress.update_step("Generating document updates (deferred)...", status="running")
             from datetime import datetime, timezone
-            date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            date_str = session_date_str or datetime.now(timezone.utc).strftime("%Y-%m-%d")
             if session_type:
                 update_reason = f"{session_type} — {date_str}"
             else:

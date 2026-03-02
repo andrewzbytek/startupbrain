@@ -77,7 +77,7 @@ class TestInitSessionState:
             "sidebar_data", "ingestion_participants", "ingestion_topic",
             "ingestion_session_summary", "ingestion_topic_tags",
             "consistency_results", "contradiction_index", "whiteboard_text",
-            "evolution_result", "ingestion_session_type",
+            "evolution_result", "ingestion_session_type", "ingestion_session_date",
             "book_crosscheck_content", "book_crosscheck_filename",
             "show_hypothesis_form",
             "deferred_writer", "_batch_committed", "_has_pending_ingestion",

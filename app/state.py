@@ -41,6 +41,7 @@ def init_session_state():
         "ingestion_participants": "",
         "ingestion_topic": "",
         "ingestion_session_type": "",
+        "ingestion_session_date": None,
         "ingestion_session_summary": "",
         "ingestion_topic_tags": [],
         # Consistency check results
@@ -105,6 +106,7 @@ def reset_ingestion():
     st.session_state.contradiction_index = 0
     st.session_state.whiteboard_text = ""
     st.session_state.ingestion_session_type = ""
+    st.session_state.ingestion_session_date = None
     st.session_state.pipeline_result = {}
     st.session_state.deferred_writer = None
     st.session_state._batch_committed = False
