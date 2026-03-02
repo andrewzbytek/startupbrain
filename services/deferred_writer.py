@@ -7,6 +7,7 @@ Checkpoints pipeline state to MongoDB so crashes are recoverable.
 """
 
 import logging
+import subprocess
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -291,3 +292,97 @@ def load_pending_ingestion() -> Optional[DeferredWriter]:
     if data is None:
         return None
     return DeferredWriter.from_checkpoint(data)
+
+
+def rollback_last_session() -> dict:
+    """
+    Roll back the most recently committed session:
+    1. Find latest session in MongoDB
+    2. Delete session + its claims from MongoDB
+    3. Revert startup_brain.md to previous git version
+    4. Mirror reverted doc to MongoDB
+    5. Git commit the revert
+
+    Returns dict with: success (bool), message (str), session_id (str), claims_deleted (int)
+    """
+    from services.mongo_client import (
+        get_latest_session, delete_many, delete_one,
+        upsert_living_document,
+    )
+    from services.document_updater import (
+        write_living_document, _git_commit, LIVING_DOC_PATH,
+    )
+
+    # 1. Find latest session
+    session = get_latest_session()
+    if session is None:
+        return {"success": False, "message": "No sessions found in MongoDB.", "session_id": "", "claims_deleted": 0}
+
+    session_id = str(session["_id"])
+    repo_root = LIVING_DOC_PATH.parent.parent
+
+    # 2. Delete claims for this session
+    claims_deleted = delete_many("claims", {"session_id": session_id})
+
+    # 3. Delete the session document
+    delete_one("sessions", {"_id": session["_id"]})
+
+    # 4. Find the previous git commit that touched the living document
+    try:
+        relative_path = str(LIVING_DOC_PATH.relative_to(repo_root)).replace("\\", "/")
+        log_result = subprocess.run(
+            ["git", "log", "--oneline", "-2", "--", relative_path],
+            cwd=str(repo_root),
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        log_lines = log_result.stdout.strip().split("\n")
+        if len(log_lines) < 2:
+            return {
+                "success": True,
+                "message": f"Session {session_id} deleted from MongoDB ({claims_deleted} claims). "
+                           "Only one git commit for the document — no git revert performed.",
+                "session_id": session_id,
+                "claims_deleted": claims_deleted,
+            }
+
+        prev_hash = log_lines[1].split()[0]
+
+        # 5. Get the document content from the previous commit
+        show_result = subprocess.run(
+            ["git", "show", f"{prev_hash}:{relative_path}"],
+            cwd=str(repo_root),
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        prev_content = show_result.stdout
+
+        # 6. Write reverted document to disk and MongoDB
+        write_living_document(prev_content)
+        date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        upsert_living_document(
+            prev_content,
+            metadata={"last_updated": date_str, "update_reason": f"Rollback session {session_id}"},
+        )
+
+        # 7. Git commit the revert
+        _git_commit(f"Rollback session: {session_id}")
+
+    except subprocess.CalledProcessError as e:
+        return {
+            "success": True,
+            "message": f"Session {session_id} deleted from MongoDB ({claims_deleted} claims). "
+                       f"Git revert failed: {e}",
+            "session_id": session_id,
+            "claims_deleted": claims_deleted,
+        }
+
+    return {
+        "success": True,
+        "message": f"Rolled back session {session_id}: {claims_deleted} claims deleted, "
+                   f"document reverted to commit {prev_hash}.",
+        "session_id": session_id,
+        "claims_deleted": claims_deleted,
+    }

@@ -165,6 +165,11 @@ def _update_position(doc: str, section: str, new_position_content: str) -> str:
     if " → " in section:
         _, subsection = section.split(" → ", 1)
 
+        # Strip duplicate header from content if LLM included it
+        header_line = f"### {subsection}"
+        if new_position_content.startswith(header_line):
+            new_position_content = new_position_content[len(header_line):].lstrip("\n")
+
         # Try sections with **Current position:** format first
         pattern = re.compile(
             rf"(### {re.escape(subsection)}\n)"

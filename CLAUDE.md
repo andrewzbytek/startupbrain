@@ -16,6 +16,10 @@ AI-powered knowledge management for a 2-person startup. See `docs/SPEC.md` for f
 - All state management via `st.session_state` — Streamlit re-runs on every interaction
 - State machine: `chat → ingesting → confirming_claims → checking_consistency → resolving_contradiction → done`
 
+## Session Rollback
+- `from services.deferred_writer import rollback_last_session; rollback_last_session()` — rolls back the most recent session (deletes session + claims from MongoDB, reverts startup_brain.md to previous git version, mirrors to MongoDB, git commits the revert)
+- `services/mongo_client.py` also exposes `delete_many(collection, query)` and `get_latest_session()` for manual cleanup
+
 ## Key Conventions
 - Use `@st.cache_resource` for MongoDB connections
 - Every Claude API call goes through `services/claude_client.py` which handles cost tracking and Sonnet/Opus routing

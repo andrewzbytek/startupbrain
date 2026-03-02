@@ -575,3 +575,71 @@ class TestGetSessionClaims:
             result = mc.get_session_claims([])
             mock.assert_not_called()
             assert result == []
+
+
+# ---------------------------------------------------------------------------
+# delete_many tests
+# ---------------------------------------------------------------------------
+
+class TestDeleteMany:
+    """Tests for delete_many: deletes all matching documents."""
+
+    def test_returns_count_on_success(self):
+        mock_db = MagicMock()
+        mock_collection = MagicMock()
+        mock_collection.delete_many.return_value = MagicMock(deleted_count=5)
+        mock_db.__getitem__ = MagicMock(return_value=mock_collection)
+
+        with patch.object(mc, "get_db", return_value=mock_db):
+            result = mc.delete_many("claims", {"session_id": "s1"})
+            assert result == 5
+            mock_collection.delete_many.assert_called_once_with({"session_id": "s1"})
+
+    def test_returns_zero_when_db_none(self):
+        with patch.object(mc, "get_db", return_value=None):
+            result = mc.delete_many("claims", {"session_id": "s1"})
+            assert result == 0
+
+    def test_returns_zero_on_exception(self):
+        mock_db = MagicMock()
+        mock_collection = MagicMock()
+        mock_collection.delete_many.side_effect = Exception("fail")
+        mock_db.__getitem__ = MagicMock(return_value=mock_collection)
+
+        with patch.object(mc, "get_db", return_value=mock_db):
+            result = mc.delete_many("claims", {})
+            assert result == 0
+
+
+# ---------------------------------------------------------------------------
+# get_latest_session tests
+# ---------------------------------------------------------------------------
+
+class TestGetLatestSession:
+    """Tests for get_latest_session: retrieves the most recent session."""
+
+    def test_returns_session(self):
+        mock_db = MagicMock()
+        mock_sessions = MagicMock()
+        mock_sessions.find_one.return_value = {"_id": "s1", "created_at": "2026-03-01"}
+        mock_db.__getitem__ = MagicMock(return_value=mock_sessions)
+
+        with patch.object(mc, "get_db", return_value=mock_db):
+            result = mc.get_latest_session()
+            assert result["_id"] == "s1"
+            mock_sessions.find_one.assert_called_once_with(sort=[("created_at", -1)])
+
+    def test_returns_none_when_db_none(self):
+        with patch.object(mc, "get_db", return_value=None):
+            result = mc.get_latest_session()
+            assert result is None
+
+    def test_returns_none_on_exception(self):
+        mock_db = MagicMock()
+        mock_sessions = MagicMock()
+        mock_sessions.find_one.side_effect = Exception("fail")
+        mock_db.__getitem__ = MagicMock(return_value=mock_sessions)
+
+        with patch.object(mc, "get_db", return_value=mock_db):
+            result = mc.get_latest_session()
+            assert result is None

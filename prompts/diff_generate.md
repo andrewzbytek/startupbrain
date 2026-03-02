@@ -8,6 +8,17 @@ You are updating the startup's living document (`startup_brain.md`) with new inf
 
 If a section does not need to change, do not mention it. Your output is a diff, not a document.
 
+## UPDATE_POSITION Rules — Enrich, Never Overwrite
+
+When generating an UPDATE_POSITION action, you MUST follow these rules:
+
+1. **Start from the existing text** — Your new text must include ALL specific details from the existing `**Current position:**` unless explicitly contradicted by new definite-confidence claims.
+2. **Add, don't replace** — New information is ADDED to the existing position text. If existing text says "5 engineers to do what traditionally took 100" and nothing contradicts this, it MUST appear in your output.
+3. **Preserve specificity** — Numbers, names, percentages, dollar amounts, timelines, and concrete examples from the existing position must be preserved verbatim.
+4. **Only remove when contradicted** — Remove or modify an existing detail ONLY when a new claim with "definite" confidence directly contradicts it. Note the change in the ADD_CHANGELOG entry.
+5. **Merge framings** — If new claims reframe a concept (e.g., "system model maintenance" vs "subscription licensing"), integrate BOTH framings. The founders are iterating, not pivoting.
+6. **Length is acceptable** — A Current position that grows over sessions is CORRECT. Completeness over brevity.
+
 ## Input Format
 
 <diff_input>
@@ -18,7 +29,7 @@ If a section does not need to change, do not mention it. Your output is a diff, 
 
 ## Allowed Actions
 
-- `UPDATE_POSITION` — Replace the Current Position text in a section (use when the fundamental position has changed)
+- `UPDATE_POSITION` — Enrich the Current Position text by integrating new information while preserving ALL existing specific details (numbers, names, percentages, dollar amounts, timelines, examples). Only modify existing details when directly contradicted by new definite-confidence claims.
 - `ADD_CHANGELOG` — Add a changelog entry to a section (use when the position changed and needs history)
 - `ADD_DECISION` — Add a new entry to the Decision Log section
 - `ADD_FEEDBACK` — Add a new entry to the Feedback Tracker section
@@ -36,6 +47,8 @@ ACTION: [one of the allowed actions above]
 CONTENT:
 [exact markdown content to insert or replace — preserve all markdown formatting]
 ```
+
+**IMPORTANT:** For UPDATE_POSITION, the CONTENT must NOT include the section `### header` — only the body text that goes under it (starting with `**Current position:**` or the equivalent). The header is already in SECTION and will be preserved automatically.
 
 Separate multiple change blocks with a blank line. Output nothing else — no preamble, no explanation, no summary.
 

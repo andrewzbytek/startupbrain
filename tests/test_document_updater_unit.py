@@ -525,6 +525,56 @@ class TestUpdatePositionBackslashSafety:
 
 
 # ---------------------------------------------------------------------------
+# _update_position duplicate header stripping tests
+# ---------------------------------------------------------------------------
+
+class TestUpdatePositionDuplicateHeaderStripping:
+    """Verify _update_position strips duplicate ### headers from LLM content."""
+
+    def test_strips_duplicate_header_current_position_format(self):
+        from services.document_updater import _update_position
+        doc = (
+            "## Current State\n\n"
+            "### Pricing\n"
+            "**Current position:** Old price\n"
+            "**Changelog:**\n"
+            "- 2026-01-01: Initial\n"
+        )
+        # LLM mistakenly includes the header in the content
+        new_content = "### Pricing\n**Current position:** New price $100\n"
+        result = _update_position(doc, "Current State → Pricing", new_content)
+        assert result.count("### Pricing") == 1
+        assert "New price $100" in result
+
+    def test_strips_duplicate_header_bare_section(self):
+        from services.document_updater import _update_position
+        doc = (
+            "## Decision Log\n\n"
+            "### 2026-03-02 — Some Decision\n"
+            "**Decision:** Old text\n"
+            "**Context:** Old context\n"
+            "\n### 2026-03-02 — Another Decision\n"
+        )
+        new_content = "### 2026-03-02 — Some Decision\n**Decision:** Updated text\n**Context:** New context\n"
+        result = _update_position(doc, "Decision Log → 2026-03-02 — Some Decision", new_content)
+        assert result.count("### 2026-03-02 — Some Decision") == 1
+        assert "Updated text" in result
+
+    def test_no_strip_when_header_absent(self):
+        from services.document_updater import _update_position
+        doc = (
+            "## Current State\n\n"
+            "### Pricing\n"
+            "**Current position:** Old price\n"
+            "**Changelog:**\n"
+        )
+        new_content = "**Current position:** Correct content without header\n"
+        result = _update_position(doc, "Current State → Pricing", new_content)
+        assert result.count("### Pricing") == 1
+        assert "Correct content without header" in result
+
+
+# ---------------------------------------------------------------------------
 # parse_diff_output code fence stripping tests
 # ---------------------------------------------------------------------------
 

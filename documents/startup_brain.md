@@ -124,7 +124,6 @@ Last updated: [date]
 [No decisions recorded yet]
 
 ### 2026-03-02 — HazOp and LOPA as Initial Wedge Product
-### 2026-03-02 — HazOp and LOPA as Initial Wedge Product
 **Decision:** Focus initial product development on HazOp (hazard assessment) and LOPA (layers of protection) risk assessments as wedge product to capture entire engineering stack over time. HAZOP is not the business itself, but the ingestion engine, with the system model being the real asset.
 **Alternatives considered:** Full EPCM platform from start, other engineering workflows
 **Why alternatives were rejected:** Risk assessment provides clear, demonstrable value and creates urgency. Can show 20 minutes vs 3,000 hours improvement with BP data example. HAZOP market alone not big enough to be VC backable, but serves as wedge - customers will reject "replace entire engineering stack" but accept "run HAZOP and LOPA risk assessment." Once engaged with data access, can expand to P&ID checks, procurement assistance, operations HAZOP, eventually capturing full engineering stack through trust-building.

@@ -11,6 +11,7 @@ Given the original document and the proposed diff changes, verify:
 3. **Format integrity** (BLOCKING) — Do the changes follow the correct diff format (SECTION/ACTION/CONTENT blocks)? Are section headers exact matches to headers in the original document?
 4. **No unintended modifications** (BLOCKING) — Are there any changes that touch content that should not have been touched?
 5. **Completeness** (NON-BLOCKING) — Are the key themes from the new information captured? Minor omissions are acceptable — not every claim needs its own section update. The diff captures the most important positions and decisions. Low-confidence or speculative claims can be omitted.
+6. **Detail preservation within positions** (BLOCKING) — For each UPDATE_POSITION, compare the existing `**Current position:**` text against the proposed new text. Every specific number, name, percentage, dollar amount, timeline, and concrete example in the existing text MUST appear in the new text unless directly contradicted by a new claim. Losing detail is the #1 failure mode.
 
 ## Critical Rule
 
@@ -59,3 +60,4 @@ If there are blocking issues:
 - [ ] Are all section headers in the changes exact matches to headers in the original document? (BLOCKING)
 - [ ] Would a human applying these changes produce a coherent, well-formed markdown document? (BLOCKING)
 - [ ] Are the key themes from the new information captured? (NON-BLOCKING — note in `<notes>` if incomplete)
+- [ ] Does any UPDATE_POSITION lose specific details from the original position? Compare original vs proposed — every specific detail must be preserved unless contradicted. (BLOCKING — detail loss)

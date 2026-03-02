@@ -179,6 +179,31 @@ def delete_one(collection_name: str, query: dict) -> bool:
         return False
 
 
+def delete_many(collection_name: str, query: dict) -> int:
+    """Delete all matching documents. Returns count deleted."""
+    db = get_db()
+    if db is None:
+        return 0
+    try:
+        result = db[collection_name].delete_many(query)
+        return result.deleted_count
+    except Exception as e:
+        st.warning(f"MongoDB delete_many failed ({collection_name}): {e}")
+        return 0
+
+
+def get_latest_session() -> Optional[dict]:
+    """Get the most recently created session (sort by created_at desc)."""
+    db = get_db()
+    if db is None:
+        return None
+    try:
+        return db["sessions"].find_one(sort=[("created_at", -1)])
+    except Exception as e:
+        st.warning(f"MongoDB get_latest_session failed: {e}")
+        return None
+
+
 # ---------------------------------------------------------------------------
 # Collection-specific helpers
 # ---------------------------------------------------------------------------

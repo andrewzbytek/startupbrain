@@ -1,9 +1,11 @@
 """
-Unit tests for services/deferred_writer.py — DeferredWriter and load_pending_ingestion.
+Unit tests for services/deferred_writer.py — DeferredWriter, load_pending_ingestion,
+and rollback_last_session.
 All tests run without API keys, MongoDB, or network access.
 """
 
 import sys
+import subprocess
 from unittest.mock import MagicMock, patch, call
 
 import pytest
@@ -404,3 +406,142 @@ class TestSerializeConsistency:
         assert "raw" not in str(serialized)
         assert serialized["has_contradictions"] is True
         assert serialized["pass2"]["retained"] == [{"id": "1"}]
+
+
+# ---------------------------------------------------------------------------
+# rollback_last_session tests
+# ---------------------------------------------------------------------------
+
+class TestRollbackLastSession:
+
+    def _mock_subprocess_run(self, log_stdout="abc1234 Latest commit\ndef5678 Previous commit", show_stdout="previous doc content"):
+        """Create a side_effect function for subprocess.run that handles git log and git show."""
+        def side_effect(cmd, **kwargs):
+            result = MagicMock()
+            result.returncode = 0
+            if "log" in cmd:
+                result.stdout = log_stdout
+            elif "show" in cmd:
+                result.stdout = show_stdout
+            else:
+                result.stdout = ""
+            return result
+        return side_effect
+
+    def test_returns_failure_when_no_sessions(self):
+        with patch("services.mongo_client.get_latest_session", return_value=None):
+            from services.deferred_writer import rollback_last_session
+            result = rollback_last_session()
+        assert result["success"] is False
+        assert "No sessions" in result["message"]
+
+    def test_deletes_claims_and_session(self):
+        from bson import ObjectId
+        sid = ObjectId()
+        session = {"_id": sid, "created_at": "2026-03-01"}
+
+        with patch("services.mongo_client.get_latest_session", return_value=session), \
+             patch("services.mongo_client.delete_many", return_value=3) as mock_del_many, \
+             patch("services.mongo_client.delete_one") as mock_del_one, \
+             patch("subprocess.run", side_effect=self._mock_subprocess_run()), \
+             patch("services.document_updater.write_living_document"), \
+             patch("services.mongo_client.upsert_living_document"), \
+             patch("services.document_updater._git_commit", return_value=True):
+            from services.deferred_writer import rollback_last_session
+            result = rollback_last_session()
+
+        mock_del_many.assert_called_once_with("claims", {"session_id": str(sid)})
+        mock_del_one.assert_called_once_with("sessions", {"_id": sid})
+        assert result["claims_deleted"] == 3
+
+    def test_reverts_document_to_previous_commit(self):
+        from bson import ObjectId
+        sid = ObjectId()
+        session = {"_id": sid, "created_at": "2026-03-01"}
+
+        with patch("services.mongo_client.get_latest_session", return_value=session), \
+             patch("services.mongo_client.delete_many", return_value=1), \
+             patch("services.mongo_client.delete_one"), \
+             patch("subprocess.run", side_effect=self._mock_subprocess_run(show_stdout="reverted content")), \
+             patch("services.document_updater.write_living_document") as mock_write, \
+             patch("services.mongo_client.upsert_living_document") as mock_upsert, \
+             patch("services.document_updater._git_commit", return_value=True):
+            from services.deferred_writer import rollback_last_session
+            result = rollback_last_session()
+
+        mock_write.assert_called_once_with("reverted content")
+        mock_upsert.assert_called_once()
+        assert result["success"] is True
+
+    def test_git_commits_the_revert(self):
+        from bson import ObjectId
+        sid = ObjectId()
+        session = {"_id": sid, "created_at": "2026-03-01"}
+
+        with patch("services.mongo_client.get_latest_session", return_value=session), \
+             patch("services.mongo_client.delete_many", return_value=0), \
+             patch("services.mongo_client.delete_one"), \
+             patch("subprocess.run", side_effect=self._mock_subprocess_run()), \
+             patch("services.document_updater.write_living_document"), \
+             patch("services.mongo_client.upsert_living_document"), \
+             patch("services.document_updater._git_commit", return_value=True) as mock_git:
+            from services.deferred_writer import rollback_last_session
+            result = rollback_last_session()
+
+        mock_git.assert_called_once()
+        assert "Rollback session" in mock_git.call_args[0][0]
+
+    def test_handles_single_commit_gracefully(self):
+        from bson import ObjectId
+        sid = ObjectId()
+        session = {"_id": sid, "created_at": "2026-03-01"}
+
+        with patch("services.mongo_client.get_latest_session", return_value=session), \
+             patch("services.mongo_client.delete_many", return_value=2), \
+             patch("services.mongo_client.delete_one"), \
+             patch("subprocess.run", side_effect=self._mock_subprocess_run(log_stdout="abc1234 Only commit")), \
+             patch("services.document_updater.write_living_document") as mock_write:
+            from services.deferred_writer import rollback_last_session
+            result = rollback_last_session()
+
+        # Should still succeed but not revert git
+        assert result["success"] is True
+        assert "no git revert" in result["message"].lower()
+        mock_write.assert_not_called()
+
+    def test_handles_git_failure_gracefully(self):
+        from bson import ObjectId
+        sid = ObjectId()
+        session = {"_id": sid, "created_at": "2026-03-01"}
+
+        def fail_subprocess(cmd, **kwargs):
+            raise subprocess.CalledProcessError(1, cmd)
+
+        with patch("services.mongo_client.get_latest_session", return_value=session), \
+             patch("services.mongo_client.delete_many", return_value=1), \
+             patch("services.mongo_client.delete_one"), \
+             patch("subprocess.run", side_effect=fail_subprocess):
+            from services.deferred_writer import rollback_last_session
+            result = rollback_last_session()
+
+        # MongoDB cleanup still succeeded
+        assert result["success"] is True
+        assert "Git revert failed" in result["message"]
+        assert result["claims_deleted"] == 1
+
+    def test_returns_session_id(self):
+        from bson import ObjectId
+        sid = ObjectId()
+        session = {"_id": sid, "created_at": "2026-03-01"}
+
+        with patch("services.mongo_client.get_latest_session", return_value=session), \
+             patch("services.mongo_client.delete_many", return_value=0), \
+             patch("services.mongo_client.delete_one"), \
+             patch("subprocess.run", side_effect=self._mock_subprocess_run()), \
+             patch("services.document_updater.write_living_document"), \
+             patch("services.mongo_client.upsert_living_document"), \
+             patch("services.document_updater._git_commit", return_value=True):
+            from services.deferred_writer import rollback_last_session
+            result = rollback_last_session()
+
+        assert result["session_id"] == str(sid)
