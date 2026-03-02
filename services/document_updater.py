@@ -152,13 +152,11 @@ def apply_diff(document: str, diff_blocks: list) -> str:
 
 def _update_position(doc: str, section: str, new_position_content: str) -> str:
     """Replace the **Current position:** line in the given section."""
-    # Find the section header and replace the Current position line
-    # Section headers look like "### Target Market / Initial Customer"
-    # We need to find the section and replace the "**Current position:**" line
-
     # Extract the subsection name from "Current State → Pricing" format
     if " → " in section:
         _, subsection = section.split(" → ", 1)
+
+        # Try sections with **Current position:** format first
         pattern = re.compile(
             rf"(### {re.escape(subsection)}\n)"
             rf"(\*\*Current position:\*\*.*?)(\n\*\*Changelog|\n###|\Z)",
@@ -171,7 +169,19 @@ def _update_position(doc: str, section: str, new_position_content: str) -> str:
         if updated != doc:
             return updated
 
-    # Fallback: replace first occurrence of Current position after section header
+        # Fallback for sections without **Current position:** (e.g. Key Assumptions, Open Questions)
+        # Replace bare content between section header and next section
+        bare_pattern = re.compile(
+            rf"(### {re.escape(subsection)}\n)(.*?)(\n###|\n## |\Z)",
+            re.DOTALL,
+        )
+        def bare_replacer(m):
+            return m.group(1) + new_position_content + "\n" + m.group(3)
+
+        updated = bare_pattern.sub(bare_replacer, doc)
+        if updated != doc:
+            return updated
+
     logging.warning("_update_position: section '%s' not found in document, returning unmodified", section)
     return doc
 

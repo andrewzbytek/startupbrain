@@ -238,12 +238,19 @@ def render_checking_consistency():
             )
             claims_stored = pipeline_result.get("claims_stored", 0)
             doc_updated = pipeline_result.get("document_updated", False)
+            changes_applied = pipeline_result.get("changes_applied", 0)
+            doc_update_msg = pipeline_result.get("document_update_message", "")
+
+            # Store pipeline result for the done screen
+            st.session_state.pipeline_result = pipeline_result
 
             if doc_updated:
-                progress.update_step(f"Living document updated ({claims_stored} claims stored)", status="complete")
+                progress.update_step(
+                    f"Living document updated — {changes_applied} section(s) changed, {claims_stored} claims stored",
+                    status="complete",
+                )
             else:
-                msg = pipeline_result.get("document_update_message", "unknown reason")
-                progress.update_step(f"Document update issue: {msg}", status="error")
+                progress.update_step(f"Document update failed: {doc_update_msg}", status="error")
 
             # Check if any confirmed claims relate to active hypotheses
             try:
@@ -314,18 +321,34 @@ def render_done():
     consistency_results = st.session_state.get("consistency_results", {})
     claims = st.session_state.get("pending_claims", [])
     session_id = st.session_state.get("current_session_id", "")
+    pipeline_result = st.session_state.get("pipeline_result", {})
 
-    st.success("Your session has been successfully ingested into Startup Brain.")
+    doc_updated = pipeline_result.get("document_updated", False)
+    changes_applied = pipeline_result.get("changes_applied", 0)
+    claims_stored = pipeline_result.get("claims_stored", 0)
+    doc_update_msg = pipeline_result.get("document_update_message", "")
 
-    col1, col2, col3 = st.columns(3)
+    if doc_updated:
+        st.success("Session ingested successfully. Living document updated.")
+    else:
+        st.warning(
+            "Session ingested but the living document was NOT updated. "
+            "Your claims are safely stored in the database. "
+            "You can try ingesting again or use chat to update the document manually."
+        )
+        if doc_update_msg:
+            st.error(f"Document update error: {doc_update_msg}")
+
+    col1, col2, col3, col4 = st.columns(4)
     with col1:
-        st.metric("Claims stored", len(claims))
+        st.metric("Claims confirmed", len(claims))
     with col2:
-        has_contradictions = consistency_results.get("has_contradictions", False) if consistency_results else False
-        st.metric("Contradictions resolved", "Yes" if has_contradictions else "None found")
+        st.metric("Claims stored", claims_stored)
     with col3:
-        has_critical = consistency_results.get("has_critical", False) if consistency_results else False
-        st.metric("Deep analysis (Opus)", "Yes" if has_critical else "Not needed")
+        st.metric("Sections updated", changes_applied if doc_updated else 0)
+    with col4:
+        has_contradictions = consistency_results.get("has_contradictions", False) if consistency_results else False
+        st.metric("Contradictions", "Resolved" if has_contradictions else "None")
 
     if session_id:
         st.caption(f"Session ID: {session_id}")

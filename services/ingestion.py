@@ -297,6 +297,7 @@ def run_ingestion_pipeline(
         "consistency_results": consistency_results,
         "document_updated": doc_result.get("success", False),
         "document_update_message": doc_result.get("message", ""),
+        "changes_applied": doc_result.get("changes_applied", 0),
         "claims_stored": claims_stored,
         "session_id": session_id,
     }

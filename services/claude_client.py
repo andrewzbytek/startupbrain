@@ -47,6 +47,8 @@ def _get_client() -> Optional[object]:
 
 def escape_xml(text: str) -> str:
     """Escape user-controlled content for safe XML embedding."""
+    if text is None:
+        return ""
     text = text.replace("&", "&amp;")
     text = text.replace("<", "&lt;")
     text = text.replace(">", "&gt;")

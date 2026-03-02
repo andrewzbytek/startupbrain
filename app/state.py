@@ -101,3 +101,4 @@ def reset_ingestion():
     st.session_state.contradiction_index = 0
     st.session_state.whiteboard_text = ""
     st.session_state.ingestion_session_type = ""
+    st.session_state.pipeline_result = {}
