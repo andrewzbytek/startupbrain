@@ -145,6 +145,9 @@ Last updated: [date]
 **Context:** Differentiating from traditional EPCM deliverables and creating lifecycle value.
 **Participants:** Andrew, Danny
 
+- [2026-03-02] Updated Current State → Business Model / Revenue Model: Revenue will come throughout the entire plant lifecycle: design, construction, operations, and potentially decommissioning.
+  Reason: So while this is a little bit of a contradiction, I want to explain. What we meant by that is that initially we'll do HazOp and LOPA risk assessments, and future expansion will be into design improvements, procurement, construction management with risk-based polarization. From a VC perspective, or from the very future big vision perspective, we can eventually expand into construction and operations and the commissioning, but maybe that's like five or ten years out, so it should be only like a visionary claim.
+
 ## Feedback Tracker
 
 ### Recurring Themes
