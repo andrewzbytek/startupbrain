@@ -34,10 +34,11 @@ class _AttrDict(dict):
 
 
 # Mock streamlit before importing app modules
-_own_mock_st = MagicMock()
+_own_mock_st = sys.modules.get("streamlit") or MagicMock()
 _own_mock_st.session_state = _AttrDict()
 _own_mock_st.cache_resource = lambda f: f
-sys.modules.setdefault("streamlit", _own_mock_st)
+_own_mock_st.warning = MagicMock()
+sys.modules["streamlit"] = _own_mock_st
 
 # Mock pymongo
 mock_pymongo = MagicMock()

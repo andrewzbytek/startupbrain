@@ -31,10 +31,11 @@ class _AttrDict(dict):
             raise AttributeError(key)
 
 
-mock_st = MagicMock()
+mock_st = sys.modules.get("streamlit") or MagicMock()
 mock_st.session_state = _AttrDict()
 mock_st.cache_resource = lambda f: f
-sys.modules.setdefault("streamlit", mock_st)
+mock_st.warning = MagicMock()
+sys.modules["streamlit"] = mock_st
 
 
 # ---------------------------------------------------------------------------
