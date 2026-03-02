@@ -39,7 +39,6 @@ Last updated: [date]
 - 2026-03-02: Positioned as AI-native EPCM with HazOp/LOPA wedge product, expanding to full engineering platform. Source: Co-founder discussion (Andrew, Danny)
 - 2026-03-02: Refined to fixed-fee lifecycle model vs traditional billable hours. Added interactive reports and knowledge preservation components. Source: Co-founder discussion (Andrew, Danny)
 - 2026-03-02: Clarified expansion timeline - HazOp/LOPA initially, design/procurement/construction medium-term, full lifecycle (operations/decommissioning) as 5-10 year vision. Source: Co-founder discussion (Andrew, Danny)
-```
 - 2026-03-02: Detailed cost structure and revenue streams mapped - costs include operations, compute, CAC, labor (forward-deployed engineers, AI team). Revenue from project fees (wedge), data access subscriptions/licensing, forward deployment. Source: Co-founder discussion (Andrew, Danny)
 - 2026-03-02: Clarified forward deployment as premium offering, not core revenue stream. Main model focuses on project fees (wedge) and data access subscriptions/licensing. Source: Contradiction resolution discussion (Andrew, Danny)
 - 2026-03-02: Clarified core revenue model - fixed-fee contracts as entry point, subscription/licensing for AI-powered data access as primary value. Source: Contradiction resolution discussion (Andrew, Danny)

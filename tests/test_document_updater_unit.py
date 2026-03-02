@@ -522,3 +522,44 @@ class TestUpdatePositionBackslashSafety:
         new_content = "**Current position:** Price is £123\n"
         result = _update_position(doc, "Current State → Pricing", new_content)
         assert "£123" in result
+
+
+# ---------------------------------------------------------------------------
+# parse_diff_output code fence stripping tests
+# ---------------------------------------------------------------------------
+
+class TestParseDiffOutputCodeFences:
+    """Tests for parse_diff_output stripping markdown code fences."""
+
+    VALID_DIFF = (
+        "SECTION: Current State → Pricing\n"
+        "ACTION: UPDATE_POSITION\n"
+        "CONTENT:\n"
+        "**Current position:** New price.\n"
+    )
+
+    def test_strips_markdown_code_fence(self):
+        """Should strip ```markdown ... ``` wrapping and still parse correctly."""
+        from services.document_updater import parse_diff_output
+        wrapped = f"```markdown\n{self.VALID_DIFF}\n```"
+        blocks = parse_diff_output(wrapped)
+        assert len(blocks) == 1
+        assert blocks[0]["section"] == "Current State → Pricing"
+        assert "```" not in blocks[0]["content"]
+
+    def test_strips_plain_code_fence(self):
+        """Should strip plain ``` ... ``` wrapping and still parse correctly."""
+        from services.document_updater import parse_diff_output
+        wrapped = f"```\n{self.VALID_DIFF}\n```"
+        blocks = parse_diff_output(wrapped)
+        assert len(blocks) == 1
+        assert blocks[0]["section"] == "Current State → Pricing"
+        assert "```" not in blocks[0]["content"]
+
+    def test_unwrapped_input_unchanged(self):
+        """Should still parse correctly when there are no code fences (no regression)."""
+        from services.document_updater import parse_diff_output
+        blocks = parse_diff_output(self.VALID_DIFF)
+        assert len(blocks) == 1
+        assert blocks[0]["action"] == "UPDATE_POSITION"
+        assert "New price." in blocks[0]["content"]

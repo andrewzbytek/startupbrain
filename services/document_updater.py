@@ -101,6 +101,15 @@ def parse_diff_output(raw_output: str) -> list:
     Returns:
         List of dicts: [{section, action, content}, ...]
     """
+    # Strip wrapping code fences (```markdown ... ``` or ``` ... ```)
+    stripped = raw_output.strip()
+    if stripped.startswith("```"):
+        first_newline = stripped.index("\n") if "\n" in stripped else 3
+        stripped = stripped[first_newline + 1:]
+    if stripped.endswith("```"):
+        stripped = stripped[:-3]
+    raw_output = stripped.strip()
+
     blocks = []
     # Split on double newlines between blocks
     # Each block starts with "SECTION:"

@@ -899,6 +899,8 @@ def _resolve_contradiction(contradiction: dict, action: str, new_claim: str, exp
         section = contradiction.get("existing_section", "Unknown Section")
         tension = contradiction.get("tension_description", "")
 
+        participants = st.session_state.get("ingestion_participants", "Founders")
+
         if action == "update":
             new_info = (
                 f"Contradiction resolved ({date_str}): Updating {section}.\n"
@@ -910,7 +912,14 @@ def _resolve_contradiction(contradiction: dict, action: str, new_claim: str, exp
 
             # Explicit Decision Log entry
             doc = read_living_document()
-            decision_entry = f"- [{date_str}] Updated {section}: {new_claim} (resolved contradiction)"
+            decision_entry = (
+                f"### {date_str} — Resolved: {section}\n"
+                f"**Decision:** Updated to: {new_claim}\n"
+                f"**Alternatives considered:** Keep previous position\n"
+                f"**Why alternatives were rejected:** New information contradicted existing position. {tension}\n"
+                f"**Context:** Contradiction resolution during ingestion.\n"
+                f"**Participants:** {participants}"
+            )
             doc = _add_decision(doc, decision_entry)
             write_living_document(doc)
             upsert_living_document(doc, metadata={"last_updated": date_str, "update_reason": reason})
@@ -943,8 +952,12 @@ def _resolve_contradiction(contradiction: dict, action: str, new_claim: str, exp
             # Explicit Decision Log entry with explanation
             doc = read_living_document()
             decision_entry = (
-                f"- [{date_str}] Updated {section}: {new_claim}\n"
-                f"  Reason: {explanation}"
+                f"### {date_str} — Resolved: {section}\n"
+                f"**Decision:** Updated to: {new_claim}\n"
+                f"**Alternatives considered:** Keep previous position\n"
+                f"**Why alternatives were rejected:** {explanation}\n"
+                f"**Context:** Contradiction resolution during ingestion.\n"
+                f"**Participants:** {participants}"
             )
             doc = _add_decision(doc, decision_entry)
             write_living_document(doc)

@@ -486,7 +486,7 @@ class TestResolveContradictionUpdate:
         mock_decision.assert_called_once()
         decision_args = mock_decision.call_args[0]
         assert "Enterprise is our market" in decision_args[1]
-        assert "resolved contradiction" in decision_args[1]
+        assert "Contradiction resolution" in decision_args[1]
         # Should NOT call _add_dismissed
         mock_dismissed.assert_not_called()
         # Should git commit

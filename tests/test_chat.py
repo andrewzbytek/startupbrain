@@ -641,3 +641,79 @@ class TestFormatRecallContext:
         ]
         result = _format_recall_context(sessions)
         assert "2026-02-15" in result
+
+
+# ---------------------------------------------------------------------------
+# _resolve_contradiction Decision Log formatting
+# ---------------------------------------------------------------------------
+
+class TestResolveContradictionDecisionFormat:
+    """Tests for _resolve_contradiction: structured Decision Log entries."""
+
+    def _run_resolve(self, action, explanation=""):
+        """Helper: call _resolve_contradiction and capture the decision_entry passed to _add_decision."""
+        import sys
+        from unittest.mock import patch, MagicMock
+
+        st_mod = sys.modules["streamlit"]
+        # Ensure session_state supports real dict .get() (not MagicMock)
+        if not isinstance(st_mod.session_state, dict):
+            st_mod.session_state = _AttrDict()
+        st_mod.session_state["ingestion_participants"] = "Andrew, Danny"
+
+        contradiction = {
+            "existing_section": "Current State → Pricing",
+            "tension_description": "Price changed from 50K to 75K",
+            "new_claim": "Price is 75K",
+            "existing_position": "Price is 50K",
+        }
+
+        captured = {}
+
+        def capture_add_decision(doc, entry):
+            captured["entry"] = entry
+            return doc  # pass-through
+
+        with patch("services.document_updater.update_document"), \
+             patch("services.document_updater.read_living_document", return_value="## Decision Log\n"), \
+             patch("services.document_updater.write_living_document"), \
+             patch("services.mongo_client.upsert_living_document"), \
+             patch("services.document_updater._git_commit"), \
+             patch("services.document_updater._add_decision", side_effect=capture_add_decision), \
+             patch("services.document_updater._add_dismissed"):
+            from app.components.chat import _resolve_contradiction
+            _resolve_contradiction(contradiction, action, "Price is 75K", explanation)
+
+        return captured.get("entry", "")
+
+    def test_update_action_has_structured_header(self):
+        """'update' action decision entry should use ### header format."""
+        entry = self._run_resolve("update")
+        assert entry.startswith("### ")
+        assert "Resolved: Current State" in entry
+
+    def test_update_action_has_decision_fields(self):
+        """'update' action decision entry should contain **Decision:** and other fields."""
+        entry = self._run_resolve("update")
+        assert "**Decision:**" in entry
+        assert "**Alternatives considered:**" in entry
+        assert "**Why alternatives were rejected:**" in entry
+        assert "**Context:**" in entry
+        assert "**Participants:** Andrew, Danny" in entry
+
+    def test_explain_action_has_structured_header(self):
+        """'explain' action decision entry should use ### header format."""
+        entry = self._run_resolve("explain", explanation="Customer feedback changed our mind")
+        assert entry.startswith("### ")
+        assert "Resolved: Current State" in entry
+
+    def test_explain_action_includes_user_explanation(self):
+        """'explain' action should include the user's explanation in 'Why alternatives were rejected'."""
+        entry = self._run_resolve("explain", explanation="Customer feedback changed our mind")
+        assert "Customer feedback changed our mind" in entry
+        assert "**Why alternatives were rejected:** Customer feedback changed our mind" in entry
+
+    def test_explain_action_has_participants(self):
+        """'explain' action decision entry should include participants."""
+        entry = self._run_resolve("explain", explanation="Reason here")
+        assert "**Participants:** Andrew, Danny" in entry
