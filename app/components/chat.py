@@ -750,46 +750,47 @@ def render_chat():
     if not is_mongo_available():
         st.warning("MongoDB is unavailable. Running in degraded mode — chat works but ingestion and history are disabled.")
 
-    # Display conversation history
-    history = st.session_state.get("conversation_history", [])
+    # --- Chat frame: bordered container for the conversation area ---
+    with st.container(border=True):
+        history = st.session_state.get("conversation_history", [])
 
-    # Display conversation history
-    for msg in history:
-        with st.chat_message(msg["role"]):
-            st.markdown(msg["content"])
+        # Display conversation history
+        for msg in history:
+            with st.chat_message(msg["role"]):
+                st.markdown(msg["content"])
 
-    # --- Welcome area (only when empty) — compact, centered above chat input ---
-    if not history:
-        st.markdown(
-            '<div class="welcome-container">'
-            '<div class="welcome-tagline">Your startup\'s AI memory. Ask anything.</div>'
-            '<div class="welcome-emphasis">Chat \u00b7 Ingest \u00b7 Track \u00b7 Challenge</div>'
-            '</div>',
-            unsafe_allow_html=True,
-        )
-        # Suggestion chips — small centered buttons
-        _, sc1, sc2, sc3, sc4, _ = st.columns([1.5, 1, 1, 1, 1, 1.5])
-        with sc1:
-            if st.button("Current state", key="quick_state"):
-                _handle_quick_action("What's our current state?", "current_state")
-                return
-        with sc2:
-            if st.button("Open questions", key="quick_questions"):
-                _handle_quick_action("What are our open questions?", "general")
-                return
-        with sc3:
-            if st.button("Recent changes", key="quick_changes"):
-                _handle_quick_action("What are the recent changes?", "historical")
-                return
-        with sc4:
-            if st.button("Challenge me", key="quick_challenge"):
-                _handle_quick_action("Challenge our current assumptions. What are we missing?", "challenge")
-                return
+        # --- Welcome area (only when empty) — compact, centered above chat input ---
+        if not history:
+            st.markdown(
+                '<div class="welcome-container">'
+                '<div class="welcome-tagline">Your startup\'s AI memory. Ask anything.</div>'
+                '<div class="welcome-emphasis">Chat \u00b7 Ingest \u00b7 Track \u00b7 Challenge</div>'
+                '</div>',
+                unsafe_allow_html=True,
+            )
+            # Suggestion chips — small centered buttons
+            _, sc1, sc2, sc3, sc4, _ = st.columns([1.5, 1, 1, 1, 1, 1.5])
+            with sc1:
+                if st.button("Current state", key="quick_state"):
+                    _handle_quick_action("What's our current state?", "current_state")
+                    return
+            with sc2:
+                if st.button("Open questions", key="quick_questions"):
+                    _handle_quick_action("What are our open questions?", "general")
+                    return
+            with sc3:
+                if st.button("Recent changes", key="quick_changes"):
+                    _handle_quick_action("What are the recent changes?", "historical")
+                    return
+            with sc4:
+                if st.button("Challenge me", key="quick_challenge"):
+                    _handle_quick_action("Challenge our current assumptions. What are we missing?", "challenge")
+                    return
 
-    # Quick command chips — always visible, tiny row
-    _render_quick_command_panel()
+        # Quick command chips — always visible, tiny row
+        _render_quick_command_panel()
 
-    # Book framework upload (collapsed)
+    # Book framework upload — outside frame, near the bottom
     with st.expander("Upload .md for cross-check", expanded=False):
         uploaded_file = st.file_uploader(
             "Choose file", type=["md"], key="book_upload",

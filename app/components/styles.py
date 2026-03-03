@@ -226,6 +226,14 @@ div[data-testid="stHorizontalBlock"] .stRadio > div > label > div:first-child {
     box-shadow: var(--glow-blue) !important;
 }
 
+/* Chat frame — bordered container styling */
+[data-testid="stVerticalBlockBorderWrapper"] {
+    border-color: var(--border-default) !important;
+    border-radius: 10px !important;
+    background-color: var(--bg-surface) !important;
+    min-height: 420px;
+}
+
 /* Force chat message content to full width during streaming */
 [data-testid="stChatMessageContent"] {
     width: 100% !important;
