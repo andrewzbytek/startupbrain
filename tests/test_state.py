@@ -72,7 +72,7 @@ class TestInitSessionState:
     def test_initializes_all_expected_keys(self):
         init_session_state()
         expected_keys = {
-            "mode", "conversation_history", "pending_claims", "contradictions",
+            "mode", "active_view", "conversation_history", "pending_claims", "contradictions",
             "current_session_id", "current_transcript", "ingestion_status",
             "sidebar_data", "ingestion_participants", "ingestion_topic",
             "ingestion_session_summary", "ingestion_topic_tags",
@@ -80,6 +80,7 @@ class TestInitSessionState:
             "evolution_result", "ingestion_session_type", "ingestion_session_date",
             "book_crosscheck_content", "book_crosscheck_filename",
             "show_hypothesis_form",
+            "pipeline_result",
             "deferred_writer", "_batch_committed", "_has_pending_ingestion",
         }
         assert expected_keys == set(mock_st.session_state.keys())

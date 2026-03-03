@@ -1,40 +1,761 @@
 """
-Custom CSS injection for Startup Brain.
+Dark command-center CSS theme for Startup Brain.
+Exports inject_custom_css() which injects all styles via st.markdown.
 """
 
 import streamlit as st
 
 
 def inject_custom_css():
+    # Load fonts via <link> tag — more reliable than @import in Safari
+    st.markdown(
+        '<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700'
+        '&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">',
+        unsafe_allow_html=True,
+    )
     st.markdown("""<style>
-    /* Chat messages */
-    .stChatMessage { padding: 1rem 1.5rem; border-radius: 12px; margin-bottom: 0.5rem; }
+/* ===== 1. Google Fonts — Space Grotesk + IBM Plex Mono (loaded via <link> above) ===== */
 
-    /* Severity banners */
-    .severity-critical { background-color: #FEE2E2; border-left: 4px solid #DC2626; padding: 1rem; border-radius: 4px; margin: 0.5rem 0; }
-    .severity-notable { background-color: #FEF3C7; border-left: 4px solid #D97706; padding: 1rem; border-radius: 4px; margin: 0.5rem 0; }
+/* ===== 2. CSS Variables ===== */
+:root {
+    --bg-primary: #0D1117;
+    --bg-surface: #161B22;
+    --bg-elevated: #1C2333;
+    --border-default: #30363D;
+    --border-hover: #484F58;
+    --text-primary: #E6EDF3;
+    --text-secondary: #8B949E;
+    --accent-blue: #58A6FF;
+    --accent-cyan: #39D2C0;
+    --accent-green: #3FB950;
+    --accent-yellow: #D29922;
+    --accent-red: #F85149;
+    --accent-purple: #BC8CFF;
+    --font-display: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'JetBrains Mono', 'Fira Code', monospace;
+    --glow-blue: 0 0 20px rgba(88,166,255,0.15);
+    --glow-cyan: 0 0 20px rgba(57,210,192,0.12);
+}
 
-    /* Pill badges for themes */
-    .pill-badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 0.8rem; margin: 2px; }
-    .pill-badge-red { background-color: #FEE2E2; color: #991B1B; }
-    .pill-badge-yellow { background-color: #FEF3C7; color: #92400E; }
-    .pill-badge-blue { background-color: #DBEAFE; color: #1E40AF; }
+/* ===== 3. Global dark overrides ===== */
+.stApp,
+.main .block-container,
+[data-testid="stAppViewContainer"],
+[data-testid="stAppViewBlockContainer"],
+[data-testid="stVerticalBlock"],
+[data-testid="stMain"] {
+    background-color: var(--bg-primary) !important;
+    color: var(--text-primary) !important;
+}
 
-    /* Hide Streamlit menu and footer */
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
+header[data-testid="stHeader"] {
+    background-color: var(--bg-primary) !important;
+    border-bottom: none !important;
+}
 
-    /* Claim row styling */
-    .claim-row { border-bottom: 1px solid #E5E7EB; padding: 8px 0; }
+html, body, .stApp, .stMarkdown, .stMarkdown p, .stMarkdown li,
+.stMarkdown span, .stText, [data-testid="stText"],
+label, .stRadio label, .stSelectbox label, .stTextInput label,
+.stTextArea label, .stNumberInput label {
+    font-family: var(--font-display) !important;
+    color: var(--text-primary) !important;
+}
 
-    /* Status indicators */
-    .status-green { color: #22C55E; }
-    .status-white { color: #D1D5DB; }
+code, pre, .stCode, [data-testid="stCode"] {
+    font-family: var(--font-mono) !important;
+}
 
-    /* Hypothesis status badges */
-    .hypothesis-badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 0.75rem; margin: 2px; font-weight: 600; }
-    .hypothesis-unvalidated { background-color: #FEF3C7; color: #92400E; }
-    .hypothesis-testing { background-color: #DBEAFE; color: #1E40AF; }
-    .hypothesis-validated { background-color: #D1FAE5; color: #065F46; }
-    .hypothesis-invalidated { background-color: #FEE2E2; color: #991B1B; }
-    </style>""", unsafe_allow_html=True)
+h1, .stMarkdown h1 {
+    color: var(--text-primary) !important;
+    font-family: var(--font-display) !important;
+    font-weight: 700 !important;
+    letter-spacing: -0.03em !important;
+}
+
+h2, .stMarkdown h2 {
+    color: var(--accent-blue) !important;
+    font-family: var(--font-display) !important;
+    font-weight: 600 !important;
+    letter-spacing: -0.02em !important;
+    font-size: 1.35rem !important;
+    border-bottom: 1px solid var(--border-default) !important;
+    padding-bottom: 0.4rem !important;
+}
+
+h3, .stMarkdown h3 {
+    color: var(--accent-cyan) !important;
+    font-family: var(--font-display) !important;
+    font-weight: 600 !important;
+    letter-spacing: -0.01em !important;
+    font-size: 1.1rem !important;
+}
+
+h4, h5, h6,
+.stMarkdown h4, .stMarkdown h5, .stMarkdown h6 {
+    color: var(--text-primary) !important;
+    font-family: var(--font-display) !important;
+    font-weight: 600 !important;
+}
+
+/* ===== 4. Hide sidebar entirely ===== */
+section[data-testid="stSidebar"] {
+    display: none !important;
+}
+
+button[data-testid="stSidebarCollapsedControl"],
+[data-testid="collapsedControl"] {
+    display: none !important;
+}
+
+/* ===== 5. Atmospheric background ===== */
+[data-testid="stAppViewContainer"]::before {
+    content: "";
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    background:
+        radial-gradient(ellipse 80% 60% at 10% 20%, rgba(88,166,255,0.04) 0%, transparent 70%),
+        radial-gradient(ellipse 60% 50% at 90% 80%, rgba(57,210,192,0.03) 0%, transparent 70%),
+        radial-gradient(ellipse 50% 40% at 50% 10%, rgba(188,140,255,0.02) 0%, transparent 60%);
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* ===== 6. Top bar styling ===== */
+.top-bar-title {
+    font-family: var(--font-display) !important;
+    font-weight: 700;
+    font-size: 1.4rem;
+    letter-spacing: -0.03em;
+    color: var(--text-primary);
+    margin: 0;
+    line-height: 1.2;
+}
+
+.top-bar-subtitle {
+    font-family: var(--font-display) !important;
+    font-size: 0.75rem;
+    color: var(--accent-cyan);
+    margin: 0;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    font-weight: 500;
+}
+
+.status-pill {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 500;
+    font-family: var(--font-mono) !important;
+    background-color: var(--bg-elevated);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-default);
+    letter-spacing: 0.01em;
+}
+
+/* ===== 7. Tab navigation styling (st.radio horizontal) ===== */
+div[data-testid="stHorizontalBlock"] .stRadio > div {
+    display: flex !important;
+    flex-direction: row !important;
+    gap: 0 !important;
+    background-color: var(--bg-surface) !important;
+    border-bottom: 1px solid var(--border-default) !important;
+    padding: 0 !important;
+    border-radius: 8px 8px 0 0 !important;
+}
+
+div[data-testid="stHorizontalBlock"] .stRadio > div > label {
+    padding: 0.6rem 1.5rem !important;
+    border-bottom: 2px solid transparent !important;
+    cursor: pointer !important;
+    color: var(--text-secondary) !important;
+    font-weight: 500 !important;
+    font-size: 0.88rem !important;
+    font-family: var(--font-display) !important;
+    letter-spacing: -0.01em !important;
+    transition: color 0.2s ease, border-color 0.2s ease, background-color 0.2s ease !important;
+    background-color: transparent !important;
+    margin: 0 !important;
+}
+
+div[data-testid="stHorizontalBlock"] .stRadio > div > label:hover {
+    color: var(--text-primary) !important;
+    background-color: rgba(88,166,255,0.04) !important;
+}
+
+div[data-testid="stHorizontalBlock"] .stRadio > div > label[data-checked="true"],
+div[data-testid="stHorizontalBlock"] .stRadio > div > label:has(input:checked) {
+    color: var(--accent-blue) !important;
+    border-bottom-color: var(--accent-blue) !important;
+    font-weight: 600 !important;
+}
+
+/* Hide radio circles */
+div[data-testid="stHorizontalBlock"] .stRadio > div > label > div:first-child {
+    display: none !important;
+}
+
+/* ===== 8. Dark chat message styling ===== */
+.stChatMessage,
+[data-testid="stChatMessage"] {
+    background-color: var(--bg-surface) !important;
+    border: 1px solid var(--border-default) !important;
+    border-radius: 12px !important;
+    padding: 1rem 1.5rem !important;
+    margin-bottom: 0.5rem !important;
+    color: var(--text-primary) !important;
+    transition: border-color 0.2s ease !important;
+}
+
+.stChatMessage:hover,
+[data-testid="stChatMessage"]:hover {
+    border-color: var(--border-hover) !important;
+}
+
+/* User messages: slightly elevated shade */
+[data-testid="stChatMessage"][data-testid*="user"] {
+    background-color: var(--bg-elevated) !important;
+}
+
+[data-testid="stChatMessageContent"] p,
+[data-testid="stChatMessageContent"] li,
+[data-testid="stChatMessageContent"] span {
+    color: var(--text-primary) !important;
+}
+
+/* Chat input */
+[data-testid="stChatInput"],
+[data-testid="stChatInput"] textarea {
+    background-color: var(--bg-surface) !important;
+    border: 1px solid var(--border-default) !important;
+    color: var(--text-primary) !important;
+    border-radius: 8px !important;
+    font-family: var(--font-display) !important;
+}
+
+[data-testid="stChatInput"] textarea:focus {
+    border-color: var(--accent-blue) !important;
+    box-shadow: var(--glow-blue) !important;
+}
+
+/* ===== 9. Quick command chip styling ===== */
+.quick-cmd-chip {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    background-color: rgba(57, 210, 192, 0.08);
+    color: var(--accent-cyan);
+    border: 1px solid rgba(57, 210, 192, 0.2);
+    border-radius: 999px;
+    padding: 3px 12px;
+    margin: 2px 4px;
+    cursor: default;
+    transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+    letter-spacing: 0.02em;
+}
+
+@media (hover: hover) {
+    .quick-cmd-chip:hover {
+        background-color: rgba(57, 210, 192, 0.16);
+        border-color: rgba(57, 210, 192, 0.4);
+        box-shadow: var(--glow-cyan);
+        transform: translateY(-1px);
+    }
+}
+
+/* ===== 10. Dashboard card styling ===== */
+.dashboard-card {
+    background: linear-gradient(135deg, var(--bg-surface) 0%, var(--bg-elevated) 100%);
+    border: 1px solid var(--border-default);
+    border-radius: 10px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 0.75rem;
+    transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+    position: relative;
+}
+
+@media (hover: hover) {
+    .dashboard-card:hover {
+        border-color: var(--accent-blue);
+        box-shadow: var(--glow-blue);
+        transform: translateY(-2px);
+    }
+}
+
+.section-dot-green {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: var(--accent-green);
+    box-shadow: 0 0 6px rgba(63,185,80,0.4);
+    margin-right: 6px;
+    vertical-align: middle;
+}
+
+.section-dot-gray {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: var(--text-secondary);
+    margin-right: 6px;
+    vertical-align: middle;
+}
+
+/* ===== 11. Step indicator styling ===== */
+.step-indicator {
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 1rem 0;
+    gap: 0;
+}
+
+.step-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+}
+
+.step-circle {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    z-index: 1;
+    font-family: var(--font-display);
+    transition: all 0.3s ease;
+}
+
+.step-circle.completed {
+    background-color: var(--accent-green);
+    color: #ffffff;
+    box-shadow: 0 0 8px rgba(63,185,80,0.3);
+}
+
+.step-circle.active {
+    background-color: var(--accent-blue);
+    color: #ffffff;
+    box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.25), var(--glow-blue);
+    animation: pulse-active 2s infinite;
+}
+
+@keyframes pulse-active {
+    0%, 100% { box-shadow: 0 0 0 3px rgba(88,166,255,0.25); }
+    50% { box-shadow: 0 0 0 5px rgba(88,166,255,0.15), 0 0 20px rgba(88,166,255,0.1); }
+}
+
+.step-circle.pending {
+    background-color: var(--border-default);
+    color: var(--text-secondary);
+}
+
+.step-connector {
+    width: 60px;
+    height: 2px;
+    margin-top: 15px;
+    flex-shrink: 0;
+}
+
+.step-connector.completed {
+    background: linear-gradient(90deg, var(--accent-green), var(--accent-blue));
+}
+
+.step-connector.pending {
+    background-color: var(--border-default);
+}
+
+.step-label {
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    margin-top: 6px;
+    text-align: center;
+    white-space: nowrap;
+    font-family: var(--font-display);
+}
+
+.step-label.active {
+    color: var(--accent-blue);
+    font-weight: 600;
+}
+
+.step-label.completed {
+    color: var(--accent-green);
+}
+
+/* ===== 12. Severity badges (dark theme) ===== */
+.severity-critical {
+    background-color: rgba(248, 81, 73, 0.1);
+    border-left: 4px solid var(--accent-red);
+    padding: 1rem;
+    border-radius: 4px;
+    margin: 0.5rem 0;
+    color: var(--text-primary);
+}
+
+.severity-notable {
+    background-color: rgba(210, 153, 34, 0.1);
+    border-left: 4px solid var(--accent-yellow);
+    padding: 1rem;
+    border-radius: 4px;
+    margin: 0.5rem 0;
+    color: var(--text-primary);
+}
+
+/* ===== 13. Pill badges (dark theme) ===== */
+.pill-badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    margin: 2px;
+    font-weight: 500;
+    font-family: var(--font-display);
+}
+
+.pill-badge-red {
+    background-color: rgba(248, 81, 73, 0.12);
+    color: var(--accent-red);
+}
+
+.pill-badge-yellow {
+    background-color: rgba(210, 153, 34, 0.12);
+    color: var(--accent-yellow);
+}
+
+.pill-badge-blue {
+    background-color: rgba(88, 166, 255, 0.12);
+    color: var(--accent-blue);
+}
+
+/* ===== 14. Hypothesis badges (dark theme) ===== */
+.hypothesis-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    margin: 2px;
+    font-weight: 600;
+    font-family: var(--font-display);
+}
+
+.hypothesis-unvalidated {
+    background-color: rgba(210, 153, 34, 0.12);
+    color: var(--accent-yellow);
+}
+
+.hypothesis-testing {
+    background-color: rgba(88, 166, 255, 0.12);
+    color: var(--accent-blue);
+}
+
+.hypothesis-validated {
+    background-color: rgba(63, 185, 80, 0.12);
+    color: var(--accent-green);
+}
+
+.hypothesis-invalidated {
+    background-color: rgba(248, 81, 73, 0.12);
+    color: var(--accent-red);
+}
+
+/* ===== 15. Button overrides ===== */
+.stButton > button,
+button[kind="primary"] {
+    background: linear-gradient(135deg, var(--accent-blue) 0%, #79B8FF 100%) !important;
+    color: #ffffff !important;
+    border: none !important;
+    border-radius: 8px !important;
+    font-weight: 600 !important;
+    font-family: var(--font-display) !important;
+    letter-spacing: -0.01em !important;
+    transition: all 0.2s ease !important;
+    box-shadow: 0 2px 8px rgba(88,166,255,0.2) !important;
+}
+
+.stButton > button:hover,
+button[kind="primary"]:hover {
+    background: linear-gradient(135deg, #79B8FF 0%, var(--accent-blue) 100%) !important;
+    color: #ffffff !important;
+    box-shadow: 0 4px 16px rgba(88,166,255,0.3) !important;
+    transform: translateY(-1px) !important;
+}
+
+.stButton > button[kind="secondary"],
+button[kind="secondary"] {
+    background: var(--bg-surface) !important;
+    color: var(--text-primary) !important;
+    border: 1px solid var(--border-default) !important;
+    box-shadow: none !important;
+}
+
+.stButton > button[kind="secondary"]:hover,
+button[kind="secondary"]:hover {
+    background-color: var(--bg-elevated) !important;
+    border-color: var(--border-hover) !important;
+    box-shadow: none !important;
+    transform: translateY(-1px) !important;
+}
+
+/* ===== 16. Form input overrides ===== */
+input, textarea, select,
+.stTextInput input,
+.stTextArea textarea,
+.stSelectbox select,
+[data-testid="stTextInput"] input,
+[data-testid="stTextArea"] textarea,
+.stSelectbox [data-baseweb="select"],
+[data-baseweb="select"],
+[data-baseweb="input"] {
+    background-color: var(--bg-surface) !important;
+    border: 1px solid var(--border-default) !important;
+    color: var(--text-primary) !important;
+    border-radius: 8px !important;
+    font-family: var(--font-display) !important;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
+}
+
+input:focus, textarea:focus, select:focus,
+.stTextInput input:focus,
+.stTextArea textarea:focus,
+[data-testid="stTextInput"] input:focus,
+[data-testid="stTextArea"] textarea:focus {
+    border-color: var(--accent-blue) !important;
+    box-shadow: var(--glow-blue) !important;
+}
+
+/* Dropdown menus */
+[data-baseweb="popover"],
+[data-baseweb="menu"],
+[data-baseweb="list"] {
+    background-color: var(--bg-surface) !important;
+    border: 1px solid var(--border-default) !important;
+}
+
+[data-baseweb="menu"] li,
+[data-baseweb="list"] li {
+    color: var(--text-primary) !important;
+}
+
+[data-baseweb="menu"] li:hover,
+[data-baseweb="list"] li:hover {
+    background-color: var(--bg-elevated) !important;
+}
+
+/* ===== 17. Expander overrides ===== */
+.streamlit-expanderHeader,
+[data-testid="stExpander"],
+details, summary {
+    background-color: var(--bg-surface) !important;
+    border: 1px solid var(--border-default) !important;
+    border-radius: 8px !important;
+    color: var(--text-primary) !important;
+    transition: border-color 0.2s ease !important;
+}
+
+[data-testid="stExpander"]:hover,
+details:hover {
+    border-color: var(--border-hover) !important;
+}
+
+[data-testid="stExpander"] > details > div {
+    background-color: var(--bg-surface) !important;
+}
+
+/* ===== 18. Dividers ===== */
+hr, .stDivider,
+[data-testid="stDivider"] {
+    border-color: var(--border-default) !important;
+}
+
+/* ===== 19. Hide Streamlit menu and footer ===== */
+#MainMenu { visibility: hidden; }
+footer { visibility: hidden; }
+header .decoration { display: none !important; }
+
+/* ===== 20. Metric styling ===== */
+[data-testid="stMetric"],
+[data-testid="stMetricValue"],
+[data-testid="stMetricLabel"] {
+    color: var(--text-primary) !important;
+}
+
+[data-testid="stMetricValue"] {
+    font-weight: 700 !important;
+    font-family: var(--font-display) !important;
+    letter-spacing: -0.02em !important;
+}
+
+[data-testid="stMetricDelta"] {
+    font-family: var(--font-display) !important;
+}
+
+/* ===== 21. Dark st.info/success/warning/error overrides ===== */
+[data-testid="stAlert"],
+.stAlert,
+div[data-testid="stNotification"] {
+    border-radius: 8px !important;
+    font-family: var(--font-display) !important;
+}
+
+/* st.info */
+div[data-testid="stAlert"][data-baseweb*="info"],
+.element-container .stAlert:has([data-testid="stAlertContentInfo"]),
+div[role="alert"].st-emotion-cache-info,
+[data-testid="stNotification"][data-type="info"] {
+    background-color: rgba(88, 166, 255, 0.08) !important;
+    border-left: 4px solid var(--accent-blue) !important;
+    color: var(--text-primary) !important;
+}
+
+/* st.success */
+div[data-testid="stAlert"][data-baseweb*="positive"],
+.element-container .stAlert:has([data-testid="stAlertContentSuccess"]),
+div[role="alert"].st-emotion-cache-success,
+[data-testid="stNotification"][data-type="success"] {
+    background-color: rgba(63, 185, 80, 0.08) !important;
+    border-left: 4px solid var(--accent-green) !important;
+    color: var(--text-primary) !important;
+}
+
+/* st.warning */
+div[data-testid="stAlert"][data-baseweb*="warning"],
+.element-container .stAlert:has([data-testid="stAlertContentWarning"]),
+div[role="alert"].st-emotion-cache-warning,
+[data-testid="stNotification"][data-type="warning"] {
+    background-color: rgba(210, 153, 34, 0.08) !important;
+    border-left: 4px solid var(--accent-yellow) !important;
+    color: var(--text-primary) !important;
+}
+
+/* st.error */
+div[data-testid="stAlert"][data-baseweb*="negative"],
+.element-container .stAlert:has([data-testid="stAlertContentError"]),
+div[role="alert"].st-emotion-cache-error,
+[data-testid="stNotification"][data-type="error"] {
+    background-color: rgba(248, 81, 73, 0.08) !important;
+    border-left: 4px solid var(--accent-red) !important;
+    color: var(--text-primary) !important;
+}
+
+/* Alert text inside all notification types */
+[data-testid="stAlert"] p,
+[data-testid="stNotification"] p,
+.stAlert p {
+    color: var(--text-primary) !important;
+}
+
+/* ===== 22. Scrollbar styling ===== */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--border-default);
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--text-secondary);
+}
+
+/* ===== 23. Welcome screen ===== */
+.welcome-container {
+    text-align: center;
+    padding: 3rem 1rem 2rem;
+}
+
+.welcome-tagline {
+    color: var(--text-secondary);
+    font-family: var(--font-display);
+    font-size: 1.1rem;
+    font-weight: 400;
+    margin-bottom: 0.3rem;
+}
+
+.welcome-emphasis {
+    color: var(--accent-cyan);
+    font-family: var(--font-display);
+    font-size: 0.85rem;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 2rem;
+}
+
+/* ===== 24. Responsive breakpoints ===== */
+@media (max-width: 1440px) {
+    .main .block-container {
+        max-width: 95% !important;
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+    }
+}
+
+@media (max-width: 1200px) {
+    .top-bar-title {
+        font-size: 1.2rem;
+    }
+
+    .status-pill {
+        font-size: 0.68rem;
+        padding: 2px 8px;
+    }
+}
+
+/* ===== 25. Mobile (iPhone) breakpoint ===== */
+@media (max-width: 480px) {
+    .step-connector {
+        width: 24px;
+    }
+
+    .step-circle {
+        width: 26px;
+        height: 26px;
+        font-size: 0.75rem;
+    }
+
+    .step-label {
+        font-size: 0.65rem;
+    }
+
+    .top-bar-title {
+        font-size: 1rem;
+    }
+
+    .top-bar-subtitle {
+        font-size: 0.65rem;
+    }
+
+    .status-pill {
+        font-size: 0.62rem;
+        padding: 2px 6px;
+    }
+
+    .dashboard-card {
+        padding: 0.75rem 1rem;
+    }
+
+    .quick-cmd-chip {
+        font-size: 0.7rem;
+        padding: 2px 8px;
+    }
+}
+</style>""", unsafe_allow_html=True)

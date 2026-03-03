@@ -3,6 +3,7 @@ Claim confirmation UI for Startup Brain.
 Displays extracted claims as an interactive checklist per SPEC Section 3.2.
 """
 
+import html as html_mod
 from uuid import uuid4
 
 import streamlit as st
@@ -60,12 +61,14 @@ def render_claim_editor():
             with col_meta:
                 claim_type = claim.get("claim_type", "claim")
                 confidence = claim.get("confidence", "")
-                badge_color = "#DBEAFE" if claim_type == "claim" else "#FEF3C7"
-                text_color = "#1E40AF" if claim_type == "claim" else "#92400E"
+                badge_color = "rgba(88, 166, 255, 0.12)" if claim_type == "claim" else "rgba(210, 153, 34, 0.12)"
+                text_color = "#58A6FF" if claim_type == "claim" else "#D29922"
+                safe_type = html_mod.escape(claim_type)
+                safe_conf = html_mod.escape(confidence) if confidence else ""
                 st.markdown(
                     f'<span style="background:{badge_color};color:{text_color};padding:2px 6px;border-radius:4px;font-size:0.75rem;">'
-                    f'{claim_type}</span>'
-                    + (f' <span style="font-size:0.75rem;color:#6B7280;">{confidence}</span>' if confidence else ""),
+                    f'{safe_type}</span>'
+                    + (f' <span style="font-size:0.75rem;color:#8B949E;">{safe_conf}</span>' if safe_conf else ""),
                     unsafe_allow_html=True,
                 )
 
@@ -82,8 +85,6 @@ def render_claim_editor():
         if to_remove:
             st.session_state.pending_claims = updated_claims
             st.rerun()
-        else:
-            pass
 
     st.markdown("---")
 

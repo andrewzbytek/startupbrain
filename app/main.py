@@ -9,7 +9,7 @@ st.set_page_config(
     page_title="Startup Brain",
     layout="wide",
     page_icon="🧠",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed",
 )
 
 # Must import state before any other app imports to avoid circular refs
@@ -32,10 +32,11 @@ if not st.session_state.get("_has_pending_ingestion") and st.session_state.get("
 from app.components.styles import inject_custom_css
 inject_custom_css()
 
-from app.components.sidebar import render_sidebar
+from app.components.top_bar import render_top_bar
+from app.components.dashboard import render_dashboard
 from app.components.chat import render_chat, render_contradiction_resolution
 from app.components.claim_editor import render_claim_editor
-from app.components.progress import IngestionProgress, INGESTION_STEPS, render_step_indicator
+from app.components.progress import IngestionProgress, render_step_indicator
 
 
 def render_ingesting():
@@ -428,85 +429,95 @@ def render_done():
 
 # ---- Main routing ----
 
-# Always render sidebar
-render_sidebar()
-
-# Main content area
-st.title("Startup Brain")
+# Persistent top bar across all views
+render_top_bar()
 
 mode = st.session_state.get("mode", "chat")
 
-# --- Crash recovery UI (intercepts chat mode when pending checkpoint exists) ---
-if st.session_state.get("_has_pending_ingestion") and mode == "chat":
-    writer = st.session_state.get("deferred_writer")
-    if writer is not None:
-        st.warning("A previous ingestion was interrupted before completing.")
-        col_info1, col_info2, col_info3 = st.columns(3)
-        with col_info1:
-            st.metric("Stage", writer.stage)
-        with col_info2:
-            st.metric("Claims", len(writer.confirmed_claims))
-        with col_info3:
-            st.metric("Resolutions", len(writer.contradiction_resolutions))
-
-        col_resume, col_discard = st.columns(2)
-        with col_resume:
-            if st.button("Resume", type="primary", use_container_width=True, key="resume_pending"):
-                st.session_state.pending_claims = writer.confirmed_claims
-                st.session_state.current_transcript = writer.transcript
-                st.session_state.ingestion_participants = writer.metadata.get("participants", "")
-                st.session_state.ingestion_topic = writer.metadata.get("topic", "")
-                st.session_state.ingestion_session_type = writer.session_type
-                st.session_state.ingestion_session_summary = writer.session_summary
-                st.session_state.ingestion_topic_tags = writer.topic_tags
-                st.session_state.consistency_results = writer.consistency_results
-                st.session_state._has_pending_ingestion = False
-
-                if writer.stage == "ready_to_commit":
-                    set_mode("done")
-                elif writer.stage == "awaiting_resolution":
-                    resolved_count = len(writer.contradiction_resolutions)
-                    st.session_state.contradiction_index = resolved_count
-                    pass2 = (writer.consistency_results or {}).get("pass2", {})
-                    contradictions = pass2.get("retained", []) if pass2 else []
-                    st.session_state.contradictions = contradictions
-                    if resolved_count >= len(contradictions):
-                        set_mode("done")
-                    else:
-                        set_mode("resolving_contradiction")
-                else:
-                    set_mode("done")
-                st.rerun()
-
-        with col_discard:
-            if st.button("Discard", use_container_width=True, key="discard_pending"):
-                writer.rollback()
-                st.session_state._has_pending_ingestion = False
-                st.session_state.deferred_writer = None
-                st.rerun()
+# Non-chat modes (ingestion pipeline) render directly — no tab navigation
+if mode not in ("chat",):
+    if mode == "ingesting":
+        render_ingesting()
+    elif mode == "confirming_claims":
+        render_claim_editor()
+    elif mode == "checking_consistency":
+        render_checking_consistency()
+    elif mode == "resolving_contradiction":
+        render_contradiction_resolution()
+    elif mode == "done":
+        render_done()
     else:
-        st.session_state._has_pending_ingestion = False
-        render_chat()
-
-elif mode == "chat":
-    render_chat()
-
-elif mode == "ingesting":
-    render_ingesting()
-
-elif mode == "confirming_claims":
-    render_claim_editor()
-
-elif mode == "checking_consistency":
-    render_checking_consistency()
-
-elif mode == "resolving_contradiction":
-    render_contradiction_resolution()
-
-elif mode == "done":
-    render_done()
-
+        st.warning(f"Unknown mode: {mode}. Resetting to chat.")
+        set_mode("chat")
+        st.rerun()
 else:
-    st.warning(f"Unknown mode: {mode}. Resetting to chat.")
-    set_mode("chat")
-    st.rerun()
+    # Chat mode — show tab navigation (Chat | Dashboard)
+    # --- Crash recovery intercept ---
+    if st.session_state.get("_has_pending_ingestion"):
+        writer = st.session_state.get("deferred_writer")
+        if writer is not None:
+            st.warning("A previous ingestion was interrupted before completing.")
+            col_info1, col_info2, col_info3 = st.columns(3)
+            with col_info1:
+                st.metric("Stage", writer.stage)
+            with col_info2:
+                st.metric("Claims", len(writer.confirmed_claims))
+            with col_info3:
+                st.metric("Resolutions", len(writer.contradiction_resolutions))
+
+            col_resume, col_discard = st.columns(2)
+            with col_resume:
+                if st.button("Resume", type="primary", use_container_width=True, key="resume_pending"):
+                    st.session_state.pending_claims = writer.confirmed_claims
+                    st.session_state.current_transcript = writer.transcript
+                    st.session_state.ingestion_participants = writer.metadata.get("participants", "")
+                    st.session_state.ingestion_topic = writer.metadata.get("topic", "")
+                    st.session_state.ingestion_session_type = writer.session_type
+                    st.session_state.ingestion_session_summary = writer.session_summary
+                    st.session_state.ingestion_topic_tags = writer.topic_tags
+                    st.session_state.consistency_results = writer.consistency_results
+                    st.session_state._has_pending_ingestion = False
+
+                    if writer.stage == "ready_to_commit":
+                        set_mode("done")
+                    elif writer.stage == "awaiting_resolution":
+                        resolved_count = len(writer.contradiction_resolutions)
+                        st.session_state.contradiction_index = resolved_count
+                        pass2 = (writer.consistency_results or {}).get("pass2", {})
+                        contradictions = pass2.get("retained", []) if pass2 else []
+                        st.session_state.contradictions = contradictions
+                        if resolved_count >= len(contradictions):
+                            set_mode("done")
+                        else:
+                            set_mode("resolving_contradiction")
+                    else:
+                        set_mode("done")
+                    st.rerun()
+
+            with col_discard:
+                if st.button("Discard", use_container_width=True, key="discard_pending"):
+                    writer.rollback()
+                    st.session_state._has_pending_ingestion = False
+                    st.session_state.deferred_writer = None
+                    st.rerun()
+        else:
+            st.session_state._has_pending_ingestion = False
+            # Fall through to normal tab navigation below
+
+    if not st.session_state.get("_has_pending_ingestion"):
+        # Tab navigation via st.radio styled as tabs
+        active_view = st.radio(
+            "Navigation",
+            options=["Chat", "Dashboard"],
+            index=0 if st.session_state.get("active_view", "chat") == "chat" else 1,
+            horizontal=True,
+            label_visibility="collapsed",
+            key="nav_tabs",
+        )
+        # Sync back to session state
+        st.session_state.active_view = "dashboard" if active_view == "Dashboard" else "chat"
+
+        if st.session_state.active_view == "dashboard":
+            render_dashboard()
+        else:
+            render_chat()

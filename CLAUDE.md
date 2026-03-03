@@ -10,6 +10,10 @@ AI-powered knowledge management for a 2-person startup. See `docs/SPEC.md` for f
 
 ## Architecture
 - Streamlit app at `app/main.py` (entry point for Streamlit Community Cloud)
+- Layout: Two-view tab navigation (Chat | Dashboard) with persistent top bar
+- No sidebar — all content in main area, sidebar hidden via CSS
+- Navigation via `session_state.active_view` (`st.radio` styled as tabs), not `st.tabs()`
+- Parser functions shared in `app/components/_parsers.py`
 - Services in `services/` — each service is a single-purpose module
 - LLM prompts in `prompts/` as markdown files — loaded at runtime, never hardcoded
 - Living document at `documents/startup_brain.md` — git-tracked, mirrored to MongoDB
@@ -28,10 +32,14 @@ AI-powered knowledge management for a 2-person startup. See `docs/SPEC.md` for f
 - Git commit `documents/startup_brain.md` after every update with descriptive message
 - Session types (defined in `app/state.py:SESSION_TYPES`) flow through extraction, consistency, pushback, audit, and storage
 - All new service function parameters must default to empty string/None for backward compatibility
+- Multi-user: UI is designed for single-user but component boundaries support future multi-user extension (user-scoped session state, auth layer). Not implemented yet — design only.
 
 ## File Ownership (for parallel agent work)
 When splitting tasks across agents, avoid overlapping file edits:
-- **Frontend**: `app/main.py`, `app/state.py`, `app/components/*.py`
+- **Frontend layout**: `app/main.py`, `app/state.py`
+- **Frontend components**: `app/components/top_bar.py`, `app/components/dashboard.py`, `app/components/chat.py`, `app/components/claim_editor.py`, `app/components/progress.py`
+- **Theme/styles**: `app/components/styles.py`
+- **Parsers**: `app/components/_parsers.py` (shared parsing functions), `app/components/sidebar.py` (legacy re-export shell)
 - **Backend services**: `services/*.py`
 - **Prompts**: `prompts/*.md`
 - **Tests**: `tests/test_*.py`
@@ -40,7 +48,7 @@ When splitting tasks across agents, avoid overlapping file edits:
 - Test transcripts in `tests/test_transcripts/`
 - Run unit tests: `python -m pytest tests/ -m "not integration"`
 - Run integration tests: `python -m pytest tests/ -m integration` (requires API key + MongoDB)
-- 839 unit tests + 45 integration tests across 24 test files, all unit tests run fully offline with mocks
+- 859 unit tests + 45 integration tests across 24 test files, all unit tests run fully offline with mocks
 
 ## Deployment
 - Streamlit Community Cloud from this repo
@@ -55,13 +63,13 @@ All 24 sections of `docs/SPEC.md` are implemented. The system is production-read
 
 **Core pipeline:** Full ingestion (transcript → claim extraction → human confirmation → consistency check → doc update), 3-pass consistency engine (P1+P2 Sonnet, P3 Opus on Critical only), diff-and-verify living document updates, git auto-commit after every update. Active Hypotheses section tracks testable assumptions with validation states. Living document has 17 sections under Current State, ordered for pitch narrative flow (Kamps cross-check).
 
-**UI:** Conversational chat with query classification and streaming, sidebar dashboard (Current View, External Feedback by source, Recent Changes, Actions with download buttons, Topic Evolution, API Cost, RAG Health), step indicators across 4-stage ingestion flow, claim editor with inline editing.
+**UI:** Dark command center theme (Vercel/Raycast inspired). Two-view layout: Chat (default) with quick command chips, Dashboard (full-page card grid of all 17 sections + panels). Persistent top bar with Ingest/Audit buttons and API cost + RAG health status pills. No sidebar. Conversational chat with query classification and streaming, HTML/CSS step indicators across 4-stage ingestion flow, claim editor with inline editing.
 
-**Features:** Session type categorization through entire pipeline, whiteboard photo processing (vision), feedback pattern detection, evolution narratives, pitch material generation (Opus), cost tracking with budget alerts, book framework cross-check via .md upload in chat, direct corrections with informational consistency check, contradiction resolution writing Decision Log and Dismissed Contradictions entries, quick notes via chat prefix (`note:`, `remember:`, `jot:`, `fyi:`) for lightweight doc updates without full pipeline, hypothesis tracking via chat prefix (`hypothesis:`, `validated:`, `invalidated:`) or sidebar form, Socratic system prompt with context surfacing and feedback echo, sidebar tensions indicator (changelog churn, dismissed contradictions, decisions under evaluation), 'challenge' query classification routing to Opus, Quick Commands legend for prefix discoverability, full context export (living doc + session history + claims as single MD), session rollback command.
+**Features:** Session type categorization through entire pipeline, whiteboard photo processing (vision), feedback pattern detection, evolution narratives, pitch material generation (Opus), cost tracking with budget alerts, book framework cross-check via .md upload in chat, direct corrections with informational consistency check, contradiction resolution writing Decision Log and Dismissed Contradictions entries, quick notes via chat prefix (`note:`, `remember:`, `jot:`, `fyi:`) for lightweight doc updates without full pipeline, hypothesis tracking via chat prefix (`hypothesis:`, `validated:`, `invalidated:`) or dashboard form, Socratic system prompt with context surfacing and feedback echo, dashboard tensions indicator (changelog churn, dismissed contradictions, decisions under evaluation), 'challenge' query classification routing to Opus, quick command chips below chat input for prefix discoverability, full context export (living doc + session history + claims as single MD), session rollback command.
 
 **Infrastructure:** Vector search code ready (`vector_search_text()`, upgraded `_get_rag_evidence()`), time-based fallback on free tier, RAG health monitor (warns at 200 claims).
 
-**Tests:** 839 unit tests, 45 integration tests across 24 test files. All unit tests run fully offline with mocks.
+**Tests:** 859 unit tests, 45 integration tests across 24 test files. All unit tests run fully offline with mocks.
 
 ### Decided Against
 
@@ -83,4 +91,4 @@ Sections from Kamps pitch guide cross-check: Problem We're Solving, Why Now, Tra
 
 ### Next Steps
 1. **Use the system daily** — ingest real transcripts, build up the living document, see how consistency engine performs on real data.
-2. **When sidebar says "RAG upgrade needed"** (~200 claims) — upgrade Atlas to M10+ and create vector search indexes per `scripts/bootstrap.py`.
+2. **When top bar says "RAG upgrade needed"** (~200 claims) — upgrade Atlas to M10+ and create vector search indexes per `scripts/bootstrap.py`.

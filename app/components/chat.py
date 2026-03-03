@@ -3,6 +3,7 @@ Chat interface for Startup Brain.
 Handles conversation, query routing, and contradiction resolution UI.
 """
 
+import html
 import re
 from datetime import datetime, timedelta, timezone
 
@@ -684,6 +685,25 @@ def _apply_hypothesis_status_update(user_message: str) -> str:
         return f"Could not update hypothesis: {e}"
 
 
+def _render_quick_command_chips():
+    """Render quick command chips as visual hints below chat input."""
+    chips = [
+        ("note:", "Quick note to update the doc"),
+        ("hypothesis:", "Track a testable assumption"),
+        ("contact:", "Track a contact or prospect"),
+        ("validated:", "Mark a hypothesis as validated"),
+        ("correction:", "Directly correct something in the doc"),
+    ]
+    chip_html = " ".join(
+        f'<span class="quick-cmd-chip" title="{tooltip}">{label}</span>'
+        for label, tooltip in chips
+    )
+    st.markdown(
+        f'<div style="margin-top: -0.5rem; margin-bottom: 1rem;">{chip_html}</div>',
+        unsafe_allow_html=True,
+    )
+
+
 def _handle_quick_action(text: str, query_type: str):
     """Process a quick-action button click as a user message."""
     with st.chat_message("user"):
@@ -706,20 +726,29 @@ def render_chat():
 
     # Welcome message when conversation is empty
     if not history:
-        st.markdown("**Welcome to Startup Brain** — your startup's AI memory.")
-        st.caption("Ask me anything about your startup, or try one of these:")
-        col1, col2, col3 = st.columns(3)
+        st.markdown(
+            '<div class="welcome-container">'
+            '<div class="welcome-tagline">Your startup\'s AI memory. Ask anything.</div>'
+            '<div class="welcome-emphasis">Chat \u00b7 Ingest \u00b7 Track \u00b7 Challenge</div>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+        col1, col2, col3, col4 = st.columns(4)
         with col1:
-            if st.button("What's our current state?", key="quick_state"):
+            if st.button("Current State", key="quick_state", use_container_width=True):
                 _handle_quick_action("What's our current state?", "current_state")
                 return
         with col2:
-            if st.button("Any open questions?", key="quick_questions"):
-                _handle_quick_action("Any open questions?", "general")
+            if st.button("Open Questions", key="quick_questions", use_container_width=True):
+                _handle_quick_action("What are our open questions?", "general")
                 return
         with col3:
-            if st.button("Recent changes", key="quick_changes"):
-                _handle_quick_action("Recent changes", "historical")
+            if st.button("Recent Changes", key="quick_changes", use_container_width=True):
+                _handle_quick_action("What are the recent changes?", "historical")
+                return
+        with col4:
+            if st.button("Challenge Me", key="quick_challenge", use_container_width=True):
+                _handle_quick_action("Challenge our current assumptions. What are we missing?", "challenge")
                 return
 
     for msg in history:
@@ -731,9 +760,14 @@ def render_chat():
         "Upload .md for cross-check", type=["md"], key="book_upload",
     )
     if uploaded_file is not None:
-        content = uploaded_file.read().decode("utf-8")
-        st.session_state.book_crosscheck_content = content
-        st.session_state.book_crosscheck_filename = uploaded_file.name
+        try:
+            content = uploaded_file.read().decode("utf-8")
+        except UnicodeDecodeError:
+            st.error("Could not read file — only UTF-8 encoded .md files are supported.")
+            content = None
+        if content is not None:
+            st.session_state.book_crosscheck_content = content
+            st.session_state.book_crosscheck_filename = uploaded_file.name
 
     if st.session_state.get("book_crosscheck_content"):
         filename = st.session_state.get("book_crosscheck_filename", "file")
@@ -749,6 +783,7 @@ def render_chat():
 
     # Chat input
     user_input = st.chat_input("Ask anything about your startup...")
+    _render_quick_command_chips()
 
     if user_input:
         # Display user message
@@ -762,7 +797,7 @@ def render_chat():
             response = (
                 "That looks like a session transcript or summary. "
                 "Would you like to run it through the ingestion pipeline to extract and store the key claims? "
-                "Click **Ingest New Session** in the sidebar, or paste it there to get started."
+                "Click **Ingest Session** in the top bar to get started."
             )
             with st.chat_message("assistant"):
                 st.markdown(response)
@@ -858,12 +893,12 @@ def render_contradiction_resolution():
     st.progress((idx + 1) / total)
 
     severity = contradiction.get("severity", "Notable")
-    if severity == "Critical":
-        st.error(f"Severity: {severity}")
-    elif severity == "Notable":
-        st.warning(f"Severity: {severity}")
-    else:
-        st.info(f"Severity: {severity}")
+    severity_cls = "critical" if severity == "Critical" else "notable"
+    st.markdown(
+        f'<div class="severity-{severity_cls}">'
+        f'<strong>Severity: {html.escape(severity)}</strong></div>',
+        unsafe_allow_html=True,
+    )
 
     # Show the tension
     col1, col2 = st.columns(2)

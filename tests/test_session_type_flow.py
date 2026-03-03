@@ -319,17 +319,20 @@ class TestParseFeedbackBySource:
 
 class TestRenderStepIndicator:
     def test_step_indicator_callable(self):
-        """render_step_indicator should be importable and callable."""
+        """render_step_indicator should be importable and callable via st.markdown."""
         from app.components.progress import render_step_indicator
         st_mod = sys.modules["streamlit"]
-        st_mod.columns = MagicMock(return_value=[MagicMock() for _ in range(4)])
+        st_mod.markdown = MagicMock()
         render_step_indicator(1)
-        st_mod.columns.assert_called_once()
+        st_mod.markdown.assert_called_once()
+        html = st_mod.markdown.call_args[0][0]
+        assert 'step-indicator' in html
+        assert 'step-circle active' in html
 
     def test_step_indicator_accepts_all_steps(self):
         """render_step_indicator should work for steps 1-4."""
         from app.components.progress import render_step_indicator
         st_mod = sys.modules["streamlit"]
-        st_mod.columns = MagicMock(return_value=[MagicMock() for _ in range(4)])
+        st_mod.markdown = MagicMock()
         for step in [1, 2, 3, 4]:
             render_step_indicator(step)

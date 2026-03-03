@@ -30,6 +30,7 @@ def init_session_state():
     """Initialize ALL session_state keys with defaults. Safe to call on every rerun."""
     defaults = {
         "mode": "chat",
+        "active_view": "chat",
         "conversation_history": [],
         "pending_claims": [],
         "contradictions": [],
@@ -56,6 +57,8 @@ def init_session_state():
         "book_crosscheck_content": "",
         "book_crosscheck_filename": "",
         "show_hypothesis_form": False,
+        # Pipeline result for done screen
+        "pipeline_result": {},
         # Deferred writes / crash recovery
         "deferred_writer": None,
         "_batch_committed": False,
@@ -107,6 +110,7 @@ def reset_ingestion():
     st.session_state.whiteboard_text = ""
     st.session_state.ingestion_session_type = ""
     st.session_state.ingestion_session_date = None
+    st.session_state.active_view = "chat"
     st.session_state.pipeline_result = {}
     st.session_state.deferred_writer = None
     st.session_state._batch_committed = False

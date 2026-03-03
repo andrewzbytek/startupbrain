@@ -82,15 +82,37 @@ class IngestionProgress:
 def render_step_indicator(current_step: int):
     """Render a 4-step horizontal progress indicator. current_step is 1-based."""
     steps = ["Input", "Review Claims", "Consistency Check", "Done"]
-    cols = st.columns(len(steps))
-    for i, (col, label) in enumerate(zip(cols, steps), 1):
-        with col:
-            if i < current_step:
-                st.markdown(f"~~:gray[{i}. {label}]~~  :green[Done]")
-            elif i == current_step:
-                st.markdown(f"**:blue[{i}. {label}] ←**")
-            else:
-                st.markdown(f":gray[{i}. {label}]")
+
+    parts = []
+    for i, label in enumerate(steps, 1):
+        # Determine state for this step
+        if i < current_step:
+            circle_cls = "completed"
+            label_cls = "completed"
+        elif i == current_step:
+            circle_cls = "active"
+            label_cls = "active"
+        else:
+            circle_cls = "pending"
+            label_cls = ""
+
+        # Add connector before steps 2-4
+        if i > 1:
+            conn_cls = "completed" if i <= current_step else "pending"
+            parts.append(
+                f'<div class="step-connector {conn_cls}"></div>'
+            )
+
+        # Circle + label
+        parts.append(
+            f'<div class="step-item">'
+            f'<div class="step-circle {circle_cls}">{i}</div>'
+            f'<div class="step-label {label_cls}">{label}</div>'
+            f'</div>'
+        )
+
+    html = f'<div class="step-indicator">{"".join(parts)}</div>'
+    st.markdown(html, unsafe_allow_html=True)
 
 
 def show_simple_progress(steps: list, current_step: int) -> None:
