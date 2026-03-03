@@ -686,11 +686,46 @@ def _apply_hypothesis_status_update(user_message: str) -> str:
 
 
 _QUICK_COMMANDS = [
-    ("note:", "note: ", "We decided to focus on small plants first", "Adds a quick note to your living document"),
-    ("hypothesis:", "hypothesis: ", "Small plant operators have <12 month procurement cycles", "Tracks a testable assumption"),
-    ("contact:", "contact: ", "Jane Doe, PSEG, prospect, in-conversation", "Logs a contact: name, org, type, status"),
-    ("validated:", "validated: ", "Small plants have shorter procurement cycles", "Marks a hypothesis as validated"),
-    ("correction:", "correction: ", "Our target is plant operators, not compliance officers", "Corrects something in the living document"),
+    (
+        "note:", "note: ",
+        "We decided to focus on small plants first",
+        "Adds a quick note to your living document",
+        "Updates the living document directly via AI — the AI decides which section "
+        "to update. Also stores a claim in MongoDB. **No extraction, no consistency "
+        "check, no confirmation step.** Use for quick facts, decisions, or reminders.",
+    ),
+    (
+        "hypothesis:", "hypothesis: ",
+        "Small plant operators have <12 month procurement cycles",
+        "Tracks a testable assumption",
+        "Adds an entry to the Active Hypotheses section with status 'unvalidated'. "
+        "Stored in both the living document and MongoDB. You can later mark it "
+        "validated or invalidated. **No consistency check.**",
+    ),
+    (
+        "contact:", "contact: ",
+        "Jane Doe, PSEG, prospect, in-conversation",
+        "Logs a contact: name, org, type, status",
+        "Updates the Key Contacts section of the living document via AI. "
+        "Also stores a claim in MongoDB. Format: name, organization, type "
+        "(prospect/investor/advisor/hire/partner), status. **No consistency check.**",
+    ),
+    (
+        "validated:", "validated: ",
+        "Small plants have shorter procurement cycles",
+        "Marks a hypothesis as validated",
+        "Finds a matching hypothesis in the Active Hypotheses section and changes "
+        "its status to 'validated'. Updates both the living document and MongoDB. "
+        "Use the exact hypothesis text (or a close match).",
+    ),
+    (
+        "correction:", "correction: ",
+        "Our target is plant operators, not compliance officers",
+        "Corrects something in the living document",
+        "Applies a direct correction to the living document via AI. The AI figures out "
+        "what to change. Runs an **informational consistency check** (results shown but "
+        "don't block the update). Use when you realize something in the doc is wrong.",
+    ),
 ]
 
 
@@ -701,7 +736,7 @@ def _render_quick_command_panel():
     # If no command is active, show chips as clickable st.buttons styled small
     if not active_cmd:
         btn_cols = st.columns(len(_QUICK_COMMANDS))
-        for i, (label, _prefix, _example, _hint) in enumerate(_QUICK_COMMANDS):
+        for i, (label, _prefix, _example, _hint, _detail) in enumerate(_QUICK_COMMANDS):
             with btn_cols[i]:
                 if st.button(label, key=f"qcmd_btn_{i}", use_container_width=True):
                     st.session_state._active_quick_cmd = _prefix
@@ -710,12 +745,30 @@ def _render_quick_command_panel():
         # Active command — show guidance, input field with placeholder, and buttons
         example = ""
         hint = ""
-        for _label, prefix, ex, h in _QUICK_COMMANDS:
+        detail = ""
+        for _label, prefix, ex, h, d in _QUICK_COMMANDS:
             if prefix == active_cmd:
                 example = ex
                 hint = h
+                detail = d
                 break
-        st.caption(f"{hint}. Example: *{example}*")
+        # Guidance line + help popover
+        hint_col, help_col = st.columns([6, 1])
+        with hint_col:
+            st.caption(f"{hint}. Example: *{example}*")
+        with help_col:
+            with st.popover("?"):
+                st.markdown(f"**{active_cmd.strip()}**")
+                st.markdown(detail)
+                st.markdown("---")
+                st.markdown(
+                    "**How is this different from Ingest Session?**\n\n"
+                    "Full ingestion extracts multiple claims from a transcript, "
+                    "lets you confirm/edit each one, runs a 3-pass consistency check "
+                    "against everything already in your knowledge base, and flags "
+                    "contradictions for resolution. Quick commands skip all of that — "
+                    "they apply a single update directly."
+                )
         cmd_text = st.text_input(
             "Quick command",
             value="",
