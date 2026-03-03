@@ -762,7 +762,7 @@ def render_chat():
             '</div>',
             unsafe_allow_html=True,
         )
-        col1, col2, col3, col4 = st.columns(4)
+        _, col1, col2, col3, col4, _ = st.columns([0.5, 1, 1, 1, 1, 0.5])
         with col1:
             if st.button("Current State", key="quick_state", use_container_width=True):
                 _handle_quick_action("What's our current state?", "current_state")
@@ -784,19 +784,24 @@ def render_chat():
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
 
-    # Book framework upload for cross-check
-    uploaded_file = st.file_uploader(
-        "Upload .md for cross-check", type=["md"], key="book_upload",
-    )
-    if uploaded_file is not None:
-        try:
-            content = uploaded_file.read().decode("utf-8")
-        except UnicodeDecodeError:
-            st.error("Could not read file — only UTF-8 encoded .md files are supported.")
-            content = None
-        if content is not None:
-            st.session_state.book_crosscheck_content = content
-            st.session_state.book_crosscheck_filename = uploaded_file.name
+    # Quick command panel — always visible after welcome/history
+    _render_quick_command_panel()
+
+    # Book framework upload for cross-check (collapsed to stay out of the way)
+    with st.expander("Upload .md for cross-check", expanded=False):
+        uploaded_file = st.file_uploader(
+            "Choose file", type=["md"], key="book_upload",
+            label_visibility="collapsed",
+        )
+        if uploaded_file is not None:
+            try:
+                content = uploaded_file.read().decode("utf-8")
+            except UnicodeDecodeError:
+                st.error("Could not read file — only UTF-8 encoded .md files are supported.")
+                content = None
+            if content is not None:
+                st.session_state.book_crosscheck_content = content
+                st.session_state.book_crosscheck_filename = uploaded_file.name
 
     if st.session_state.get("book_crosscheck_content"):
         filename = st.session_state.get("book_crosscheck_filename", "file")
@@ -809,9 +814,6 @@ def render_chat():
                 st.session_state.book_crosscheck_content = ""
                 st.session_state.book_crosscheck_filename = ""
                 st.rerun()
-
-    # Quick command panel (above chat input)
-    _render_quick_command_panel()
 
     # Chat input
     user_input = st.chat_input("Ask anything about your startup...")
