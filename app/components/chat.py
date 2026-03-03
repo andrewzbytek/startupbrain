@@ -686,11 +686,11 @@ def _apply_hypothesis_status_update(user_message: str) -> str:
 
 
 _QUICK_COMMANDS = [
-    ("note:", "note: ", "We decided to focus on small plants first"),
-    ("hypothesis:", "hypothesis: ", "Small plant operators have <12 month procurement cycles"),
-    ("contact:", "contact: ", "Jane Doe, PSEG, prospect, in-conversation"),
-    ("validated:", "validated: ", "Small plants have shorter procurement cycles"),
-    ("correction:", "correction: ", "Our target is plant operators, not compliance officers"),
+    ("note:", "note: ", "We decided to focus on small plants first", "Adds a quick note to your living document"),
+    ("hypothesis:", "hypothesis: ", "Small plant operators have <12 month procurement cycles", "Tracks a testable assumption"),
+    ("contact:", "contact: ", "Jane Doe, PSEG, prospect, in-conversation", "Logs a contact: name, org, type, status"),
+    ("validated:", "validated: ", "Small plants have shorter procurement cycles", "Marks a hypothesis as validated"),
+    ("correction:", "correction: ", "Our target is plant operators, not compliance officers", "Corrects something in the living document"),
 ]
 
 
@@ -701,30 +701,37 @@ def _render_quick_command_panel():
     # If no command is active, show chips as clickable st.buttons styled small
     if not active_cmd:
         btn_cols = st.columns(len(_QUICK_COMMANDS))
-        for i, (label, prefix, _example) in enumerate(_QUICK_COMMANDS):
+        for i, (label, _prefix, _example, _hint) in enumerate(_QUICK_COMMANDS):
             with btn_cols[i]:
                 if st.button(label, key=f"qcmd_btn_{i}", use_container_width=True):
-                    st.session_state._active_quick_cmd = prefix
+                    st.session_state._active_quick_cmd = _prefix
                     st.rerun()
     else:
-        # Active command — show input field
+        # Active command — show guidance, input field with placeholder, and buttons
         example = ""
-        for _label, prefix, ex in _QUICK_COMMANDS:
+        hint = ""
+        for _label, prefix, ex, h in _QUICK_COMMANDS:
             if prefix == active_cmd:
                 example = ex
+                hint = h
                 break
+        st.caption(f"{hint}. Example: *{example}*")
         cmd_text = st.text_input(
             "Quick command",
-            value=active_cmd,
-            placeholder=f"e.g., {active_cmd}{example}",
+            value="",
+            placeholder=f"{active_cmd}{example}",
             key="_quick_cmd_input",
             label_visibility="collapsed",
         )
         send_col, cancel_col, _ = st.columns([1, 1, 4])
         with send_col:
             if st.button("Send", key="qcmd_send", use_container_width=True):
-                if cmd_text.strip() and cmd_text.strip() != active_cmd.strip():
-                    st.session_state._quick_cmd_pending = cmd_text.strip()
+                text_to_send = cmd_text.strip() if cmd_text.strip() else ""
+                # Prepend prefix if user didn't include it
+                if text_to_send and not text_to_send.startswith(active_cmd.strip()):
+                    text_to_send = active_cmd + text_to_send
+                if text_to_send:
+                    st.session_state._quick_cmd_pending = text_to_send
                     st.session_state._active_quick_cmd = None
                     st.rerun()
         with cancel_col:
