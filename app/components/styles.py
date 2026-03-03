@@ -107,24 +107,7 @@ button[data-testid="stSidebarCollapsedControl"],
     display: none !important;
 }
 
-/* ===== 5. Atmospheric background ===== */
-[data-testid="stAppViewContainer"]::before {
-    content: "";
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    height: 100dvh;
-    background:
-        radial-gradient(ellipse 80% 60% at 10% 20%, rgba(88,166,255,0.04) 0%, transparent 70%),
-        radial-gradient(ellipse 60% 50% at 90% 80%, rgba(57,210,192,0.03) 0%, transparent 70%),
-        radial-gradient(ellipse 50% 40% at 50% 10%, rgba(188,140,255,0.02) 0%, transparent 60%);
-    pointer-events: none;
-    z-index: 0;
-}
-
-/* ===== 6. Top bar styling ===== */
+/* ===== 5. Top bar styling ===== */
 .top-bar-title {
     font-family: var(--font-display) !important;
     font-weight: 700;
@@ -243,72 +226,16 @@ div[data-testid="stHorizontalBlock"] .stRadio > div > label > div:first-child {
     box-shadow: var(--glow-blue) !important;
 }
 
-/* ===== 9. Quick command chip styling ===== */
-.quick-cmd-chip {
-    display: inline-block;
-    font-family: var(--font-mono);
-    font-size: 0.75rem;
-    background-color: rgba(57, 210, 192, 0.08);
-    color: var(--accent-cyan);
-    border: 1px solid rgba(57, 210, 192, 0.2);
-    border-radius: 999px;
-    padding: 3px 12px;
-    margin: 2px 4px;
-    cursor: default;
-    transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
-    letter-spacing: 0.02em;
+/* Force chat message content to full width during streaming */
+[data-testid="stChatMessageContent"] {
+    width: 100% !important;
+    min-height: 1.5em;
+}
+[data-testid="stChatMessageContent"] > div {
+    width: 100% !important;
 }
 
-@media (hover: hover) {
-    .quick-cmd-chip:hover {
-        background-color: rgba(57, 210, 192, 0.16);
-        border-color: rgba(57, 210, 192, 0.4);
-        box-shadow: var(--glow-cyan);
-        transform: translateY(-1px);
-    }
-}
-
-/* ===== 10. Dashboard card styling ===== */
-.dashboard-card {
-    background: linear-gradient(135deg, var(--bg-surface) 0%, var(--bg-elevated) 100%);
-    border: 1px solid var(--border-default);
-    border-radius: 10px;
-    padding: 1rem 1.25rem;
-    margin-bottom: 0.75rem;
-    transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
-    position: relative;
-}
-
-@media (hover: hover) {
-    .dashboard-card:hover {
-        border-color: var(--accent-blue);
-        box-shadow: var(--glow-blue);
-        transform: translateY(-2px);
-    }
-}
-
-.section-dot-green {
-    display: inline-block;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background-color: var(--accent-green);
-    box-shadow: 0 0 6px rgba(63,185,80,0.4);
-    margin-right: 6px;
-    vertical-align: middle;
-}
-
-.section-dot-gray {
-    display: inline-block;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background-color: var(--text-secondary);
-    margin-right: 6px;
-    vertical-align: middle;
-}
-
-/* ===== 11. Step indicator styling ===== */
+/* ===== 9. Step indicator styling ===== */
 .step-indicator {
     display: flex;
     align-items: flex-start;
@@ -370,7 +297,7 @@ div[data-testid="stHorizontalBlock"] .stRadio > div > label > div:first-child {
 }
 
 .step-connector.completed {
-    background: linear-gradient(90deg, var(--accent-green), var(--accent-blue));
+    background-color: var(--accent-green);
 }
 
 .step-connector.pending {
@@ -474,39 +401,33 @@ div[data-testid="stHorizontalBlock"] .stRadio > div > label > div:first-child {
 /* ===== 15. Button overrides ===== */
 .stButton > button,
 button[kind="primary"] {
-    background: linear-gradient(135deg, var(--accent-blue) 0%, #79B8FF 100%) !important;
+    background-color: var(--accent-blue) !important;
     color: #ffffff !important;
     border: none !important;
     border-radius: 8px !important;
     font-weight: 600 !important;
     font-family: var(--font-display) !important;
     letter-spacing: -0.01em !important;
-    transition: all 0.2s ease !important;
-    box-shadow: 0 2px 8px rgba(88,166,255,0.2) !important;
+    transition: background-color 0.2s ease !important;
 }
 
 .stButton > button:hover,
 button[kind="primary"]:hover {
-    background: linear-gradient(135deg, #79B8FF 0%, var(--accent-blue) 100%) !important;
+    background-color: #79B8FF !important;
     color: #ffffff !important;
-    box-shadow: 0 4px 16px rgba(88,166,255,0.3) !important;
-    transform: translateY(-1px) !important;
 }
 
 .stButton > button[kind="secondary"],
 button[kind="secondary"] {
-    background: var(--bg-surface) !important;
+    background-color: var(--bg-surface) !important;
     color: var(--text-primary) !important;
     border: 1px solid var(--border-default) !important;
-    box-shadow: none !important;
 }
 
 .stButton > button[kind="secondary"]:hover,
 button[kind="secondary"]:hover {
     background-color: var(--bg-elevated) !important;
     border-color: var(--border-hover) !important;
-    box-shadow: none !important;
-    transform: translateY(-1px) !important;
 }
 
 /* ===== 16. Form input overrides ===== */
@@ -747,15 +668,6 @@ div[role="alert"].st-emotion-cache-error,
     .status-pill {
         font-size: 0.62rem;
         padding: 2px 6px;
-    }
-
-    .dashboard-card {
-        padding: 0.75rem 1rem;
-    }
-
-    .quick-cmd-chip {
-        font-size: 0.7rem;
-        padding: 2px 8px;
     }
 }
 </style>""", unsafe_allow_html=True)

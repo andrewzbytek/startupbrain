@@ -63,6 +63,7 @@ def init_session_state():
         "deferred_writer": None,
         "_batch_committed": False,
         "_has_pending_ingestion": False,
+        "_active_quick_cmd": None,
     }
     for key, value in defaults.items():
         if key not in st.session_state:

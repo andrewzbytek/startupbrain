@@ -685,23 +685,52 @@ def _apply_hypothesis_status_update(user_message: str) -> str:
         return f"Could not update hypothesis: {e}"
 
 
-def _render_quick_command_chips():
-    """Render quick command chips as visual hints below chat input."""
-    chips = [
-        ("note:", "Quick note to update the doc"),
-        ("hypothesis:", "Track a testable assumption"),
-        ("contact:", "Track a contact or prospect"),
-        ("validated:", "Mark a hypothesis as validated"),
-        ("correction:", "Directly correct something in the doc"),
-    ]
-    chip_html = " ".join(
-        f'<span class="quick-cmd-chip" title="{tooltip}">{label}</span>'
-        for label, tooltip in chips
-    )
-    st.markdown(
-        f'<div style="margin-top: -0.5rem; margin-bottom: 1rem;">{chip_html}</div>',
-        unsafe_allow_html=True,
-    )
+_QUICK_COMMANDS = [
+    ("note:", "note: ", "We decided to focus on small plants first"),
+    ("hypothesis:", "hypothesis: ", "Small plant operators have <12 month procurement cycles"),
+    ("contact:", "contact: ", "Jane Doe, PSEG, prospect, in-conversation"),
+    ("validated:", "validated: ", "Small plants have shorter procurement cycles"),
+    ("correction:", "correction: ", "Our target is plant operators, not compliance officers"),
+]
+
+
+def _render_quick_command_panel():
+    """Render interactive quick command buttons above chat input."""
+    active_cmd = st.session_state.get("_active_quick_cmd")
+
+    # Button row
+    btn_cols = st.columns(len(_QUICK_COMMANDS))
+    for i, (label, prefix, _example) in enumerate(_QUICK_COMMANDS):
+        with btn_cols[i]:
+            if st.button(label, key=f"qcmd_btn_{i}", use_container_width=True):
+                st.session_state._active_quick_cmd = prefix
+                st.rerun()
+
+    # If a command is active, show the input field
+    if active_cmd:
+        example = ""
+        for _label, prefix, ex in _QUICK_COMMANDS:
+            if prefix == active_cmd:
+                example = ex
+                break
+        cmd_text = st.text_input(
+            "Quick command",
+            value=active_cmd,
+            placeholder=f"e.g., {active_cmd}{example}",
+            key="_quick_cmd_input",
+            label_visibility="collapsed",
+        )
+        send_col, cancel_col, _ = st.columns([1, 1, 4])
+        with send_col:
+            if st.button("Send", key="qcmd_send", use_container_width=True):
+                if cmd_text.strip() and cmd_text.strip() != active_cmd.strip():
+                    st.session_state._quick_cmd_pending = cmd_text.strip()
+                    st.session_state._active_quick_cmd = None
+                    st.rerun()
+        with cancel_col:
+            if st.button("Cancel", key="qcmd_cancel", use_container_width=True):
+                st.session_state._active_quick_cmd = None
+                st.rerun()
 
 
 def _handle_quick_action(text: str, query_type: str):
@@ -781,9 +810,16 @@ def render_chat():
                 st.session_state.book_crosscheck_filename = ""
                 st.rerun()
 
+    # Quick command panel (above chat input)
+    _render_quick_command_panel()
+
     # Chat input
     user_input = st.chat_input("Ask anything about your startup...")
-    _render_quick_command_chips()
+
+    # Pick up pending quick command if no direct input
+    pending_cmd = st.session_state.pop("_quick_cmd_pending", None)
+    if not user_input and pending_cmd:
+        user_input = pending_cmd
 
     if user_input:
         # Display user message
