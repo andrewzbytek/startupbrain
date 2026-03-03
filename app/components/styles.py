@@ -399,7 +399,7 @@ div[data-testid="stHorizontalBlock"] .stRadio > div > label > div:first-child {
 }
 
 /* ===== 15. Button overrides ===== */
-.stButton > button,
+/* Primary action buttons (Ingest Session, form submits, etc.) */
 button[kind="primary"] {
     background-color: var(--accent-blue) !important;
     color: #ffffff !important;
@@ -411,12 +411,34 @@ button[kind="primary"] {
     transition: background-color 0.2s ease !important;
 }
 
-.stButton > button:hover,
 button[kind="primary"]:hover {
     background-color: #79B8FF !important;
     color: #ffffff !important;
 }
 
+/* Default buttons — ghost/outline style (suggestion chips, quick commands) */
+.stButton > button {
+    background-color: transparent !important;
+    color: var(--text-secondary) !important;
+    border: 1px solid var(--border-default) !important;
+    border-radius: 999px !important;
+    font-weight: 500 !important;
+    font-family: var(--font-display) !important;
+    font-size: 0.8rem !important;
+    letter-spacing: -0.01em !important;
+    padding: 0.3rem 0.8rem !important;
+    transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease !important;
+    min-height: 0 !important;
+    line-height: 1.4 !important;
+}
+
+.stButton > button:hover {
+    color: var(--text-primary) !important;
+    border-color: var(--border-hover) !important;
+    background-color: var(--bg-surface) !important;
+}
+
+/* Secondary button explicit style */
 .stButton > button[kind="secondary"],
 button[kind="secondary"] {
     background-color: var(--bg-surface) !important;
@@ -428,6 +450,21 @@ button[kind="secondary"] {
 button[kind="secondary"]:hover {
     background-color: var(--bg-elevated) !important;
     border-color: var(--border-hover) !important;
+}
+
+/* Top bar & dashboard action buttons — filled style (not ghost) */
+.stButton > button[kind="primary"] {
+    background-color: var(--accent-blue) !important;
+    color: #ffffff !important;
+    border: none !important;
+    border-radius: 8px !important;
+    padding: 0.5rem 1rem !important;
+    font-size: 0.88rem !important;
+    font-weight: 600 !important;
+}
+
+.stButton > button[kind="primary"]:hover {
+    background-color: #79B8FF !important;
 }
 
 /* ===== 16. Form input overrides ===== */
@@ -597,28 +634,86 @@ div[role="alert"].st-emotion-cache-error,
     background: var(--text-secondary);
 }
 
-/* ===== 23. Welcome screen ===== */
+/* ===== 23. Chat-centric welcome screen ===== */
 .welcome-container {
     text-align: center;
-    padding: 3rem 1rem 2rem;
+    padding: 0 1rem 0.5rem;
 }
 
 .welcome-tagline {
     color: var(--text-secondary);
     font-family: var(--font-display);
-    font-size: 1.1rem;
+    font-size: 0.95rem;
     font-weight: 400;
-    margin-bottom: 0.3rem;
+    margin-bottom: 0;
 }
 
 .welcome-emphasis {
-    color: var(--accent-cyan);
+    color: rgba(57, 210, 192, 0.5);
     font-family: var(--font-display);
-    font-size: 0.85rem;
+    font-size: 0.7rem;
     font-weight: 500;
     letter-spacing: 0.06em;
     text-transform: uppercase;
-    margin-bottom: 2rem;
+    margin-bottom: 0.5rem;
+}
+
+/* Suggestion chips — small ghost buttons in a centered row */
+.suggestion-chips {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px;
+    padding: 0.25rem 0 0.75rem;
+}
+
+.suggestion-chip {
+    font-family: var(--font-display);
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    background: transparent;
+    border: 1px solid var(--border-default);
+    border-radius: 999px;
+    padding: 5px 14px;
+    cursor: pointer;
+    transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+    white-space: nowrap;
+}
+
+.suggestion-chip:hover {
+    color: var(--text-primary);
+    border-color: var(--border-hover);
+    background-color: var(--bg-surface);
+}
+
+/* Quick command inline chips — tiny, monospace, unobtrusive */
+.qcmd-row {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 4px;
+    padding: 0 0 0.5rem;
+}
+
+.qcmd-chip {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    color: var(--accent-cyan);
+    background: transparent;
+    border: 1px solid rgba(57, 210, 192, 0.15);
+    border-radius: 999px;
+    padding: 2px 10px;
+    cursor: pointer;
+    transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+    opacity: 0.7;
+    white-space: nowrap;
+}
+
+.qcmd-chip:hover {
+    opacity: 1;
+    border-color: rgba(57, 210, 192, 0.4);
+    background-color: rgba(57, 210, 192, 0.06);
 }
 
 /* ===== 24. Responsive breakpoints ===== */

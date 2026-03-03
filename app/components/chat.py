@@ -695,19 +695,19 @@ _QUICK_COMMANDS = [
 
 
 def _render_quick_command_panel():
-    """Render interactive quick command buttons above chat input."""
+    """Render tiny quick command chips + active input field if one is selected."""
     active_cmd = st.session_state.get("_active_quick_cmd")
 
-    # Button row
-    btn_cols = st.columns(len(_QUICK_COMMANDS))
-    for i, (label, prefix, _example) in enumerate(_QUICK_COMMANDS):
-        with btn_cols[i]:
-            if st.button(label, key=f"qcmd_btn_{i}", use_container_width=True):
-                st.session_state._active_quick_cmd = prefix
-                st.rerun()
-
-    # If a command is active, show the input field
-    if active_cmd:
+    # If no command is active, show chips as clickable st.buttons styled small
+    if not active_cmd:
+        btn_cols = st.columns(len(_QUICK_COMMANDS))
+        for i, (label, prefix, _example) in enumerate(_QUICK_COMMANDS):
+            with btn_cols[i]:
+                if st.button(label, key=f"qcmd_btn_{i}", use_container_width=True):
+                    st.session_state._active_quick_cmd = prefix
+                    st.rerun()
+    else:
+        # Active command — show input field
         example = ""
         for _label, prefix, ex in _QUICK_COMMANDS:
             if prefix == active_cmd:
@@ -753,7 +753,12 @@ def render_chat():
     # Display conversation history
     history = st.session_state.get("conversation_history", [])
 
-    # Welcome message when conversation is empty
+    # Display conversation history
+    for msg in history:
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
+
+    # --- Welcome area (only when empty) — compact, centered above chat input ---
     if not history:
         st.markdown(
             '<div class="welcome-container">'
@@ -762,32 +767,29 @@ def render_chat():
             '</div>',
             unsafe_allow_html=True,
         )
-        _, col1, col2, col3, col4, _ = st.columns([0.5, 1, 1, 1, 1, 0.5])
-        with col1:
-            if st.button("Current State", key="quick_state", use_container_width=True):
+        # Suggestion chips — small centered buttons
+        _, sc1, sc2, sc3, sc4, _ = st.columns([1.5, 1, 1, 1, 1, 1.5])
+        with sc1:
+            if st.button("Current state", key="quick_state"):
                 _handle_quick_action("What's our current state?", "current_state")
                 return
-        with col2:
-            if st.button("Open Questions", key="quick_questions", use_container_width=True):
+        with sc2:
+            if st.button("Open questions", key="quick_questions"):
                 _handle_quick_action("What are our open questions?", "general")
                 return
-        with col3:
-            if st.button("Recent Changes", key="quick_changes", use_container_width=True):
+        with sc3:
+            if st.button("Recent changes", key="quick_changes"):
                 _handle_quick_action("What are the recent changes?", "historical")
                 return
-        with col4:
-            if st.button("Challenge Me", key="quick_challenge", use_container_width=True):
+        with sc4:
+            if st.button("Challenge me", key="quick_challenge"):
                 _handle_quick_action("Challenge our current assumptions. What are we missing?", "challenge")
                 return
 
-    for msg in history:
-        with st.chat_message(msg["role"]):
-            st.markdown(msg["content"])
-
-    # Quick command panel — always visible after welcome/history
+    # Quick command chips — always visible, tiny row
     _render_quick_command_panel()
 
-    # Book framework upload for cross-check (collapsed to stay out of the way)
+    # Book framework upload (collapsed)
     with st.expander("Upload .md for cross-check", expanded=False):
         uploaded_file = st.file_uploader(
             "Choose file", type=["md"], key="book_upload",
@@ -815,7 +817,7 @@ def render_chat():
                 st.session_state.book_crosscheck_filename = ""
                 st.rerun()
 
-    # Chat input
+    # Chat input — the primary interaction point
     user_input = st.chat_input("Ask anything about your startup...")
 
     # Pick up pending quick command if no direct input
