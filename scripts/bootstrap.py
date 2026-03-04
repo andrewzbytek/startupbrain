@@ -35,6 +35,8 @@ COLLECTIONS = [
     "book_frameworks",
     "living_document",
     "cost_log",
+    "pending_ingestion",
+    "locks",
 ]
 
 # Standard indexes: (collection, field, index_name)
@@ -81,7 +83,7 @@ def create_indexes(db) -> None:
             db[collection_name].create_index(
                 [(field, ASCENDING)],
                 name=index_name,
-                background=True,
+                # background=True removed — deprecated in pymongo 4.x
             )
             print(f"  [ok]   {collection_name}.{field} ({index_name})")
         except Exception as e:
@@ -164,7 +166,7 @@ def main() -> None:
         print(f"  ERROR: Could not connect: {e}")
         sys.exit(1)
 
-    db = client["pitch_brain"]
+    db = client["startup_brain"]
 
     create_collections(db)
     create_indexes(db)

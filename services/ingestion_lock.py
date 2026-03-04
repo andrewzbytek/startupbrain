@@ -105,8 +105,10 @@ def acquire_lock(session_id: Optional[str] = None) -> dict:
         }
 
     except Exception as e:
-        # MongoDB error — allow ingestion (graceful degradation)
-        return {"acquired": True, "locked_by": None, "message": f"Lock check failed ({e}) — allowing ingestion"}
+        # MongoDB error — fail closed to protect concurrent safety
+        import logging
+        logging.error("Ingestion lock acquisition failed: %s", e)
+        return {"acquired": False, "locked_by": None, "message": f"Lock check failed ({e}) — denying ingestion for safety"}
 
 
 def release_lock(session_id: Optional[str] = None) -> bool:

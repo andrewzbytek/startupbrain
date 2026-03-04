@@ -15,5 +15,7 @@ services:
         sync: false
       - key: APP_PASSWORD
         sync: false
+      - key: DISABLE_AUTH
+        sync: false
       - key: PYTHON_VERSION
         value: "3.12.0"

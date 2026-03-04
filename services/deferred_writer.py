@@ -74,13 +74,13 @@ class DeferredWriter:
             return {"success": False, "message": "No document loaded.", "changes_applied": 0}
 
         max_retries = 2
-        diff_output = generate_diff(self.in_memory_doc, new_info, update_reason)
+        diff_output = generate_diff(self.in_memory_doc, new_info, update_reason, brain=self.brain)
         verification_feedback = ""
 
         for attempt in range(max_retries + 1):
             if verification_feedback and attempt > 0:
                 retry_info = f"{new_info}\n\nPrevious verification failed with issues:\n{verification_feedback}"
-                diff_output = generate_diff(self.in_memory_doc, retry_info, update_reason)
+                diff_output = generate_diff(self.in_memory_doc, retry_info, update_reason, brain=self.brain)
 
             verification = verify_diff(self.in_memory_doc, diff_output, new_info)
 

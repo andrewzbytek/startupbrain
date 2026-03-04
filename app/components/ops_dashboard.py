@@ -54,7 +54,7 @@ def render_ops_dashboard():
         hypotheses = _parse_hypotheses(doc)
         if hypotheses:
             for h in hypotheses:
-                badge_class = f"hypothesis-{h['status']}"
+                badge_class = f"hypothesis-badge hypothesis-{h['status']}"
                 st.markdown(
                     f'<span class="{badge_class}">{h["status"]}</span> '
                     f'**{_escape_latex(h["text"])}**',

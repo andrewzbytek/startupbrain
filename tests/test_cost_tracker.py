@@ -83,8 +83,7 @@ class TestLogApiCall:
             assert doc["tokens_out"] == 500
             assert doc["task_type"] == "extraction"
             assert "cost_usd" in doc
-            assert "timestamp" in doc
-            assert isinstance(doc["timestamp"], datetime)
+            assert "timestamp" not in doc  # removed redundant field; insert_one adds created_at
 
     def test_calls_mongo_log_cost(self):
         """Should call mongo_client.log_cost."""

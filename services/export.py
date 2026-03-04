@@ -46,7 +46,15 @@ def generate_context_export() -> str:
     lines.append("")
 
     sessions = get_sessions(limit=100)
-    sessions.sort(key=lambda s: s.get("created_at") or datetime.min.replace(tzinfo=timezone.utc))  # oldest first
+    def _safe_sort_dt(s):
+        dt = s.get("created_at")
+        if dt is None:
+            return datetime.min.replace(tzinfo=timezone.utc)
+        if hasattr(dt, 'tzinfo') and dt.tzinfo is None:
+            return dt.replace(tzinfo=timezone.utc)
+        return dt
+
+    sessions.sort(key=_safe_sort_dt)  # oldest first
 
     if not sessions:
         lines.append("_No sessions recorded yet._")

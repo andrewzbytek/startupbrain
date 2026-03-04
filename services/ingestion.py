@@ -229,6 +229,7 @@ def run_ingestion_pipeline(
     session_id: str,
     metadata: Optional[dict] = None,
     session_summary: str = "",
+    brain: str = "pitch",
 ) -> dict:
     """
     Orchestrate post-confirmation ingestion:
@@ -277,7 +278,7 @@ def run_ingestion_pipeline(
         )
     new_info = "\n".join(claims_text_parts)
 
-    doc_result = document_updater.update_document(new_info, update_reason=update_reason)
+    doc_result = document_updater.update_document(new_info, update_reason=update_reason, brain=brain)
 
     # Step 3: Store session in MongoDB (if not already stored)
     if not session_id:
@@ -285,6 +286,7 @@ def run_ingestion_pipeline(
             transcript,
             metadata=metadata,
             session_summary=session_summary,
+            brain=brain,
         )
         if not session_id:
             logging.warning("store_session returned None — session may not be persisted to MongoDB")
@@ -292,7 +294,7 @@ def run_ingestion_pipeline(
     # Step 4: Store confirmed claims
     claims_stored = 0
     if session_id:
-        inserted = store_confirmed_claims(confirmed_claims, session_id, metadata=metadata)
+        inserted = store_confirmed_claims(confirmed_claims, session_id, metadata=metadata, brain=brain)
         claims_stored = len(inserted)
 
     return {

@@ -224,8 +224,6 @@ def _parse_contacts(doc: str) -> list:
             return contacts
         content = kc_match.group(1).strip()
 
-    if not content:
-        return contacts
     if not content or content == "[No contacts tracked yet]":
         return contacts
 

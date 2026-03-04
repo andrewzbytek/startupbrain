@@ -33,7 +33,7 @@ def _get_current_strategy_summary(brain: str = "pitch") -> str:
     return match.group(1).strip()[:3000]
 
 
-def detect_patterns(feedback_tracker_section: str, new_feedback: dict) -> dict:
+def detect_patterns(feedback_tracker_section: str, new_feedback: dict, brain: str = "pitch") -> dict:
     """
     Detect patterns in feedback using Sonnet and feedback_pattern.md prompt.
 
@@ -53,12 +53,12 @@ def detect_patterns(feedback_tracker_section: str, new_feedback: dict) -> dict:
     from services.claude_client import call_sonnet, escape_xml, load_prompt
 
     prompt_template = load_prompt("feedback_pattern")
-    strategy_summary = _get_current_strategy_summary()
+    strategy_summary = _get_current_strategy_summary(brain=brain)
 
     prompt = f"""{prompt_template}
 
 <feedback_input>
-  <current_feedback_tracker>{feedback_tracker_section}</current_feedback_tracker>
+  <current_feedback_tracker>{escape_xml(feedback_tracker_section)}</current_feedback_tracker>
   <new_feedback>
     <date>{escape_xml(new_feedback.get('date', datetime.now(timezone.utc).strftime('%Y-%m-%d')))}</date>
     <source_name>{escape_xml(new_feedback.get('source_name', ''))}</source_name>
@@ -66,7 +66,7 @@ def detect_patterns(feedback_tracker_section: str, new_feedback: dict) -> dict:
     <feedback_text>{escape_xml(new_feedback.get('feedback_text', ''))}</feedback_text>
     <meeting_context>{escape_xml(new_feedback.get('meeting_context', ''))}</meeting_context>
   </new_feedback>
-  <current_strategy_summary>{strategy_summary}</current_strategy_summary>
+  <current_strategy_summary>{escape_xml(strategy_summary)}</current_strategy_summary>
 </feedback_input>"""
 
     result = call_sonnet(prompt, task_type="feedback_pattern")
@@ -201,7 +201,7 @@ def ingest_feedback(
     feedback_id = insert_feedback(feedback_doc)
 
     # Get current feedback tracker for context
-    feedback_tracker = _get_feedback_tracker_section()
+    feedback_tracker = _get_feedback_tracker_section(brain=brain)
 
     new_feedback = {
         "date": date_str,
@@ -212,7 +212,7 @@ def ingest_feedback(
     }
 
     # Run pattern detection
-    pattern_results = detect_patterns(feedback_tracker, new_feedback)
+    pattern_results = detect_patterns(feedback_tracker, new_feedback, brain=brain)
 
     # Update living document with feedback entry
     # Build new_info from pattern results

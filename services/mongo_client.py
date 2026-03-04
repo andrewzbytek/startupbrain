@@ -159,8 +159,10 @@ def update_one(
     if db is None:
         return False
     try:
+        # Shallow-copy to avoid mutating caller's dict
+        update = {**update}
         if "$set" in update:
-            update["$set"]["updated_at"] = datetime.now(timezone.utc)
+            update["$set"] = {**update["$set"], "updated_at": datetime.now(timezone.utc)}
         else:
             update["$set"] = {"updated_at": datetime.now(timezone.utc)}
         db[collection_name].update_one(query, update, upsert=upsert)

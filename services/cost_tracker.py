@@ -38,7 +38,6 @@ def log_api_call(model: str, tokens_in: int, tokens_out: int, task_type: str) ->
         "tokens_out": tokens_out,
         "cost_usd": cost,
         "task_type": task_type,
-        "timestamp": datetime.now(timezone.utc),
     }
     return log_cost(doc)
 

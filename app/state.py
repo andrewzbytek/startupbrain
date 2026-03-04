@@ -69,6 +69,9 @@ def init_session_state():
         "_active_quick_cmd": None,
         "active_brain": "pitch",
         "chat_brain_context": "pitch",
+        "_quick_cmd_pending": None,
+        "_lock_session_id": None,
+        "_lock_acquired": False,
     }
     for key, value in defaults.items():
         if key not in st.session_state:

@@ -301,7 +301,9 @@ class TestBatchCommit:
              patch("services.mongo_client.upsert_living_document"), \
              patch("services.mongo_client.delete_pending_ingestion"), \
              patch("services.ingestion.store_session", return_value="s1"), \
-             patch("services.ingestion.store_confirmed_claims", return_value=[]):
+             patch("services.ingestion.store_confirmed_claims", return_value=[]), \
+             patch("services.ingestion_lock.acquire_doc_lock", return_value=True), \
+             patch("services.ingestion_lock.release_doc_lock"):
             writer.batch_commit()
 
         assert mock_git.call_count == 1
@@ -315,7 +317,9 @@ class TestBatchCommit:
              patch("services.mongo_client.upsert_living_document"), \
              patch("services.mongo_client.delete_pending_ingestion"), \
              patch("services.ingestion.store_session", return_value="sess1") as mock_store_session, \
-             patch("services.ingestion.store_confirmed_claims", return_value=["c1", "c2"]) as mock_store_claims:
+             patch("services.ingestion.store_confirmed_claims", return_value=["c1", "c2"]) as mock_store_claims, \
+             patch("services.ingestion_lock.acquire_doc_lock", return_value=True), \
+             patch("services.ingestion_lock.release_doc_lock"):
             result = writer.batch_commit()
 
         mock_store_session.assert_called_once()
@@ -330,7 +334,9 @@ class TestBatchCommit:
              patch("services.mongo_client.upsert_living_document"), \
              patch("services.mongo_client.delete_pending_ingestion") as mock_delete, \
              patch("services.ingestion.store_session", return_value="s1"), \
-             patch("services.ingestion.store_confirmed_claims", return_value=[]):
+             patch("services.ingestion.store_confirmed_claims", return_value=[]), \
+             patch("services.ingestion_lock.acquire_doc_lock", return_value=True), \
+             patch("services.ingestion_lock.release_doc_lock"):
             writer.batch_commit()
 
         mock_delete.assert_called_once()
@@ -340,7 +346,9 @@ class TestBatchCommit:
         writer.in_memory_doc = "changed"
 
         with patch("services.document_updater.write_living_document", side_effect=IOError("disk full")), \
-             patch("services.mongo_client.delete_pending_ingestion") as mock_delete:
+             patch("services.mongo_client.delete_pending_ingestion") as mock_delete, \
+             patch("services.ingestion_lock.acquire_doc_lock", return_value=True), \
+             patch("services.ingestion_lock.release_doc_lock"):
             result = writer.batch_commit()
 
         assert result["success"] is False

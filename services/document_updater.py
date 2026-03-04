@@ -305,7 +305,7 @@ def _add_dismissed(doc: str, dismissed_content: str) -> str:
 
     def replacer(m):
         existing = m.group(2).strip()
-        if existing == "[No dismissed contradictions]":
+        if existing.lower().strip() == "[no dismissed contradictions]":
             existing = ""
         if existing:
             return m.group(1) + existing + "\n" + dismissed_content + "\n" + m.group(3)
@@ -324,7 +324,7 @@ def _add_hypothesis(doc: str, hypothesis_content: str) -> str:
 
     def replacer(m):
         existing = m.group(2).strip()
-        if existing == "[No hypotheses tracked yet]":
+        if existing.lower().strip() == "[no hypotheses tracked yet]":
             existing = ""
         return m.group(1) + existing + "\n" + hypothesis_content + "\n" + m.group(3)
 
@@ -441,10 +441,14 @@ def _add_section(doc: str, section: str, section_content: str) -> str:
             )
 
     # Section doesn't exist — insert at end of ## Current State
-    # Find the first ## heading after ## Current State
-    cs_match = re.search(r"\n(## (?!Current State))", doc)
+    # Find ## Current State first, then the next ## heading after it
+    cs_start = doc.find("\n## Current State")
+    if cs_start != -1:
+        cs_match = re.search(r"\n(## (?!Current State))", doc[cs_start + 1:])
+    else:
+        cs_match = re.search(r"\n(## (?!Current State))", doc)
     if cs_match:
-        insert_pos = cs_match.start()
+        insert_pos = (cs_start + 1 + cs_match.start()) if cs_start != -1 else cs_match.start()
         return doc[:insert_pos] + "\n" + section_content + "\n" + doc[insert_pos:]
 
     # Fallback: insert before ## Decision Log
@@ -529,7 +533,6 @@ def update_document(new_info: str, update_reason: str = "", max_retries: int = 2
         verification_feedback = ""
 
         for attempt in range(max_retries + 1):
-            verify_prompt = new_info
             if verification_feedback and attempt > 0:
                 # Retry with feedback: regenerate diff
                 retry_info = f"{new_info}\n\nPrevious verification failed with issues:\n{verification_feedback}"

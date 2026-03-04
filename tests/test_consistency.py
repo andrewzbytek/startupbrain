@@ -422,6 +422,7 @@ class TestDismissedNotReflagged:
         # The dismissed section contains "BP" and "faster sale" keywords that overlap
         # The function uses word overlap heuristic — claims with >40% overlap with dismissed section are filtered
         assert isinstance(filtered, list), "check_dismissed should return a list"
+        assert len(filtered) < len(sample_contradictions), "Claims matching dismissed text should be filtered out"
 
 
 class TestPass3OnlyOnCritical:
