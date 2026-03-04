@@ -56,7 +56,7 @@ When splitting tasks across agents, avoid overlapping file edits:
 - Entry point: `app/main.py`
 - Required secrets: `ANTHROPIC_API_KEY`, `MONGODB_URI`
 
-## Current Status (as of 2026-03-02)
+## Current Status (as of 2026-03-03)
 
 ### Implementation: Complete
 All 24 sections of `docs/SPEC.md` are implemented. The system is production-ready for daily use.
@@ -65,7 +65,7 @@ All 24 sections of `docs/SPEC.md` are implemented. The system is production-read
 
 **UI:** Dark command center theme (Vercel/Raycast inspired). Two-view layout: Chat (default) with quick command chips, Dashboard (full-page card grid of all 17 sections + panels). Persistent top bar with Ingest/Audit buttons and API cost + RAG health status pills. No sidebar. Conversational chat with query classification and streaming, HTML/CSS step indicators across 4-stage ingestion flow, claim editor with inline editing.
 
-**Features:** Session type categorization through entire pipeline, whiteboard photo processing (vision), feedback pattern detection, evolution narratives, pitch material generation (Opus), cost tracking with budget alerts, book framework cross-check via .md upload in chat, direct corrections with informational consistency check, contradiction resolution writing Decision Log and Dismissed Contradictions entries, quick notes via chat prefix (`note:`, `remember:`, `jot:`, `fyi:`) for lightweight doc updates without full pipeline, hypothesis tracking via chat prefix (`hypothesis:`, `validated:`, `invalidated:`) or dashboard form, Socratic system prompt with context surfacing and feedback echo, dashboard tensions indicator (changelog churn, dismissed contradictions, decisions under evaluation), 'challenge' query classification routing to Opus, quick command chips below chat input for prefix discoverability, full context export (living doc + session history + claims as single MD), session rollback command.
+**Features:** Session type categorization through entire pipeline, whiteboard photo processing (vision), feedback pattern detection, evolution narratives, pitch material generation (Opus), cost tracking with budget alerts, book framework cross-check via .md upload in chat, direct corrections with informational consistency check, contradiction resolution writing Decision Log and Dismissed Contradictions entries, scratchpad notes via chat prefix (`note:`, `remember:`, `jot:`, `fyi:`) saved to MongoDB only (no doc update, surfaced in chat system prompt), hypothesis tracking via chat prefix (`hypothesis:`, `validated:`, `invalidated:`) or dashboard form, Socratic system prompt with context surfacing and feedback echo, dashboard tensions indicator (changelog churn, dismissed contradictions, decisions under evaluation), 'challenge' query classification routing to Opus, 3 quick command chips (note, hypothesis, contact) below chat input for prefix discoverability, full context export (living doc + session history + claims as single MD), session rollback command.
 
 **Infrastructure:** Vector search code ready (`vector_search_text()`, upgraded `_get_rag_evidence()`), time-based fallback on free tier, RAG health monitor (warns at 200 claims).
 

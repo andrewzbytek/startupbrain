@@ -61,7 +61,7 @@ startupbrain/
 │   └── whiteboard.md           # Whiteboard photo extraction (vision)
 ├── documents/
 │   └── startup_brain.md        # The living document (git-tracked, mirrored to MongoDB)
-├── tests/                      # 839 unit tests, 45 integration tests
+├── tests/                      # 859 unit tests, 45 integration tests
 │   ├── conftest.py             # Shared fixtures and sample data
 │   ├── test_transcripts/       # Sample transcripts for testing
 │   └── test_*.py               # Test modules (one per service/component)
@@ -109,7 +109,7 @@ Paste transcript → Select session type → [Optional: upload whiteboard]
 - **Book cross-check** — upload a .md book summary in chat for temporary framework cross-referencing
 - **Semantic RAG** — Atlas Vector Search with Voyage AI automated embedding for consistency evidence (graceful fallback to time-based)
 - **Direct corrections** — "no, actually X" runs a lightweight consistency check before applying (informational only)
-- **Quick notes** — prefix-based (`note:`, `remember:`, `jot:`, `fyi:`) lightweight doc updates without full ingestion pipeline
+- **Scratchpad notes** — prefix-based (`note:`, `remember:`, `jot:`, `fyi:`) saved to MongoDB as scratchpad entries (no living document update); surfaced in chat system prompt so the AI can reference them
 - **Hypothesis tracking** — prefix-based (`hypothesis:`, `validated:`, `invalidated:`) testable assumption tracking with sidebar status management
 - **Living document download** — one-click download from sidebar Actions
 - **Full context export** — "Download Full Context" button exports living document + all session history with claims as a single MD file for sharing with external LLMs or advisors
@@ -155,7 +155,7 @@ python -m pytest tests/ -m integration
 python -m pytest tests/ -v --tb=short -m "not integration"
 ```
 
-839 unit tests + 45 integration tests across 24 test files. All service and component tests run fully offline with mocks.
+859 unit tests + 45 integration tests across 24 test files. All service and component tests run fully offline with mocks.
 
 ## Deployment
 
