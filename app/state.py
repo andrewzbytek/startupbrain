@@ -13,6 +13,9 @@ VALID_MODES = {
     "checking_consistency",
     "resolving_contradiction",
     "done",
+    "ops_ingesting",
+    "ops_confirming",
+    "ops_done",
 }
 
 SESSION_TYPES = [
@@ -64,6 +67,8 @@ def init_session_state():
         "_batch_committed": False,
         "_has_pending_ingestion": False,
         "_active_quick_cmd": None,
+        "active_brain": "pitch",
+        "chat_brain_context": "pitch",
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -126,3 +131,6 @@ def reset_ingestion():
     st.session_state.deferred_writer = None
     st.session_state._batch_committed = False
     st.session_state._has_pending_ingestion = False
+    st.session_state._ops_confirmed_claims = []
+    st.session_state._ops_committed = False
+    st.session_state._ops_result = {}

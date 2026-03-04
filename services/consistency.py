@@ -8,10 +8,7 @@ Pass 3 (Opus): Deep analysis — ONLY if Pass 2 found Critical contradictions
 """
 
 import re
-from pathlib import Path
 from typing import Optional
-
-LIVING_DOC_PATH = Path(__file__).parent.parent / "documents" / "startup_brain.md"
 
 # When claim count exceeds this, time-based retrieval starts missing relevant evidence.
 # At this point, semantic vector search (Atlas M10+ with autoEmbed) becomes worth it.
@@ -20,10 +17,8 @@ RAG_UPGRADE_CLAIM_THRESHOLD = 200
 
 def read_living_document() -> str:
     """Read and return the current living document content."""
-    if not LIVING_DOC_PATH.exists():
-        return ""
-    with open(LIVING_DOC_PATH, "r", encoding="utf-8") as f:
-        return f.read()
+    from services.document_updater import read_living_document as _read_doc
+    return _read_doc(brain="pitch")
 
 
 def _claims_to_xml(claims: list) -> str:
@@ -208,7 +203,7 @@ def pass2_severity_filter(pass1_results: dict, living_doc: str, session_type: st
     pass1_xml_parts = [f"<total_found>{len(filtered_contradictions)}</total_found>"]
     for c in filtered_contradictions:
         pass1_xml_parts.append("<contradiction>")
-        pass1_xml_parts.append(f"  <existing_claim>{escape_xml(c.get('existing_claim', ''))}</existing_claim>")
+        pass1_xml_parts.append(f"  <existing_claim>{escape_xml(c.get('existing_position', ''))}</existing_claim>")
         pass1_xml_parts.append(f"  <new_claim>{escape_xml(c.get('new_claim', ''))}</new_claim>")
         pass1_xml_parts.append(f"  <tension_description>{escape_xml(c.get('tension_description', ''))}</tension_description>")
         pass1_xml_parts.append("</contradiction>")

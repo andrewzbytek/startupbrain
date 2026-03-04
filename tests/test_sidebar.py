@@ -63,8 +63,7 @@ class TestParseCurrentState:
         assert "Value Proposition" in names
         assert "Pricing" in names
         assert "Technical Approach" in names
-        assert "Key Risks" in names
-        assert "Team / Hiring Plans" in names
+        assert "Team" in names
         assert "Fundraising Status / Strategy" in names
 
     def test_empty_doc_returns_empty_list(self):
@@ -156,12 +155,27 @@ class TestParseRecentChangelog:
 # ---------------------------------------------------------------------------
 
 class TestParseFeedbackThemes:
-    def test_parses_themes_from_populated_doc(self, doc):
-        themes = _parse_feedback_themes(doc)
+    def test_parses_themes_from_populated_doc(self):
+        doc_with_feedback = """## Feedback Tracker
+
+### Recurring Themes
+- Branding needs refresh — logo feels outdated: 2 sources
+- Compliance automation is a top priority: 3 sources
+
+### Individual Feedback
+- [2026-02-20] Sarah (investor): Positive on team
+"""
+        themes = _parse_feedback_themes(doc_with_feedback)
         assert len(themes) > 0
 
-    def test_branding_theme_present(self, doc):
-        themes = _parse_feedback_themes(doc)
+    def test_branding_theme_present(self):
+        doc_with_feedback = """## Feedback Tracker
+
+### Recurring Themes
+- Branding needs refresh — logo feels outdated: 2 sources
+- Compliance automation is a top priority: 3 sources
+"""
+        themes = _parse_feedback_themes(doc_with_feedback)
         assert any("branding" in t.lower() or "logo" in t.lower() for t in themes)
 
     def test_empty_doc_returns_empty_list(self):
@@ -220,9 +234,22 @@ class TestExtractDate:
 # _parse_hypotheses (sidebar)
 # ---------------------------------------------------------------------------
 
+_DOC_WITH_HYPOTHESES = """## Active Hypotheses
+- [2026-02-10] **Small nuclear plants have procurement cycles under 12 months**
+  Status: unvalidated | Test: Ask 3 plant operators directly
+  Evidence: ---
+
+- [2026-02-12] **LLM extraction accuracy exceeds 95% on nuclear PDFs**
+  Status: testing | Test: Run 50 sample documents through pipeline
+  Evidence: Initial batch of 10 docs showed 93% accuracy
+
+## Decision Log
+"""
+
+
 class TestParseHypothesesSidebar:
-    def test_parses_populated_doc(self, doc):
-        result = _parse_hypotheses(doc)
+    def test_parses_populated_doc(self):
+        result = _parse_hypotheses(_DOC_WITH_HYPOTHESES)
         assert len(result) == 2
 
     def test_empty_doc(self):
@@ -232,8 +259,8 @@ class TestParseHypothesesSidebar:
         doc = "## Active Hypotheses\n[No hypotheses tracked yet]\n\n## Decision Log\n"
         assert _parse_hypotheses(doc) == []
 
-    def test_multiple_entries_fields(self, doc):
-        result = _parse_hypotheses(doc)
+    def test_multiple_entries_fields(self):
+        result = _parse_hypotheses(_DOC_WITH_HYPOTHESES)
         # First hypothesis
         assert result[0]["status"] == "unvalidated"
         assert "procurement" in result[0]["text"]

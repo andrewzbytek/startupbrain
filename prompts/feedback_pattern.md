@@ -69,6 +69,6 @@ Respond ONLY with valid XML:
     </theme>
   </updated_recurring_themes>
   <document_updates_needed>
-    <update>Description of what should be added to the Feedback Tracker section of startup_brain.md</update>
+    <update>Description of what should be added to the Feedback Tracker section of the living document</update>
   </document_updates_needed>
 </feedback_pattern_output>

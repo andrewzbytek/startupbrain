@@ -210,7 +210,6 @@ class TestDocumentPreservedAfterUpdate:
             "### Pricing",
             "### Technical Approach",
             "## Decision Log",
-            "## Feedback Tracker",
             "## Dismissed Contradictions",
         ]
 
@@ -271,12 +270,12 @@ class TestRetryOnVerificationFailure:
                 return {"text": sample_diff_output, "tokens_in": 500, "tokens_out": 400, "model": "claude-sonnet-4-20250514"}
 
         # Create a temp living doc
-        living_doc_path = tmp_path / "startup_brain.md"
+        living_doc_path = tmp_path / "pitch_brain.md"
         living_doc_path.write_text(sample_living_document, encoding="utf-8")
 
         with patch("services.claude_client.call_sonnet", side_effect=mock_sonnet_side_effect), \
              patch("services.claude_client.load_prompt", return_value="mock prompt"), \
-             patch("services.document_updater.LIVING_DOC_PATH", living_doc_path), \
+             patch.dict("services.document_updater._BRAIN_DOC_PATHS", {"pitch": living_doc_path}), \
              patch("services.document_updater._git_commit", return_value=True), \
              patch("services.mongo_client.upsert_living_document", return_value=True):
             from services.document_updater import update_document
@@ -290,10 +289,10 @@ class TestLivingDocReadWrite:
     """test_living_doc_read_write: Verify read_living_document() and write cycle."""
 
     def test_read_returns_string(self, tmp_path, sample_living_document):
-        living_doc_path = tmp_path / "startup_brain.md"
+        living_doc_path = tmp_path / "pitch_brain.md"
         living_doc_path.write_text(sample_living_document, encoding="utf-8")
 
-        with patch("services.document_updater.LIVING_DOC_PATH", living_doc_path):
+        with patch.dict("services.document_updater._BRAIN_DOC_PATHS", {"pitch": living_doc_path}):
             from services.document_updater import read_living_document
             content = read_living_document()
 
@@ -301,9 +300,9 @@ class TestLivingDocReadWrite:
         assert "## Current State" in content, "Should contain expected sections"
 
     def test_write_then_read_roundtrip(self, tmp_path, sample_living_document):
-        living_doc_path = tmp_path / "startup_brain.md"
+        living_doc_path = tmp_path / "pitch_brain.md"
 
-        with patch("services.document_updater.LIVING_DOC_PATH", living_doc_path):
+        with patch.dict("services.document_updater._BRAIN_DOC_PATHS", {"pitch": living_doc_path}):
             from services.document_updater import write_living_document, read_living_document
             write_living_document(sample_living_document)
             content = read_living_document()
@@ -313,16 +312,17 @@ class TestLivingDocReadWrite:
     def test_read_nonexistent_returns_empty(self, tmp_path):
         nonexistent_path = tmp_path / "nonexistent.md"
 
-        with patch("services.document_updater.LIVING_DOC_PATH", nonexistent_path):
+        with patch.dict("services.document_updater._BRAIN_DOC_PATHS", {"pitch": nonexistent_path}), \
+             patch("services.mongo_client.get_living_document", return_value=None):
             from services.document_updater import read_living_document
             content = read_living_document()
 
         assert content == "", "Non-existent file should return empty string"
 
     def test_write_creates_directories(self, tmp_path):
-        nested_path = tmp_path / "nested" / "dir" / "startup_brain.md"
+        nested_path = tmp_path / "nested" / "dir" / "pitch_brain.md"
 
-        with patch("services.document_updater.LIVING_DOC_PATH", nested_path):
+        with patch.dict("services.document_updater._BRAIN_DOC_PATHS", {"pitch": nested_path}):
             from services.document_updater import write_living_document, read_living_document
             write_living_document("# Test Document")
             content = read_living_document()

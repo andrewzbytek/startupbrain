@@ -267,10 +267,12 @@ class TestBatchCommit:
              patch("services.mongo_client.upsert_living_document"), \
              patch("services.mongo_client.delete_pending_ingestion"), \
              patch("services.ingestion.store_session", return_value="sess123"), \
-             patch("services.ingestion.store_confirmed_claims", return_value=["c1"]):
+             patch("services.ingestion.store_confirmed_claims", return_value=["c1"]), \
+             patch("services.ingestion_lock.acquire_doc_lock", return_value=True), \
+             patch("services.ingestion_lock.release_doc_lock"):
             result = writer.batch_commit()
 
-        mock_write.assert_called_once_with("changed content")
+        mock_write.assert_called_once_with("changed content", brain="pitch")
         assert result["success"] is True
 
     def test_skip_write_when_doc_unchanged(self):
@@ -469,7 +471,7 @@ class TestRollbackLastSession:
             from services.deferred_writer import rollback_last_session
             result = rollback_last_session()
 
-        mock_write.assert_called_once_with("reverted content")
+        mock_write.assert_called_once_with("reverted content", brain="pitch")
         mock_upsert.assert_called_once()
         assert result["success"] is True
 

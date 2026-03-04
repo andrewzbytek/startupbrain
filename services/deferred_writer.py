@@ -32,6 +32,7 @@ class DeferredWriter:
         self.stage = "initialized"
         self.pipeline_result = {}
         self.lock_session_id = None  # Ties checkpoint to the session that created it
+        self.brain = "pitch"
 
     def initialize(
         self,
@@ -41,11 +42,12 @@ class DeferredWriter:
         session_summary: str = "",
         topic_tags: list = None,
         session_type: str = "",
+        brain: str = "pitch",
     ):
         """Snapshot the living document and store pipeline inputs."""
         from services.document_updater import read_living_document
 
-        doc = read_living_document()
+        doc = read_living_document(brain=brain)
         self.original_doc = doc
         self.in_memory_doc = doc
         self.transcript = transcript
@@ -54,6 +56,7 @@ class DeferredWriter:
         self.session_summary = session_summary
         self.topic_tags = topic_tags or []
         self.session_type = session_type
+        self.brain = brain
         self.stage = "initialized"
 
     def apply_document_update_deferred(self, new_info: str, update_reason: str = "") -> dict:
@@ -94,7 +97,7 @@ class DeferredWriter:
 
         diff_blocks = parse_diff_output(diff_output)
         if not diff_blocks:
-            return {"success": False, "message": "No changes detected in diff output.", "changes_applied": 0}
+            return {"success": True, "message": "No changes needed — information already present.", "changes_applied": 0}
 
         self.in_memory_doc = apply_diff(self.in_memory_doc, diff_blocks)
 
@@ -157,18 +160,20 @@ class DeferredWriter:
                         "claims_stored": 0, "session_id": "", "document_updated": False, "changes_applied": 0,
                     }
                 try:
-                    write_living_document(self.in_memory_doc)
+                    write_living_document(self.in_memory_doc, brain=self.brain)
 
                     # 2. Mirror to MongoDB
                     update_reason = self._build_update_reason()
                     upsert_living_document(
                         self.in_memory_doc,
                         metadata={"last_updated": date_str, "update_reason": update_reason},
+                        brain=self.brain,
                     )
 
                     # 3. Single git commit
-                    commit_msg = f"Update startup_brain.md: {self._build_update_reason()} ({date_str})"
-                    _git_commit(commit_msg)
+                    brain_label = "pitch_brain.md" if self.brain == "pitch" else "ops_brain.md"
+                    commit_msg = f"Update {brain_label}: {self._build_update_reason()} ({date_str})"
+                    _git_commit(commit_msg, brain=self.brain)
                 finally:
                     release_doc_lock()
 
@@ -178,6 +183,7 @@ class DeferredWriter:
                 metadata=self.metadata,
                 session_summary=self.session_summary,
                 topic_tags=self.topic_tags,
+                brain=self.brain,
             )
 
             # 5. Store claims
@@ -185,6 +191,7 @@ class DeferredWriter:
             if session_id:
                 inserted = store_confirmed_claims(
                     self.confirmed_claims, session_id, metadata=self.metadata,
+                    brain=self.brain,
                 )
                 claims_stored = len(inserted)
 
@@ -249,6 +256,7 @@ class DeferredWriter:
             "contradiction_resolutions": self.contradiction_resolutions,
             "stage": self.stage,
             "lock_session_id": self.lock_session_id,
+            "brain": self.brain,
             "saved_at": datetime.now(timezone.utc).isoformat(),
         }
 
@@ -268,6 +276,7 @@ class DeferredWriter:
         writer.contradiction_resolutions = data.get("contradiction_resolutions", [])
         writer.stage = data.get("stage", "unknown")
         writer.lock_session_id = data.get("lock_session_id")
+        writer.brain = data.get("brain", "pitch")
         return writer
 
 
@@ -310,7 +319,7 @@ def rollback_last_session() -> dict:
     Roll back the most recently committed session:
     1. Find latest session in MongoDB
     2. Delete session + its claims from MongoDB
-    3. Revert startup_brain.md to previous git version
+    3. Revert pitch_brain.md to previous git version
     4. Mirror reverted doc to MongoDB
     5. Git commit the revert
 
@@ -321,7 +330,7 @@ def rollback_last_session() -> dict:
         upsert_living_document,
     )
     from services.document_updater import (
-        write_living_document, _git_commit, LIVING_DOC_PATH,
+        write_living_document, _git_commit, LIVING_DOC_PATH, _doc_path,
     )
 
     # 1. Find latest session
@@ -330,7 +339,9 @@ def rollback_last_session() -> dict:
         return {"success": False, "message": "No sessions found in MongoDB.", "session_id": "", "claims_deleted": 0}
 
     session_id = str(session["_id"])
-    repo_root = LIVING_DOC_PATH.parent.parent
+    brain = session.get("brain", "pitch")
+    doc_path = _doc_path(brain)
+    repo_root = doc_path.parent.parent
 
     # 2. Delete claims for this session
     claims_deleted = delete_many("claims", {"session_id": session_id})
@@ -340,7 +351,7 @@ def rollback_last_session() -> dict:
 
     # 4. Find the previous git commit that touched the living document
     try:
-        relative_path = str(LIVING_DOC_PATH.relative_to(repo_root)).replace("\\", "/")
+        relative_path = str(doc_path.relative_to(repo_root)).replace("\\", "/")
         log_result = subprocess.run(
             ["git", "log", "--oneline", "-2", "--", relative_path],
             cwd=str(repo_root),
@@ -371,15 +382,16 @@ def rollback_last_session() -> dict:
         prev_content = show_result.stdout
 
         # 6. Write reverted document to disk and MongoDB
-        write_living_document(prev_content)
+        write_living_document(prev_content, brain=brain)
         date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         upsert_living_document(
             prev_content,
             metadata={"last_updated": date_str, "update_reason": f"Rollback session {session_id}"},
+            brain=brain,
         )
 
         # 7. Git commit the revert
-        _git_commit(f"Rollback session: {session_id}")
+        _git_commit(f"Rollback session: {session_id}", brain=brain)
 
     except subprocess.CalledProcessError as e:
         return {

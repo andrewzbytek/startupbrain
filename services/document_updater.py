@@ -12,63 +12,78 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-LIVING_DOC_PATH = Path(__file__).parent.parent / "documents" / "startup_brain.md"
+_BRAIN_DOC_PATHS = {
+    "pitch": Path(__file__).parent.parent / "documents" / "pitch_brain.md",
+    "ops": Path(__file__).parent.parent / "documents" / "ops_brain.md",
+}
+
+# Backward-compat alias — points to pitch brain path
+LIVING_DOC_PATH = _BRAIN_DOC_PATHS["pitch"]
 
 
-def read_living_document() -> str:
+def _doc_path(brain: str = "pitch") -> Path:
+    """Return the filesystem path for the given brain's living document."""
+    return _BRAIN_DOC_PATHS.get(brain, _BRAIN_DOC_PATHS["pitch"])
+
+
+def read_living_document(brain: str = "pitch") -> str:
     """Read and return the current living document content.
 
     If the file is missing or empty (e.g. ephemeral filesystem after restart),
     attempts to recover from MongoDB mirror.
     """
+    path = _doc_path(brain)
     content = ""
-    if LIVING_DOC_PATH.exists():
-        with open(LIVING_DOC_PATH, "r", encoding="utf-8") as f:
+    if path.exists():
+        with open(path, "r", encoding="utf-8") as f:
             content = f.read()
 
     if not content:
         # Recover from MongoDB mirror
         try:
             from services.mongo_client import get_living_document
-            doc = get_living_document()
+            doc = get_living_document(brain=brain)
             if doc and isinstance(doc.get("content"), str) and doc["content"]:
                 content = doc["content"]
                 # Write back to disk for current session
                 try:
-                    LIVING_DOC_PATH.parent.mkdir(parents=True, exist_ok=True)
-                    with open(LIVING_DOC_PATH, "w", encoding="utf-8") as f:
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    with open(path, "w", encoding="utf-8") as f:
                         f.write(content)
-                    logging.info("Living document recovered from MongoDB")
+                    logging.info("Living document (%s) recovered from MongoDB", brain)
                 except Exception:
                     pass  # Disk write failed — return content from memory anyway
         except Exception as e:
-            logging.warning("Failed to recover living document from MongoDB: %s", e)
+            logging.warning("Failed to recover living document (%s) from MongoDB: %s", brain, e)
 
     return content
 
 
-def write_living_document(content: str) -> None:
+def write_living_document(content: str, brain: str = "pitch") -> None:
     """Write content to the living document file."""
-    LIVING_DOC_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with open(LIVING_DOC_PATH, "w", encoding="utf-8") as f:
+    path = _doc_path(brain)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
         f.write(content)
 
 
-def generate_diff(current_doc: str, new_info: str, update_reason: str = "") -> str:
+def generate_diff(current_doc: str, new_info: str, update_reason: str = "", brain: str = "pitch") -> str:
     """
     Call Sonnet with diff_generate.md prompt to produce a structured diff.
 
     Args:
-        current_doc: Full text of current startup_brain.md.
+        current_doc: Full text of current living document.
         new_info: New information to incorporate.
         update_reason: Context (e.g., session date).
+        brain: Which brain document ("pitch" or "ops").
 
     Returns:
         Raw diff output string from the LLM.
     """
     from services.claude_client import call_sonnet, escape_xml, load_prompt
 
-    prompt_template = load_prompt("diff_generate")
+    prompt_name = "ops_diff_generate" if brain == "ops" else "diff_generate"
+    prompt_template = load_prompt(prompt_name)
 
     prompt = f"""{prompt_template}
 
@@ -438,7 +453,7 @@ def _add_section(doc: str, section: str, section_content: str) -> str:
     return doc + "\n\n" + section_content + "\n"
 
 
-def _git_commit(message: str) -> bool:
+def _git_commit(message: str, brain: str = "pitch") -> bool:
     """
     Git add and commit the living document.
     Returns True on success, False on failure.
@@ -448,8 +463,9 @@ def _git_commit(message: str) -> bool:
     if shutil.which("git") is None:
         return False
 
+    path = _doc_path(brain)
     try:
-        repo_root = LIVING_DOC_PATH.parent.parent
+        repo_root = path.parent.parent
         # Check if we're in a git repo
         check = subprocess.run(
             ["git", "rev-parse", "--git-dir"],
@@ -460,7 +476,7 @@ def _git_commit(message: str) -> bool:
             return False
 
         subprocess.run(
-            ["git", "add", str(LIVING_DOC_PATH)],
+            ["git", "add", str(path)],
             cwd=str(repo_root),
             check=True,
             capture_output=True,
@@ -478,7 +494,7 @@ def _git_commit(message: str) -> bool:
         return False
 
 
-def update_document(new_info: str, update_reason: str = "", max_retries: int = 2) -> dict:
+def update_document(new_info: str, update_reason: str = "", max_retries: int = 2, brain: str = "pitch") -> dict:
     """
     Full diff-and-verify orchestration:
     1. Read current document
@@ -493,6 +509,7 @@ def update_document(new_info: str, update_reason: str = "", max_retries: int = 2
         new_info: New information to incorporate.
         update_reason: Context for changelog (e.g., session date and topic).
         max_retries: Max retries if verification fails.
+        brain: Which brain document to update ("pitch" or "ops").
 
     Returns:
         dict with keys: success (bool), message (str), changes_applied (int)
@@ -504,11 +521,11 @@ def update_document(new_info: str, update_reason: str = "", max_retries: int = 2
         return {"success": False, "message": "Could not acquire document lock — another update is in progress.", "changes_applied": 0}
 
     try:
-        current_doc = read_living_document()
+        current_doc = read_living_document(brain=brain)
         if not current_doc:
             return {"success": False, "message": "Living document not found.", "changes_applied": 0}
 
-        diff_output = generate_diff(current_doc, new_info, update_reason)
+        diff_output = generate_diff(current_doc, new_info, update_reason, brain=brain)
         verification_feedback = ""
 
         for attempt in range(max_retries + 1):
@@ -516,7 +533,7 @@ def update_document(new_info: str, update_reason: str = "", max_retries: int = 2
             if verification_feedback and attempt > 0:
                 # Retry with feedback: regenerate diff
                 retry_info = f"{new_info}\n\nPrevious verification failed with issues:\n{verification_feedback}"
-                diff_output = generate_diff(current_doc, retry_info, update_reason)
+                diff_output = generate_diff(current_doc, retry_info, update_reason, brain=brain)
 
             verification = verify_diff(current_doc, diff_output, new_info)
 
@@ -534,23 +551,24 @@ def update_document(new_info: str, update_reason: str = "", max_retries: int = 2
         # Parse and apply diff
         diff_blocks = parse_diff_output(diff_output)
         if not diff_blocks:
-            return {"success": False, "message": "No changes detected in diff output.", "changes_applied": 0}
+            return {"success": True, "message": "No changes needed — information already present.", "changes_applied": 0}
 
         updated_doc = apply_diff(current_doc, diff_blocks)
 
         # Write file
         try:
-            write_living_document(updated_doc)
+            write_living_document(updated_doc, brain=brain)
         except Exception as e:
             return {"success": False, "message": f"Failed to write living document: {e}", "changes_applied": 0}
 
         # Mirror to MongoDB
         date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        upsert_living_document(updated_doc, metadata={"last_updated": date_str, "update_reason": update_reason})
+        upsert_living_document(updated_doc, metadata={"last_updated": date_str, "update_reason": update_reason}, brain=brain)
 
         # Git commit
-        commit_msg = f"Update startup_brain.md: {update_reason or 'session update'} ({date_str})"
-        git_ok = _git_commit(commit_msg)
+        brain_label = "pitch_brain.md" if brain == "pitch" else "ops_brain.md"
+        commit_msg = f"Update {brain_label}: {update_reason or 'session update'} ({date_str})"
+        git_ok = _git_commit(commit_msg, brain=brain)
 
         return {
             "success": True,

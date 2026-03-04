@@ -34,7 +34,7 @@ pytestmark = pytest.mark.skipif(
 # ---------------------------------------------------------------------------
 
 REPO_ROOT = Path(__file__).parent.parent
-REAL_LIVING_DOC = REPO_ROOT / "documents" / "startup_brain.md"
+REAL_LIVING_DOC = REPO_ROOT / "documents" / "pitch_brain.md"
 
 
 # ---------------------------------------------------------------------------
@@ -439,7 +439,7 @@ def temp_living_doc():
         pytest.skip("Living document not found — skipping Phase 3 pipeline tests")
 
     tmp_dir = Path(tempfile.mkdtemp())
-    tmp_doc_path = tmp_dir / "startup_brain.md"
+    tmp_doc_path = tmp_dir / "pitch_brain.md"
     original_content = REAL_LIVING_DOC.read_text(encoding="utf-8")
     tmp_doc_path.write_text(original_content, encoding="utf-8")
 
@@ -455,9 +455,8 @@ def temp_living_doc():
 
 @pytest.fixture(scope="module")
 def pipeline_doc_patches(temp_living_doc):
-    """Patch LIVING_DOC_PATH in both document_updater and consistency to use temp file."""
-    with patch("services.document_updater.LIVING_DOC_PATH", temp_living_doc), \
-         patch("services.consistency.LIVING_DOC_PATH", temp_living_doc), \
+    """Patch _BRAIN_DOC_PATHS in document_updater to use temp file."""
+    with patch.dict("services.document_updater._BRAIN_DOC_PATHS", {"pitch": temp_living_doc}), \
          patch("services.document_updater._git_commit", return_value=True), \
          patch("services.mongo_client.upsert_living_document", return_value=True), \
          patch("services.mongo_client.insert_session", return_value="mock_session_id"), \

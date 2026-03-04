@@ -83,6 +83,7 @@ class TestInitSessionState:
             "pipeline_result",
             "deferred_writer", "_batch_committed", "_has_pending_ingestion",
             "_active_quick_cmd",
+            "active_brain", "chat_brain_context",
         }
         assert expected_keys == set(mock_st.session_state.keys())
 

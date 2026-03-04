@@ -34,7 +34,17 @@ mock_st.session_state = _AttrDict()
 mock_st.cache_resource = lambda f: f
 sys.modules.setdefault("streamlit", mock_st)
 
-from tests.conftest import get_sample_living_document
+_DOC_WITH_HYPOTHESES = """## Active Hypotheses
+- [2026-02-10] **Small nuclear plants have procurement cycles under 12 months**
+  Status: unvalidated | Test: Ask 3 plant operators directly
+  Evidence: ---
+
+- [2026-02-12] **LLM extraction accuracy exceeds 95% on nuclear PDFs**
+  Status: testing | Test: Run 50 sample documents through pipeline
+  Evidence: Initial batch of 10 docs showed 93% accuracy
+
+## Decision Log
+"""
 
 
 # ---------------------------------------------------------------------------
@@ -46,14 +56,12 @@ class TestParseHypotheses:
 
     def test_parses_populated_doc(self):
         from app.components.sidebar import _parse_hypotheses
-        doc = get_sample_living_document()
-        result = _parse_hypotheses(doc)
+        result = _parse_hypotheses(_DOC_WITH_HYPOTHESES)
         assert len(result) == 2
 
     def test_first_hypothesis_fields(self):
         from app.components.sidebar import _parse_hypotheses
-        doc = get_sample_living_document()
-        result = _parse_hypotheses(doc)
+        result = _parse_hypotheses(_DOC_WITH_HYPOTHESES)
         h = result[0]
         assert h["date"] == "2026-02-10"
         assert "procurement cycles" in h["text"]
@@ -63,8 +71,7 @@ class TestParseHypotheses:
 
     def test_second_hypothesis_has_evidence(self):
         from app.components.sidebar import _parse_hypotheses
-        doc = get_sample_living_document()
-        result = _parse_hypotheses(doc)
+        result = _parse_hypotheses(_DOC_WITH_HYPOTHESES)
         h = result[1]
         assert h["status"] == "testing"
         assert "93%" in h["evidence"]

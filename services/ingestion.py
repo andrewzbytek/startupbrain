@@ -22,6 +22,7 @@ def extract_claims(
     topic_hint: str = "",
     whiteboard_text: str = "",
     session_type: str = "",
+    prompt_name: str = "extraction",
 ) -> dict:
     """
     Call Sonnet with extraction.md prompt to extract structured claims.
@@ -41,7 +42,7 @@ def extract_claims(
     """
     from services.claude_client import call_sonnet, escape_xml, load_prompt
 
-    prompt_template = load_prompt("extraction")
+    prompt_template = load_prompt(prompt_name)
 
     prompt = f"""{prompt_template}
 
@@ -169,6 +170,7 @@ def store_session(
     metadata: Optional[dict] = None,
     session_summary: str = "",
     topic_tags: Optional[list] = None,
+    brain: str = "pitch",
 ) -> Optional[str]:
     """
     Save a raw transcript session to MongoDB sessions collection.
@@ -185,10 +187,10 @@ def store_session(
         "metadata": metadata or {},
         "session_date": (metadata or {}).get("session_date", datetime.now(timezone.utc).strftime("%Y-%m-%d")),
     }
-    return insert_session(doc)
+    return insert_session(doc, brain=brain)
 
 
-def store_confirmed_claims(claims: list, session_id: str, metadata: Optional[dict] = None) -> list:
+def store_confirmed_claims(claims: list, session_id: str, metadata: Optional[dict] = None, brain: str = "pitch") -> list:
     """
     Save each confirmed claim as a separate document in MongoDB claims collection.
     This provides fine-grained RAG retrieval (one embedding per claim).
@@ -215,7 +217,7 @@ def store_confirmed_claims(claims: list, session_id: str, metadata: Optional[dic
             "topic_tags": claim.get("topic_tags", []),
             "source_type": (metadata or {}).get("session_type", ""),
         }
-        claim_id = insert_claim(doc)
+        claim_id = insert_claim(doc, brain=brain)
         if claim_id:
             inserted_ids.append(claim_id)
     return inserted_ids

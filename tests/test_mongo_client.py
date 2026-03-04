@@ -375,7 +375,7 @@ class TestCollectionHelpers:
     def test_insert_session(self):
         with patch.object(mc, "insert_one", return_value="id1") as mock:
             result = mc.insert_session({"transcript": "text"})
-            mock.assert_called_once_with("sessions", {"transcript": "text"})
+            mock.assert_called_once_with("sessions", {"transcript": "text", "brain": "pitch"})
             assert result == "id1"
 
     def test_get_sessions(self):
@@ -386,7 +386,7 @@ class TestCollectionHelpers:
     def test_insert_claim(self):
         with patch.object(mc, "insert_one", return_value="id2") as mock:
             result = mc.insert_claim({"claim_text": "test"})
-            mock.assert_called_once_with("claims", {"claim_text": "test"})
+            mock.assert_called_once_with("claims", {"claim_text": "test", "brain": "pitch"})
             assert result == "id2"
 
     def test_get_claims_no_filter(self):
@@ -435,14 +435,14 @@ class TestCollectionHelpers:
             mock.assert_called_once()
             args = mock.call_args
             assert args[0][0] == "living_document"
-            assert args[0][1] == {"_id": "startup_brain"}
+            assert args[0][1] == {"_id": "pitch_brain"}
             assert args[1]["upsert"] is True
             assert result is True
 
     def test_get_living_document(self):
         with patch.object(mc, "find_one", return_value={"content": "doc"}) as mock:
             result = mc.get_living_document()
-            mock.assert_called_once_with("living_document", {"_id": "startup_brain"})
+            mock.assert_called_once_with("living_document", {"_id": "pitch_brain"})
             assert result["content"] == "doc"
 
     def test_log_cost(self):

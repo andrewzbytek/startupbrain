@@ -51,7 +51,7 @@ INDEXES = [
     ("cost_log", "created_at", "cost_log_created_at"),
 ]
 
-LIVING_DOC_PATH = Path(__file__).parent.parent / "documents" / "startup_brain.md"
+LIVING_DOC_PATH = Path(__file__).parent.parent / "documents" / "pitch_brain.md"
 
 
 def get_uri() -> str:
@@ -132,16 +132,16 @@ def seed_living_document(db) -> None:
     content = LIVING_DOC_PATH.read_text(encoding="utf-8")
     collection = db["living_document"]
 
-    existing = collection.find_one({"_id": "startup_brain"})
+    existing = collection.find_one({"_id": "pitch_brain"})
     if existing:
         print("  [skip] living_document already seeded")
     else:
         collection.update_one(
-            {"_id": "startup_brain"},
+            {"_id": "pitch_brain"},
             {
                 "$set": {
                     "content": content,
-                    "source_file": "documents/startup_brain.md",
+                    "source_file": "documents/pitch_brain.md",
                     "created_at": datetime.now(timezone.utc),
                     "updated_at": datetime.now(timezone.utc),
                 }
@@ -164,7 +164,7 @@ def main() -> None:
         print(f"  ERROR: Could not connect: {e}")
         sys.exit(1)
 
-    db = client["startup_brain"]
+    db = client["pitch_brain"]
 
     create_collections(db)
     create_indexes(db)

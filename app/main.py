@@ -34,7 +34,7 @@ if not is_authenticated():
     st.stop()
 
 # Must import state before any other app imports to avoid circular refs
-from app.state import init_session_state, set_mode, reset_ingestion, invalidate_sidebar
+from app.state import init_session_state, set_mode, reset_ingestion, invalidate_sidebar, SESSION_TYPES
 
 # Initialize session state on every rerun
 init_session_state()
@@ -465,6 +465,163 @@ def render_done():
         st.rerun()
 
 
+def render_ops_ingesting():
+    """Ops Brain ingestion — simpler form, no whiteboard support."""
+    from app.components.progress import render_step_indicator
+
+    render_step_indicator(current_step=1, total_steps=3, labels=["Input", "Confirm", "Store"])
+
+    st.markdown("## Ingest → Ops Brain")
+    st.caption("Extract operational items: contacts, hypotheses, risks, questions, feedback, hiring needs.")
+
+    with st.form("ops_ingest_form"):
+        transcript = st.text_area(
+            "Paste session notes or transcript",
+            height=200,
+            placeholder="Meeting notes, email thread, call notes...",
+        )
+        col1, col2 = st.columns(2)
+        with col1:
+            session_type = st.selectbox("Session type", SESSION_TYPES, key="ops_session_type")
+            participants = st.text_input("Participants", key="ops_participants")
+        with col2:
+            from datetime import date as _date
+            session_date = st.date_input("Date", value=_date.today(), key="ops_session_date")
+            topic = st.text_input("Topic hint (optional)", key="ops_topic")
+
+        col_submit, col_cancel = st.columns([1, 1])
+        with col_submit:
+            submitted = st.form_submit_button("Extract Items", type="primary", use_container_width=True)
+        with col_cancel:
+            cancelled = st.form_submit_button("Cancel", use_container_width=True)
+
+    if cancelled:
+        from app.state import reset_ingestion
+        reset_ingestion()
+        st.rerun()
+
+    if submitted and transcript.strip():
+        from services.ingestion import extract_claims
+
+        try:
+            with st.spinner("Extracting operational items..."):
+                result = extract_claims(
+                    transcript,
+                    participants=participants,
+                    topic_hint=topic,
+                    session_type=session_type,
+                    prompt_name="ops_extraction",
+                )
+
+            st.session_state.pending_claims = result.get("claims", [])
+            st.session_state.current_transcript = transcript
+            st.session_state.ingestion_session_summary = result.get("session_summary", "")
+            st.session_state.ingestion_topic_tags = result.get("topic_tags", [])
+            st.session_state.ingestion_session_type = session_type
+            st.session_state.ingestion_session_date = str(session_date)
+            st.session_state.ingestion_participants = participants
+
+            from app.state import set_mode
+            set_mode("ops_confirming")
+            st.rerun()
+        except Exception as e:
+            import logging
+            logging.error(f"Ops extraction failed: {e}")
+            st.error("Extraction failed. Please try again.")
+
+
+def render_claim_editor_for_ops():
+    """Reuse the claim editor for ops claims confirmation."""
+    from app.components.progress import render_step_indicator
+    from app.components.claim_editor import render_claim_editor
+
+    render_step_indicator(current_step=2, total_steps=3, labels=["Input", "Confirm", "Store"])
+
+    st.markdown("## Confirm Operational Items")
+    st.caption("Review and edit extracted items before storing in Ops Brain.")
+
+    render_claim_editor()
+
+    col1, col2 = st.columns([1, 1])
+    with col1:
+        if st.button("Store in Ops Brain", type="primary", use_container_width=True):
+            confirmed = [c for c in st.session_state.pending_claims if c.get("confirmed", True)]
+            if confirmed:
+                st.session_state._ops_confirmed_claims = confirmed
+                from app.state import set_mode
+                set_mode("ops_done")
+                st.rerun()
+            else:
+                st.warning("No items confirmed.")
+    with col2:
+        if st.button("Cancel", use_container_width=True):
+            from app.state import reset_ingestion
+            reset_ingestion()
+            st.rerun()
+
+
+def render_ops_done():
+    """Ops Brain ingestion completion — direct storage, no consistency check."""
+    from app.components.progress import render_step_indicator
+
+    render_step_indicator(current_step=3, total_steps=3, labels=["Input", "Confirm", "Store"])
+
+    confirmed = st.session_state.get("_ops_confirmed_claims", [])
+    if not confirmed:
+        st.warning("No confirmed items found.")
+        if st.button("Back to Chat"):
+            from app.state import reset_ingestion
+            reset_ingestion()
+            st.rerun()
+        return
+
+    # Run ops ingestion (synchronous, no deferred writer)
+    if not st.session_state.get("_ops_committed"):
+        from services.ops_ingestion import run_ops_ingestion
+
+        try:
+            with st.spinner("Storing in Ops Brain..."):
+                result = run_ops_ingestion(
+                    transcript=st.session_state.get("current_transcript", ""),
+                    confirmed_claims=confirmed,
+                    metadata={
+                        "session_type": st.session_state.get("ingestion_session_type", ""),
+                        "session_date": st.session_state.get("ingestion_session_date", ""),
+                        "participants": st.session_state.get("ingestion_participants", ""),
+                    },
+                    session_summary=st.session_state.get("ingestion_session_summary", ""),
+                    topic_tags=st.session_state.get("ingestion_topic_tags", []),
+                    session_type=st.session_state.get("ingestion_session_type", ""),
+                )
+
+            st.session_state._ops_committed = True
+            st.session_state._ops_result = result
+        except Exception as e:
+            import logging
+            logging.error(f"Ops ingestion failed: {e}")
+            result = {"success": False, "message": "Storage failed. Please try again."}
+            st.session_state._ops_result = result
+
+    result = st.session_state.get("_ops_result", {})
+
+    if result.get("success"):
+        st.success(f"Ops Brain updated: {result.get('claims_stored', 0)} items stored.")
+    else:
+        st.warning(f"Partial result: {result.get('message', 'Unknown issue')}")
+
+    st.markdown(f"**Items stored:** {result.get('claims_stored', 0)}")
+    if result.get("document_updated"):
+        st.markdown(f"**Document changes:** {result.get('changes_applied', 0)}")
+
+    if st.button("Done — Back to Chat", type="primary"):
+        st.session_state._ops_confirmed_claims = []
+        st.session_state._ops_committed = False
+        st.session_state._ops_result = {}
+        from app.state import reset_ingestion
+        reset_ingestion()
+        st.rerun()
+
+
 # ---- Main routing ----
 
 # Persistent top bar across all views
@@ -474,7 +631,13 @@ mode = st.session_state.get("mode", "chat")
 
 # Non-chat modes (ingestion pipeline) render directly — no tab navigation
 if mode not in ("chat",):
-    if mode == "ingesting":
+    if mode == "ops_ingesting":
+        render_ops_ingesting()
+    elif mode == "ops_confirming":
+        render_claim_editor_for_ops()
+    elif mode == "ops_done":
+        render_ops_done()
+    elif mode == "ingesting":
         render_ingesting()
     elif mode == "confirming_claims":
         render_claim_editor()

@@ -118,10 +118,31 @@ class TestUpdateContact:
 # TestParseContacts
 # ===========================================================================
 
+_DOC_WITH_TWO_CONTACTS = """\
+## Current State
+
+### Key Contacts / Prospects
+- [2026-02-10] **Sarah Chen** (Beacon Capital)
+  Role: Partner | Type: investor | Status: in-conversation
+  Context: Met at nuclear energy conference. Interested in compliance tech.
+  Last interaction: 2026-02-10 — Positive on technical approach, wants first customer before investing
+  Next step: Send demo after first customer signed
+
+- [2026-02-14] **Marcus Webb** (Frontier Ventures)
+  Role: Managing Director | Type: investor | Status: identified
+  Context: Warm intro from advisor network. Interested in nuclear tech startups.
+  Last interaction: 2026-02-14 — Brief intro call, asked for pitch deck
+  Next step: Send pitch deck and one-pager
+
+### Fundraising Status / Strategy
+**Current position:** Pre-seed.
+"""
+
+
 class TestParseContacts:
 
-    def test_parse_contacts_populated(self, sample_living_document):
-        contacts = _parse_contacts(sample_living_document)
+    def test_parse_contacts_populated(self):
+        contacts = _parse_contacts(_DOC_WITH_TWO_CONTACTS)
         assert len(contacts) == 2
 
     def test_parse_contacts_empty(self):
@@ -132,8 +153,8 @@ class TestParseContacts:
         contacts = _parse_contacts(_DOC_WITHOUT_CONTACTS_SECTION)
         assert contacts == []
 
-    def test_parse_contacts_field_extraction(self, sample_living_document):
-        contacts = _parse_contacts(sample_living_document)
+    def test_parse_contacts_field_extraction(self):
+        contacts = _parse_contacts(_DOC_WITH_TWO_CONTACTS)
         sarah = next(c for c in contacts if c["name"] == "Sarah Chen")
         assert sarah["date"] == "2026-02-10"
         assert sarah["org"] == "Beacon Capital"

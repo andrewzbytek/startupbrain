@@ -212,9 +212,9 @@ def get_latest_session() -> Optional[dict]:
 # Collection-specific helpers
 # ---------------------------------------------------------------------------
 
-def insert_session(session_doc: dict) -> Optional[str]:
+def insert_session(session_doc: dict, brain: str = "pitch") -> Optional[str]:
     """Store a raw transcript session. Returns inserted id."""
-    return insert_one("sessions", session_doc)
+    return insert_one("sessions", {**session_doc, "brain": brain})
 
 
 def get_sessions(limit: int = 50) -> list:
@@ -222,14 +222,18 @@ def get_sessions(limit: int = 50) -> list:
     return find_many("sessions", sort_by="created_at", sort_order=-1, limit=limit)
 
 
-def insert_claim(claim_doc: dict) -> Optional[str]:
+def insert_claim(claim_doc: dict, brain: str = "pitch") -> Optional[str]:
     """Store a single confirmed claim. Returns inserted id."""
-    return insert_one("claims", claim_doc)
+    return insert_one("claims", {**claim_doc, "brain": brain})
 
 
-def get_claims(session_id: str = None, limit: int = 200) -> list:
-    """Retrieve claims, optionally filtered by session_id."""
-    query = {"session_id": session_id} if session_id else {}
+def get_claims(session_id: str = None, limit: int = 200, brain: str = "") -> list:
+    """Retrieve claims, optionally filtered by session_id and/or brain."""
+    query = {}
+    if session_id:
+        query["session_id"] = session_id
+    if brain:
+        query["brain"] = brain
     return find_many("claims", query=query, sort_by="created_at", sort_order=-1, limit=limit)
 
 
@@ -259,10 +263,10 @@ def get_book_frameworks() -> list:
     return find_many("book_frameworks", sort_by="created_at", sort_order=1, limit=20)
 
 
-def upsert_living_document(content: str, metadata: dict = None) -> bool:
+def upsert_living_document(content: str, metadata: dict = None, brain: str = "pitch") -> bool:
     """
     Upsert the living document mirror in MongoDB.
-    There is only ever one living document.
+    There is only ever one living document per brain.
     """
     update = {
         "$set": {
@@ -270,12 +274,12 @@ def upsert_living_document(content: str, metadata: dict = None) -> bool:
             "metadata": metadata or {},
         }
     }
-    return update_one("living_document", {"_id": "startup_brain"}, update, upsert=True)
+    return update_one("living_document", {"_id": f"{brain}_brain"}, update, upsert=True)
 
 
-def get_living_document() -> Optional[dict]:
+def get_living_document(brain: str = "pitch") -> Optional[dict]:
     """Retrieve the living document mirror from MongoDB."""
-    return find_one("living_document", {"_id": "startup_brain"})
+    return find_one("living_document", {"_id": f"{brain}_brain"})
 
 
 def log_cost(cost_doc: dict) -> Optional[str]:
@@ -288,11 +292,13 @@ def get_cost_log(limit: int = 500) -> list:
     return find_many("cost_log", sort_by="created_at", sort_order=-1, limit=limit)
 
 
-def get_hypotheses(status=None, limit=50):
-    """Retrieve hypothesis claims, optionally filtered by status."""
+def get_hypotheses(status=None, limit=50, brain: str = "") -> list:
+    """Retrieve hypothesis claims, optionally filtered by status and/or brain."""
     query = {"claim_type": "hypothesis"}
     if status:
         query["status"] = status
+    if brain:
+        query["brain"] = brain
     return find_many("claims", query=query, sort_by="created_at", sort_order=-1, limit=limit)
 
 

@@ -16,16 +16,18 @@ AI-powered knowledge management for a 2-person startup. See `docs/SPEC.md` for f
 - Parser functions shared in `app/components/_parsers.py`
 - Services in `services/` — each service is a single-purpose module
 - LLM prompts in `prompts/` as markdown files — loaded at runtime, never hardcoded
-- Living document at `documents/startup_brain.md` — git-tracked, mirrored to MongoDB, auto-recovered from MongoDB on ephemeral filesystems (Render)
+- Two-brain architecture: **Pitch Brain** (`documents/pitch_brain.md`) for investor narrative, **Ops Brain** (`documents/ops_brain.md`) for operational knowledge — both git-tracked, mirrored to MongoDB, auto-recovered from MongoDB on ephemeral filesystems (Render)
+- Brain-aware services: all document/storage functions accept `brain="pitch"|"ops"` parameter (default "pitch" for backward compat)
 - All state management via `st.session_state` — Streamlit re-runs on every interaction
-- State machine: `chat → ingesting → confirming_claims → checking_consistency → resolving_contradiction → done`
+- Pitch state machine: `chat → ingesting → confirming_claims → checking_consistency → resolving_contradiction → done`
+- Ops state machine: `chat → ops_ingesting → ops_confirming → ops_done` (no consistency check)
 - `app/main.py` inserts project root into `sys.path` at startup — required because Streamlit only adds the script's directory (`app/`) to the path, not the project root
 - Auth gate at top of `app/main.py` — cookie-based login when `APP_USERNAME` + `APP_PASSWORD` env vars are set, requires explicit `DISABLE_AUTH=true` to skip in production (auto-detected via `RENDER`/`PORT` env vars), skipped in local dev when env vars unset
 - Ingestion lock via `services/ingestion_lock.py` — MongoDB-based atomic lock prevents concurrent ingestion, 30-min stale timeout for crash recovery
 - Document write lock via `services/ingestion_lock.py` — short-lived MongoDB lock (2-min timeout) prevents concurrent read-modify-write on living document across chat corrections, feedback, hypothesis updates, and ingestion batch_commit
 
 ## Session Rollback
-- `from services.deferred_writer import rollback_last_session; rollback_last_session()` — rolls back the most recent session (deletes session + claims from MongoDB, reverts startup_brain.md to previous git version, mirrors to MongoDB, git commits the revert)
+- `from services.deferred_writer import rollback_last_session; rollback_last_session()` — rolls back the most recent session (deletes session + claims from MongoDB, reverts the correct brain document to previous git version based on session's `brain` field, mirrors to MongoDB, git commits the revert)
 - `services/mongo_client.py` also exposes `delete_many(collection, query)` and `get_latest_session()` for manual cleanup
 
 ## Key Conventions
@@ -33,7 +35,7 @@ AI-powered knowledge management for a 2-person startup. See `docs/SPEC.md` for f
 - Every Claude API call goes through `services/claude_client.py` which handles cost tracking and Sonnet/Opus routing
 - Prompts are markdown files in `/prompts` — read them with open(), never inline them
 - Use XML tags for structured LLM input/output
-- Git commit `documents/startup_brain.md` after every update with descriptive message (no-ops gracefully when git unavailable, e.g. Render)
+- Git commit living documents after every update with descriptive message (no-ops gracefully when git unavailable, e.g. Render)
 - Session types (defined in `app/state.py:SESSION_TYPES`) flow through extraction, consistency, pushback, audit, and storage
 - All new service function parameters must default to empty string/None for backward compatibility
 - Auth: shared credentials via `APP_USERNAME` + `APP_PASSWORD` env vars. Cookie-based 7-day sessions (`streamlit-cookies-controller`). Auth skipped in local dev when env vars unset; production (Render) requires credentials or explicit `DISABLE_AUTH=true`.
@@ -45,7 +47,7 @@ AI-powered knowledge management for a 2-person startup. See `docs/SPEC.md` for f
 ## File Ownership (for parallel agent work)
 When splitting tasks across agents, avoid overlapping file edits:
 - **Frontend layout**: `app/main.py`, `app/state.py`
-- **Frontend components**: `app/components/top_bar.py`, `app/components/dashboard.py`, `app/components/chat.py`, `app/components/claim_editor.py`, `app/components/progress.py`, `app/components/login.py`
+- **Frontend components**: `app/components/top_bar.py`, `app/components/dashboard.py`, `app/components/ops_dashboard.py`, `app/components/chat.py`, `app/components/claim_editor.py`, `app/components/progress.py`, `app/components/login.py`
 - **Theme/styles**: `app/components/styles.py`
 - **Parsers**: `app/components/_parsers.py` (shared parsing functions), `app/components/sidebar.py` (legacy re-export shell)
 - **Backend services**: `services/*.py`
@@ -56,13 +58,13 @@ When splitting tasks across agents, avoid overlapping file edits:
 - Test transcripts in `tests/test_transcripts/`
 - Run unit tests: `python -m pytest tests/ -m "not integration"`
 - Run integration tests: `python -m pytest tests/ -m integration` (requires API key + MongoDB)
-- 893 unit tests + 45 integration tests across 26 test files, all unit tests run fully offline with mocks
+- 901 unit tests + 45 integration tests across 29 test files, all unit tests run fully offline with mocks
 
 ## Deployment
 - **Render** (primary): `render.yaml` Blueprint — free tier, auto-deploy from GitHub
   - Live at: `https://startupbrain.onrender.com`
   - Start command: `streamlit run app/main.py --server.port $PORT --server.address 0.0.0.0 --server.headless true`
-  - Ephemeral filesystem: living document auto-recovers from MongoDB on restart
+  - Ephemeral filesystem: living documents auto-recover from MongoDB on restart
   - Git commits no-op (no git repo on Render)
   - Set env vars in Render dashboard: `ANTHROPIC_API_KEY`, `MONGODB_URI`, `APP_USERNAME`, `APP_PASSWORD`
   - MongoDB Atlas Network Access must allow `0.0.0.0/0` (Render uses dynamic outbound IPs)
@@ -71,24 +73,26 @@ When splitting tasks across agents, avoid overlapping file edits:
 - Required secrets/env vars: `ANTHROPIC_API_KEY`, `MONGODB_URI`
 - Optional secrets/env vars: `APP_USERNAME`, `APP_PASSWORD` (enables login gate), `DISABLE_AUTH` (set to `true` to skip auth in production)
 
-## Current Status (as of 2026-03-04)
+## Current Status (as of 2026-03-05)
 
 ### Implementation: Complete
-All 24 sections of `docs/SPEC.md` are implemented. The system is production-ready for daily use.
+All 24 sections of `docs/SPEC.md` are implemented plus brain split architecture. The system is production-ready for daily use.
 
-**Core pipeline:** Full ingestion (transcript → claim extraction → human confirmation → consistency check → doc update), 3-pass consistency engine (P1+P2 Sonnet, P3 Opus on Critical only), diff-and-verify living document updates, git auto-commit after every update. Active Hypotheses section tracks testable assumptions with validation states. Living document has 17 sections under Current State, ordered for pitch narrative flow (Kamps cross-check).
+**Two-brain architecture:** Pitch Brain (`documents/pitch_brain.md`) holds the curated investor narrative (13 pitch sections + Decision Log + Dismissed Contradictions). Ops Brain (`documents/ops_brain.md`) holds operational knowledge (contacts, hypotheses, risks, assumptions, questions, feedback, hiring, scratchpad). Brain toggle in top bar switches context. Migration script at `scripts/migrate_brain_split.py`.
 
-**UI:** Dark command center theme (Vercel/Raycast inspired). Two-view layout: Chat (default) with quick command chips, Dashboard (full-page card grid of all 17 sections + panels). Persistent top bar with Ingest/Audit buttons and API cost + RAG health status pills. No sidebar. Conversational chat with query classification and streaming, HTML/CSS step indicators across 4-stage ingestion flow, claim editor with inline editing.
+**Core pipeline:** Pitch Brain: full ingestion (transcript → claim extraction → human confirmation → consistency check → doc update), 3-pass consistency engine (P1+P2 Sonnet, P3 Opus on Critical only), diff-and-verify living document updates, git auto-commit after every update. Ops Brain: simplified pipeline (transcript → extraction with ops_extraction prompt → human confirmation → direct doc update using ops_diff_generate prompt, no consistency check).
+
+**UI:** Dark command center theme (Vercel/Raycast inspired). Two-view layout: Chat (default) with quick command chips, Dashboard (brain-dependent: pitch shows 13-section card grid + panels, ops shows contacts/hypotheses/risks/feedback). Persistent top bar with Brain toggle (Pitch/Ops), Ingest button (routes to correct pipeline), Audit button (pitch only), and API cost + RAG health status pills. No sidebar. Chat has brain context selector (Pitch/Ops/Both) for system prompt routing. Conversational chat with query classification and streaming, HTML/CSS step indicators, claim editor with inline editing.
 
 **Features:** Session type categorization through entire pipeline, whiteboard photo processing (vision), feedback pattern detection, evolution narratives, pitch material generation (Opus), cost tracking with budget alerts, book framework cross-check via .md upload in chat, direct corrections with informational consistency check, contradiction resolution writing Decision Log and Dismissed Contradictions entries, scratchpad notes via chat prefix (`note:`, `remember:`, `jot:`, `fyi:`) saved to MongoDB only (no doc update, surfaced in chat system prompt), hypothesis tracking via chat prefix (`hypothesis:`, `validated:`, `invalidated:`) or dashboard form, Socratic system prompt with context surfacing and feedback echo, dashboard tensions indicator (changelog churn, dismissed contradictions, decisions under evaluation), 'challenge' query classification routing to Opus, 3 quick command chips (note, hypothesis, contact) below chat input for prefix discoverability, full context export (living doc + session history + claims as single MD), session rollback command, shared-credential auth with cookie persistence, ingestion lock + document write lock for concurrent access.
 
 **Security:** Auth hardened for production (requires credentials or explicit `DISABLE_AUTH=true`), HMAC cookie signing (no fallback key), sanitized error messages (no URI/path leakage), UUID-based session IDs.
 
-**Multi-user safety:** Two-tier locking — long-lived ingestion lock (30-min timeout) for full pipeline, short-lived document write lock (2-min timeout) for individual writes. Atomic lock operations via `find_one_and_update`. DeferredWriter checkpoints track lock ownership to prevent cross-user recovery hijacking. Dismissed contradictions properly filtered in consistency engine Pass 2.
+**Multi-user safety:** Two-tier locking — long-lived ingestion lock (30-min timeout) for full pipeline, short-lived document write lock (2-min timeout) for individual writes (including dashboard hypothesis forms). Atomic lock operations via `find_one_and_update`. DeferredWriter checkpoints track lock ownership to prevent cross-user recovery hijacking. Dismissed contradictions properly filtered in consistency engine Pass 2.
 
 **Infrastructure:** Vector search code ready (`vector_search_text()`, upgraded `_get_rag_evidence()`), time-based fallback on free tier, RAG health monitor (warns at 200 claims). Render deployment live at `https://startupbrain.onrender.com` (free tier), ephemeral filesystem handled by MongoDB document recovery, git no-op when not in a repo.
 
-**Tests:** 893 unit tests, 45 integration tests across 26 test files. All unit tests run fully offline with mocks.
+**Tests:** 901 unit tests, 45 integration tests across 29 test files. All unit tests run fully offline with mocks.
 
 ### Decided Against
 
@@ -103,10 +107,11 @@ All 24 sections of `docs/SPEC.md` are implemented. The system is production-read
 - Sessions store `summary` (2-3 sentences) rather than a separate `one_line_summary` — serves the same purpose.
 - Claims don't store `confirmed_by_user` boolean — redundant since only confirmed claims are ever stored.
 
-### Living Document Sections (17 under Current State, plus Active Hypotheses)
-Problem We're Solving, Target Market / Initial Customer, Value Proposition, Why Now, Traction / Milestones, Business Model / Revenue Model, Pricing, Go-to-Market Strategy, Technical Approach, Competitive Landscape, Moat / Defensibility, Key Assumptions, Open Questions, Key Risks, Team / Hiring Plans, Key Contacts / Prospects, Fundraising Status / Strategy.
+### Pitch Brain Sections (13 under Current State)
+Problem We're Solving, Target Market / Initial Customer, Value Proposition, Why Now, Traction / Milestones, Business Model / Revenue Model, Pricing, Go-to-Market Strategy, Technical Approach, Competitive Landscape, Moat / Defensibility, Team, Fundraising Status / Strategy. Plus: Decision Log, Dismissed Contradictions.
 
-Sections from Kamps pitch guide cross-check: Problem We're Solving, Why Now, Traction / Milestones, Moat / Defensibility. Key Contacts / Prospects from user request.
+### Ops Brain Sections (8 top-level)
+Contacts / Prospects, Active Hypotheses, Key Assumptions, Key Risks, Open Questions, Feedback Tracker, Hiring Plans, Scratchpad Notes.
 
 ### Next Steps
 1. **Use the system daily** — ingest real transcripts, build up the living document, see how consistency engine performs on real data.

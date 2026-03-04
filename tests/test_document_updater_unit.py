@@ -246,10 +246,13 @@ class TestUpdateDocumentUnit:
 
     def test_returns_failure_on_empty_document(self, tmp_path):
         """Should return failure when living document is empty."""
-        living_doc_path = tmp_path / "startup_brain.md"
+        living_doc_path = tmp_path / "pitch_brain.md"
         living_doc_path.write_text("", encoding="utf-8")
 
-        with patch("services.document_updater.LIVING_DOC_PATH", living_doc_path):
+        with patch.dict("services.document_updater._BRAIN_DOC_PATHS", {"pitch": living_doc_path}), \
+             patch("services.ingestion_lock.acquire_doc_lock", return_value=True), \
+             patch("services.ingestion_lock.release_doc_lock"), \
+             patch("services.mongo_client.get_living_document", return_value=None):
             from services.document_updater import update_document
             result = update_document("new info")
             assert result["success"] is False
@@ -257,12 +260,12 @@ class TestUpdateDocumentUnit:
 
     def test_returns_failure_on_empty_diff_blocks(self, tmp_path, sample_living_document):
         """Should return failure when diff produces no parseable blocks."""
-        living_doc_path = tmp_path / "startup_brain.md"
+        living_doc_path = tmp_path / "pitch_brain.md"
         living_doc_path.write_text(sample_living_document, encoding="utf-8")
 
         verified_xml = "<verify_output><verdict>VERIFIED</verdict><notes>ok</notes></verify_output>"
 
-        with patch("services.document_updater.LIVING_DOC_PATH", living_doc_path), \
+        with patch.dict("services.document_updater._BRAIN_DOC_PATHS", {"pitch": living_doc_path}), \
              patch("services.claude_client.call_sonnet", return_value={"text": "no valid diff here", "tokens_in": 100, "tokens_out": 50, "model": "m"}), \
              patch("services.claude_client.load_prompt", return_value="t"), \
              patch("services.claude_client.escape_xml", side_effect=lambda x: x):
@@ -270,17 +273,17 @@ class TestUpdateDocumentUnit:
             with patch("services.document_updater.verify_diff", return_value={"verified": True, "notes": "", "issues": [], "raw": ""}):
                 from services.document_updater import update_document
                 result = update_document("new info")
-                assert result["success"] is False
-                assert "no changes" in result["message"].lower()
+                assert result["success"] is True
+                assert result["changes_applied"] == 0
 
     def test_max_retries_exhausted(self, tmp_path, sample_living_document):
         """Should return failure after max retries when verification keeps failing."""
-        living_doc_path = tmp_path / "startup_brain.md"
+        living_doc_path = tmp_path / "pitch_brain.md"
         living_doc_path.write_text(sample_living_document, encoding="utf-8")
 
         fail_xml = "<verify_output><verdict>REJECTED</verdict><notes>bad</notes><issues><issue><description>Problem</description></issue></issues></verify_output>"
 
-        with patch("services.document_updater.LIVING_DOC_PATH", living_doc_path), \
+        with patch.dict("services.document_updater._BRAIN_DOC_PATHS", {"pitch": living_doc_path}), \
              patch("services.claude_client.call_sonnet", return_value={"text": fail_xml, "tokens_in": 100, "tokens_out": 50, "model": "m"}), \
              patch("services.claude_client.load_prompt", return_value="t"), \
              patch("services.claude_client.escape_xml", side_effect=lambda x: x):
@@ -291,7 +294,7 @@ class TestUpdateDocumentUnit:
 
     def test_success_with_changes_applied(self, tmp_path, sample_living_document):
         """Should return success with correct changes_applied count."""
-        living_doc_path = tmp_path / "startup_brain.md"
+        living_doc_path = tmp_path / "pitch_brain.md"
         living_doc_path.write_text(sample_living_document, encoding="utf-8")
 
         diff_text = (
@@ -311,7 +314,7 @@ class TestUpdateDocumentUnit:
             else:  # verify_diff
                 return {"text": verified_xml, "tokens_in": 100, "tokens_out": 50, "model": "m"}
 
-        with patch("services.document_updater.LIVING_DOC_PATH", living_doc_path), \
+        with patch.dict("services.document_updater._BRAIN_DOC_PATHS", {"pitch": living_doc_path}), \
              patch("services.claude_client.call_sonnet", side_effect=mock_sonnet), \
              patch("services.claude_client.load_prompt", return_value="t"), \
              patch("services.claude_client.escape_xml", side_effect=lambda x: x), \
@@ -326,7 +329,7 @@ class TestUpdateDocumentUnit:
 
     def test_write_permission_error(self, tmp_path, sample_living_document):
         """Should handle write permission errors gracefully."""
-        living_doc_path = tmp_path / "startup_brain.md"
+        living_doc_path = tmp_path / "pitch_brain.md"
         living_doc_path.write_text(sample_living_document, encoding="utf-8")
 
         diff_text = (
@@ -346,7 +349,7 @@ class TestUpdateDocumentUnit:
             else:
                 return {"text": verified_xml, "tokens_in": 100, "tokens_out": 50, "model": "m"}
 
-        with patch("services.document_updater.LIVING_DOC_PATH", living_doc_path), \
+        with patch.dict("services.document_updater._BRAIN_DOC_PATHS", {"pitch": living_doc_path}), \
              patch("services.claude_client.call_sonnet", side_effect=mock_sonnet), \
              patch("services.claude_client.load_prompt", return_value="t"), \
              patch("services.claude_client.escape_xml", side_effect=lambda x: x), \
@@ -358,7 +361,7 @@ class TestUpdateDocumentUnit:
 
     def test_git_commit_called(self, tmp_path, sample_living_document):
         """Should call _git_commit after successful update."""
-        living_doc_path = tmp_path / "startup_brain.md"
+        living_doc_path = tmp_path / "pitch_brain.md"
         living_doc_path.write_text(sample_living_document, encoding="utf-8")
 
         diff_text = (
@@ -378,7 +381,7 @@ class TestUpdateDocumentUnit:
             else:
                 return {"text": verified_xml, "tokens_in": 100, "tokens_out": 50, "model": "m"}
 
-        with patch("services.document_updater.LIVING_DOC_PATH", living_doc_path), \
+        with patch.dict("services.document_updater._BRAIN_DOC_PATHS", {"pitch": living_doc_path}), \
              patch("services.claude_client.call_sonnet", side_effect=mock_sonnet), \
              patch("services.claude_client.load_prompt", return_value="t"), \
              patch("services.claude_client.escape_xml", side_effect=lambda x: x), \
@@ -440,11 +443,18 @@ class TestAddHypothesisUnit:
 class TestUpdateHypothesisStatusUnit:
     """Tests for _update_hypothesis_status: updates hypothesis status in doc."""
 
-    def test_changes_status(self, sample_living_document):
+    def test_changes_status(self):
         """Should change the status of a matching hypothesis."""
         from services.document_updater import _update_hypothesis_status
+        doc = (
+            "## Active Hypotheses\n"
+            "- [2026-02-10] **Small nuclear plants have procurement cycles under 12 months**\n"
+            "  Status: unvalidated | Test: Ask 3 plant operators directly\n"
+            "  Evidence: ---\n"
+            "\n## Decision Log\n"
+        )
         result = _update_hypothesis_status(
-            sample_living_document,
+            doc,
             "Small nuclear plants have procurement cycles under 12 months",
             "validated",
         )

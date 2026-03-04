@@ -14,18 +14,18 @@ def _extract_tag(text: str, tag: str) -> str:
     return match.group(1).strip() if match else ""
 
 
-def _get_feedback_tracker_section() -> str:
+def _get_feedback_tracker_section(brain: str = "pitch") -> str:
     """Read the Feedback Tracker section from the living document."""
     from services.document_updater import read_living_document
-    doc = read_living_document()
+    doc = read_living_document(brain=brain)
     match = re.search(r"## Feedback Tracker\n(.*?)(\n## |\Z)", doc, re.DOTALL)
     return match.group(1).strip() if match else ""
 
 
-def _get_current_strategy_summary() -> str:
+def _get_current_strategy_summary(brain: str = "pitch") -> str:
     """Extract Current State section from living document for pattern analysis."""
     from services.document_updater import read_living_document
-    doc = read_living_document()
+    doc = read_living_document(brain=brain)
     match = re.search(r"## Current State\n(.*?)(\n## |\Z)", doc, re.DOTALL)
     if not match:
         return ""
@@ -38,7 +38,7 @@ def detect_patterns(feedback_tracker_section: str, new_feedback: dict) -> dict:
     Detect patterns in feedback using Sonnet and feedback_pattern.md prompt.
 
     Args:
-        feedback_tracker_section: Current Feedback Tracker section from startup_brain.md.
+        feedback_tracker_section: Current Feedback Tracker section from the living document.
         new_feedback: Dict with keys: date, source_name, source_type, feedback_text,
                        meeting_context (optional).
 
@@ -166,6 +166,7 @@ def ingest_feedback(
     source_type: str,
     date: Optional[str] = None,
     meeting_context: str = "",
+    brain: str = "pitch",
 ) -> dict:
     """
     Full feedback ingestion:
@@ -229,7 +230,7 @@ def ingest_feedback(
     if pattern_results.get("document_updates_needed"):
         new_info += "\n\nDocument updates needed:\n" + "\n".join(pattern_results["document_updates_needed"])
 
-    doc_result = update_document(new_info, update_reason=f"Feedback from {source_name} ({date_str})")
+    doc_result = update_document(new_info, update_reason=f"Feedback from {source_name} ({date_str})", brain=brain)
 
     # Check for alerts
     alerts = pattern_results.get("pattern_alerts", [])

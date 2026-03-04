@@ -1,4 +1,4 @@
-# Startup Brain — [Your Startup Name]
+# Pitch Brain — [Your Startup Name]
 Last updated: [date]
 
 ## Current State
@@ -18,7 +18,7 @@ Last updated: [date]
 - 2026-03-02: Clarified horizontal vs vertical approach - horizontal EPCM model (documentation/engineering only) vs vertical EPC model (design through construction). HAZOP/LOPA wedge enables comprehensive facility information access for fast learning cycles. Source: Contradiction resolution discussion (Andrew, Danny)
 
 ### Value Proposition
-**Current position:** AI-native engineering platform that allows 5 engineers to do what traditionally took 100. Can process HazOp and LOPA risk assessments in 20 minutes vs 3,000 hours with good accuracy. Enables iterative solutions (monthly/yearly reassessments) vs traditional waterfall approaches. Provides interactive reports where clients can query design decisions ("Why does this valve have to close so fast?") and preserves engineering knowledge so plant operators understand design rationale even if original engineers leave. AI models can now ingest P&IDs, material specs, and engineering codes and produce PE-level calculations. HAZOP is the narrowest wedge that forces full-system ingestion and unlocks everything downstream - once they structure HAZOP, they have a system model of the plant, which is incredibly valuable. With the system model, they can automate ~50% of downstream engineering tasks today, moving toward ~70% within 12 months. This automation breaks the billable hour business model. Engineers hate doing HAZOP because it is manual, repetitive, and politically sensitive, but it forces understanding of the entire facility.
+**Current position:** AI-native engineering platform that allows 5 engineers to do what traditionally took 100. Can process HAZOP and LOPA risk assessments in 20 minutes vs 3,000 hours with good accuracy. Enables iterative solutions (monthly/yearly reassessments) vs traditional waterfall approaches. Provides interactive reports where clients can query design decisions ("Why does this valve have to close so fast?") and preserves engineering knowledge so plant operators understand design rationale even if original engineers leave. AI models can now ingest P&IDs, material specs, and engineering codes and produce PE-level calculations. HAZOP is the narrowest wedge that forces full-system ingestion and unlocks everything downstream - once they structure HAZOP, they have a system model of the plant, which is incredibly valuable. With the system model, they can automate ~50% of downstream engineering tasks today, moving toward ~70% within 12 months. This automation breaks the billable hour business model. Engineers hate doing HAZOP because it is manual, repetitive, and politically sensitive, but it forces understanding of the entire facility.
 **Changelog:**
 - [Awaiting first session]
 - 2026-03-02: Defined as 20x efficiency gain (5 vs 100 engineers), 150x speed improvement (20 minutes vs 3,000 hours), plus iterative capabilities. Source: Co-founder discussion (Andrew, Danny)
@@ -42,9 +42,9 @@ Last updated: [date]
 **Current position:** Two-pronged revenue model: (1) Fixed-fee project contracts as entry point (customers are accustomed to this model), (2) Subscription or licensing fees for ongoing AI-powered data access and interrogation - the core value proposition enabling customers to query insights, simplify construction, and streamline operations throughout plant lifecycle. Cost structure includes operations, compute, customer acquisition (sales-driven), and labor costs for customer success, sales engineering, plus small AI team (1-5 people), multidisciplinary engineering team, and outsourced legal. Forward deployment compensation available as premium offering to prevent customer abuse but not core revenue stream. Future potential includes selling risk assessment data to insurance/banking as MGA-style benchmarks. Targets 5-10% of $150B US engineering market ($7.5-15B), potentially 2x including Europe. They charge a fixed fee to structure and automate HAZOP, but the real value is maintaining the system model over the project lifecycle for recurring revenue. At Final Investment Decision, only ~30% of the engineering is completed, with the majority happening after billions are already committed. As engineering gets cheaper, the percentage of engineering completed before FID should move from ~30% toward 60-70%. HAZOP is not the business itself, but the ingestion engine, with the system model being the real asset.
 **Changelog:**
 - [Awaiting first session]
-- 2026-03-02: Positioned as AI-native EPCM with HazOp/LOPA wedge product, expanding to full engineering platform. Source: Co-founder discussion (Andrew, Danny)
+- 2026-03-02: Positioned as AI-native EPCM with HAZOP/LOPA wedge product, expanding to full engineering platform. Source: Co-founder discussion (Andrew, Danny)
 - 2026-03-02: Refined to fixed-fee lifecycle model vs traditional billable hours. Added interactive reports and knowledge preservation components. Source: Co-founder discussion (Andrew, Danny)
-- 2026-03-02: Clarified expansion timeline - HazOp/LOPA initially, design/procurement/construction medium-term, full lifecycle (operations/decommissioning) as 5-10 year vision. Source: Co-founder discussion (Andrew, Danny)
+- 2026-03-02: Clarified expansion timeline - HAZOP/LOPA initially, design/procurement/construction medium-term, full lifecycle (operations/decommissioning) as 5-10 year vision. Source: Co-founder discussion (Andrew, Danny)
 - 2026-03-02: Detailed cost structure and revenue streams mapped - costs include operations, compute, CAC, labor (forward-deployed engineers, AI team). Revenue from project fees (wedge), data access subscriptions/licensing, forward deployment. Source: Co-founder discussion (Andrew, Danny)
 - 2026-03-02: Clarified forward deployment as premium offering, not core revenue stream. Main model focuses on project fees (wedge) and data access subscriptions/licensing. Source: Contradiction resolution discussion (Andrew, Danny)
 - 2026-03-02: Clarified core revenue model - fixed-fee contracts as entry point, subscription/licensing for AI-powered data access as primary value. Source: Contradiction resolution discussion (Andrew, Danny)
@@ -56,7 +56,7 @@ Last updated: [date]
 - [Awaiting first session]
 
 ### Go-to-Market Strategy
-**Current position:** Offer free partial HazOp reassessments to target companies. Sales approach: "We uncovered 10 things; we'll give you five for free. For the complete assessment, you need to buy the full solution." Strategy relies on statistical likelihood of uncovering missed risks that will create urgency. Positioning strategy: tool is so superior at risk assessment that not using it constitutes negligence. Holy grail outcome is regulator declaring non-adoption as negligence.
+**Current position:** Offer free partial HAZOP reassessments to target companies. Sales approach: "We uncovered 10 things; we'll give you five for free. For the complete assessment, you need to buy the full solution." Strategy relies on statistical likelihood of uncovering missed risks that will create urgency. Positioning strategy: tool is so superior at risk assessment that not using it constitutes negligence. Holy grail outcome is regulator declaring non-adoption as negligence.
 **Changelog:**
 - [Awaiting first session]
 - 2026-03-02: Defined free partial assessment strategy with 50% value preview model. Source: Co-founder discussion (Andrew, Danny)
@@ -82,32 +82,11 @@ Last updated: [date]
 - 2026-03-02: Added horizontal AI-native positioning enabling unlimited simultaneous customers and knowledge aggregation advantage vs competitors with isolated knowledge bases. Source: Co-founder discussion (Danny, Andrew)
 - 2026-03-02: Updated competitive positioning - confirmed we occupy unique position as AI-native with fast learning cycles in top right quadrant of competitive map. Validated competitor analysis including Unlimited Industries vertical approach limitations. Source: Co-founder discussion (Andrew, Danny)
 
-### Key Assumptions
-- It's statistically almost guaranteed that we will uncover missed risks in existing company assessments
-- Companies will panic when we uncover critical problems, creating urgency for full solution
-- Insurance companies will value our risk assessment capabilities
-- Iterative solutions always win over waterfall approaches in engineering
-- AI will kill billable hours in the EPCM industry
-- Finding bugs in current designs creates urgency due to potential lawsuits or criminal liability
-- Streamlined workflows alone are insufficient - must reduce risk below baseline to create urgency
-- Superior risk assessment can be positioned as industry standard, making non-adoption negligent
-
-### Open Questions
-[Not yet defined]
-
-### Key Risks
-**Current position:** [Not yet defined]
-**Changelog:**
-- [Awaiting first session]
-
-### Team / Hiring Plans
+### Team
 **Current position:** Andrew as CEO (external focus: sales, vision, regulators, travel), Danny as CPTO (internal operations: integrating sales, AI team, industrial experts, administration). Early hires prioritize forward-deployed engineers, customer success managers, account executives, sales engineering. Core AI team kept small (1-5 top people). Multidisciplinary engineering team (mechanical, electrical, infrastructure). Legal outsourced.
 **Changelog:**
 - [Awaiting first session]
 - 2026-03-02: Defined CEO/CPTO roles and hiring priorities - forward-deployed engineers, customer success, sales engineering, small AI team, multidisciplinary engineers. Source: Co-founder discussion (Andrew, Danny)
-
-### Key Contacts / Prospects
-[No contacts tracked yet]
 
 ### Fundraising Status / Strategy
 **Current position:** Two-stage approach: First raise from friendly VCs (Danny's network + Andrew's European contacts) to build momentum, then approach Tier 1 VCs with existing commitments as social proof. Focus on SBC entrepreneurs and targeted outreach to close rounds quickly. Currently building customer relationships and logos without formal LOIs. Raising a focused round to deepen the ingestion layer, expand agentic workflows, and secure lighthouse deployments.
@@ -116,22 +95,17 @@ Last updated: [date]
 - 2026-03-02: Defined friendly VC → Tier 1 VC fundraising strategy, focusing on customer logos before LOIs. Source: Co-founder discussion (Andrew, Danny)
 - 2026-03-02: Added specific use of funds - deepen ingestion layer, expand agentic workflows, secure lighthouse deployments. Source: Co-founder discussion (Andrew, Danny)
 
-## Active Hypotheses
-[No hypotheses tracked yet]
-
 ## Decision Log
 
-[No decisions recorded yet]
-
-### 2026-03-02 — HazOp and LOPA as Initial Wedge Product
-**Decision:** Focus initial product development on HazOp (hazard assessment) and LOPA (layers of protection) risk assessments as wedge product to capture entire engineering stack over time. HAZOP is not the business itself, but the ingestion engine, with the system model being the real asset.
+### 2026-03-02 — HAZOP and LOPA as Initial Wedge Product
+**Decision:** Focus initial product development on HAZOP (hazard assessment) and LOPA (layers of protection) risk assessments as wedge product to capture entire engineering stack over time. HAZOP is not the business itself, but the ingestion engine, with the system model being the real asset.
 **Alternatives considered:** Full EPCM platform from start, other engineering workflows
 **Why alternatives were rejected:** Risk assessment provides clear, demonstrable value and creates urgency. Can show 20 minutes vs 3,000 hours improvement with BP data example. HAZOP market alone not big enough to be VC backable, but serves as wedge - customers will reject "replace entire engineering stack" but accept "run HAZOP and LOPA risk assessment." Once engaged with data access, can expand to P&ID checks, procurement assistance, operations HAZOP, eventually capturing full engineering stack through trust-building.
 **Context:** Defining initial product focus for AI-native engineering platform.
 **Participants:** Andrew, Danny
 
 ### 2026-03-02 — Free Partial Assessment Growth Strategy
-**Decision:** Offer free HazOp reassessments showing partial results (50% of findings) to create sales pipeline.
+**Decision:** Offer free HAZOP reassessments showing partial results (50% of findings) to create sales pipeline.
 **Alternatives considered:** Traditional enterprise sales, freemium model, consulting approach
 **Why alternatives were rejected:** Free partial assessments create immediate value demonstration and urgency when risks are uncovered. Statistical likelihood of finding missed risks makes this a reliable strategy.
 **Context:** Defining go-to-market approach for risk assessment platform.
@@ -161,7 +135,7 @@ Last updated: [date]
 ### 2026-03-02 — Resolved: Current State → Business Model / Revenue Model
 **Decision:** Updated to: Revenue will come throughout the entire plant lifecycle: design, construction, operations, and potentially decommissioning.
 **Alternatives considered:** Keep previous position
-**Why alternatives were rejected:** Initially we'll do HazOp and LOPA risk assessments, and future expansion will be into design improvements, procurement, construction management with risk-based polarization. From a VC perspective, the full lifecycle vision (construction, operations, decommissioning) is 5-10 years out, so it should be only a visionary claim.
+**Why alternatives were rejected:** Initially we'll do HAZOP and LOPA risk assessments, and future expansion will be into design improvements, procurement, construction management with risk-based polarization. From a VC perspective, the full lifecycle vision (construction, operations, decommissioning) is 5-10 years out, so it should be only a visionary claim.
 **Context:** Contradiction resolution during ingestion.
 **Participants:** Andrew, Danny
 
@@ -210,13 +184,11 @@ Last updated: [date]
 ### 2026-03-02 — Resolved: Current State → Moat / Defensibility
 **Decision:** Updated to: The moat is not the AI model itself, but deep context, judgement, trust and accountability.
 **Alternatives considered:** Keep previous position
-**Why alternatives were rejected:** So this is not either-or; it's actually both. It is true that thousands of customer files will accumulate proprietary knowledge and enable faster iteration, so that will be a huge technical accumulated value. Also, there will be deep context, judgment, trust, and accountability as the company grows stronger.
-
-I think what is wrong is the mode. It is not the AI model itself; that's not true. The mode is also the AI model, but also the deep context, judgment, trust, and accountability.
+**Why alternatives were rejected:** This is not either-or; it's actually both. Thousands of customer files will accumulate proprietary knowledge and enable faster iteration, creating huge technical accumulated value. Additionally, deep context, judgment, trust, and accountability strengthen as the company grows. The moat is not the AI model alone; the moat is also the AI model combined with deep context, judgment, trust, and accountability.
 **Context:** Contradiction resolution during ingestion.
 **Participants:** Andrew, Danny
 
-### 2026-03-02 — Resolved: Decision Log → 2026-03-02 — HazOp and LOPA as Initial Wedge Product
+### 2026-03-02 — Resolved: Decision Log → 2026-03-02 — HAZOP and LOPA as Initial Wedge Product
 **Decision:** Updated to: HAZOP is not the business itself, but the ingestion engine, with the system model being the real asset.
 **Alternatives considered:** Keep previous position
 **Why alternatives were rejected:** Okay, this is really important to explain because we are using HAZOP and LOPA as an initial wedge. Yes, we will take money from the customers for it, but the market is not big enough to make it VC backable. While it is business on its own, it is not a long-term business.
@@ -228,19 +200,11 @@ Once we are in and once we have the data, we can also tell them, well, we can al
 **Participants:** Andrew, Danny
 
 ### 2026-03-02 — Resolved: Current State → Target Market / Initial Customer
-**Decision:** Updated to: We achieve fast learning cycles by being horizontal and finding a wedge (Hasob and Lopa) that requires companies to give us comprehensive information.
+**Decision:** Updated to: We achieve fast learning cycles by being horizontal and finding a wedge (HAZOP and LOPA) that requires companies to give us comprehensive information.
 **Alternatives considered:** Keep previous position
 **Why alternatives were rejected:** So what we meant by the horizontal approach is that we will target specific industries like oil and gas, power generation, and hydro and gas, and that will be our focus on the industries. Within those industries, we will not do a vertical approach, which means from design to procurement to construction to operation (EPC). We will do a horizontal approach (EPCM), which means that we will work only on the documentation and engineering and will not touch construction. That means we'll start with HAZOP and LOPA, then P&ID, then procurement, but we'll never touch construction, or will never be the person who will build the actual power plant or operate it. We will not do the Unlimited Industries startup play, which is from the very design to handing over the entire power plant and building it themselves.
 **Context:** Contradiction resolution during ingestion.
 **Participants:** Danny, Andrew
-
-## Feedback Tracker
-
-### Recurring Themes
-[No themes identified yet]
-
-### Individual Feedback
-[No feedback recorded yet]
 
 ## Dismissed Contradictions
 

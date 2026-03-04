@@ -2,7 +2,7 @@
 
 **THIS IS THE MOST IMPORTANT PROMPT IN THE SYSTEM.**
 
-You are updating the startup's living document (`startup_brain.md`) with new information. Your job is to output ONLY the specific changes needed — nothing else. Do NOT rewrite unchanged sections. Do NOT rephrase existing content. Do NOT summarize existing changelogs. Do NOT move content around.
+You are updating the startup's living document (`pitch_brain.md`) with new information. Your job is to output ONLY the specific changes needed — nothing else. Do NOT rewrite unchanged sections. Do NOT rephrase existing content. Do NOT summarize existing changelogs. Do NOT move content around.
 
 ## The Core Rule
 
@@ -22,7 +22,7 @@ When generating an UPDATE_POSITION action, you MUST follow these rules:
 ## Input Format
 
 <diff_input>
-  <current_document>{{full_startup_brain_md}}</current_document>
+  <current_document>{{full_pitch_brain_md}}</current_document>
   <new_information>{{what_needs_to_be_incorporated}}</new_information>
   <update_reason>{{session_date_and_context}}</update_reason>
 </diff_input>
@@ -32,11 +32,7 @@ When generating an UPDATE_POSITION action, you MUST follow these rules:
 - `UPDATE_POSITION` — Enrich the Current Position text by integrating new information while preserving ALL existing specific details (numbers, names, percentages, dollar amounts, timelines, examples). Only modify existing details when directly contradicted by new definite-confidence claims.
 - `ADD_CHANGELOG` — Add a changelog entry to a section (use when the position changed and needs history)
 - `ADD_DECISION` — Add a new entry to the Decision Log section
-- `ADD_FEEDBACK` — Add a new entry to the Feedback Tracker section
 - `ADD_DISMISSED` — Add a new entry to the Dismissed Contradictions section
-- `ADD_HYPOTHESIS` — Add a new entry to the Active Hypotheses section
-- `ADD_CONTACT` — Add a new person to Key Contacts / Prospects (first mention)
-- `UPDATE_CONTACT` — Update an existing contact (new interaction, status change). Match by name.
 - `ADD_SECTION` — Add an entirely new section to Current State (only when genuinely new topic)
 
 ## Output Format
@@ -53,26 +49,6 @@ CONTENT:
 **IMPORTANT:** For UPDATE_POSITION, the CONTENT must NOT include the section `### header` — only the body text that goes under it (starting with `**Current position:**` or the equivalent). The header is already in SECTION and will be preserved automatically.
 
 Separate multiple change blocks with a blank line. Output nothing else — no preamble, no explanation, no summary.
-
-## Contact Entry Format
-
-Contact entries in Key Contacts / Prospects use this structure (not position/changelog):
-
-```
-- [YYYY-MM-DD] **Name** (Organization)
-  Role: title | Type: prospect|hire|investor|advisor|partner | Status: identified|in-conversation|engaged|pilot|closed|inactive
-  Context: brief background
-  Last interaction: YYYY-MM-DD — summary
-  Next step: what to do next
-```
-
-## Contact Routing Rules
-
-- **NEVER** use UPDATE_POSITION or ADD_CHANGELOG on the Key Contacts / Prospects section — use only ADD_CONTACT and UPDATE_CONTACT.
-- Before emitting ADD_CONTACT, check if the person already exists in the document. If so, emit UPDATE_CONTACT instead.
-- **Multiple contacts in one input**: If the founder mentions several people (e.g., "meet 1) Natalie from BCDC, 2) Katherine from VC United"), emit a separate ADD_CONTACT block for each person.
-- Contact metadata (status, interaction history, next steps) stays in Key Contacts / Prospects. If the contact interaction also reveals strategic insights (e.g., pricing feedback, competitive intelligence), emit BOTH the contact action AND the appropriate strategic action (UPDATE_POSITION, ADD_FEEDBACK, etc.).
-- If the founder says "I want to meet X" or "we should talk to X" with no meeting yet, set Status to `identified` and Next step to the planned action.
 
 ---
 
@@ -151,84 +127,3 @@ CONTENT:
 
 ---
 
-### CORRECT: Adding a hypothesis
-
-Input scenario: Founder tracks a testable assumption about their market.
-
-```
-SECTION: Active Hypotheses
-ACTION: ADD_HYPOTHESIS
-CONTENT:
-- [2026-03-01] **Small nuclear plants have procurement cycles under 12 months**
-  Status: unvalidated | Test: Ask 3 plant operators directly
-  Evidence: ---
-```
-
----
-
-### CORRECT: Adding a new contact
-
-Input scenario: Founder mentions a new VC contact.
-
-```
-SECTION: Key Contacts / Prospects
-ACTION: ADD_CONTACT
-CONTENT:
-- [2026-03-02] **Natalie Park** (BCDC Fund)
-  Role: Partner | Type: investor | Status: identified
-  Context: Recommended by Sarah Chen. Focus on energy infrastructure investments.
-  Last interaction: 2026-03-02 — Identified as potential investor
-  Next step: Schedule intro meeting
-```
-
----
-
-### CORRECT: Batch contact entry — multiple ADD_CONTACT blocks
-
-Input scenario: Founder says "VCs to meet: 1) Natalie from BCDC, 2) Katherine from VC United, 3) Georgia from United Ventures"
-
-```
-SECTION: Key Contacts / Prospects
-ACTION: ADD_CONTACT
-CONTENT:
-- [2026-03-02] **Natalie** (BCDC)
-  Role: — | Type: investor | Status: identified
-  Context: VC to meet, identified during planning session.
-  Last interaction: 2026-03-02 — Added to contact list
-  Next step: Schedule intro meeting
-
-SECTION: Key Contacts / Prospects
-ACTION: ADD_CONTACT
-CONTENT:
-- [2026-03-02] **Katherine** (VC United)
-  Role: — | Type: investor | Status: identified
-  Context: VC to meet, identified during planning session.
-  Last interaction: 2026-03-02 — Added to contact list
-  Next step: Schedule intro meeting
-
-SECTION: Key Contacts / Prospects
-ACTION: ADD_CONTACT
-CONTENT:
-- [2026-03-02] **Georgia** (United Ventures)
-  Role: — | Type: investor | Status: identified
-  Context: VC to meet, identified during planning session.
-  Last interaction: 2026-03-02 — Added to contact list
-  Next step: Schedule intro meeting
-```
-
----
-
-### CORRECT: Updating an existing contact after a meeting
-
-Input scenario: Founder met Natalie, she liked the demo and wants pilot data.
-
-```
-SECTION: Key Contacts / Prospects
-ACTION: UPDATE_CONTACT
-CONTENT:
-- [2026-03-02] **Natalie Park** (BCDC Fund)
-  Role: Partner | Type: investor | Status: in-conversation
-  Context: Recommended by Sarah Chen. Focus on energy infrastructure investments.
-  Last interaction: 2026-03-02 — Liked demo, wants to see pilot data before committing
-  Next step: Send pilot results by March 15
-```

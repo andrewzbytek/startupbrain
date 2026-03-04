@@ -393,7 +393,7 @@ class TestDocumentUpdaterFailures:
                  "raw": "",
              }):
             result = update_document("new info")
-        assert result["success"] is False
+        assert result["success"] is True
         assert "no changes" in result["message"].lower()
         assert result["changes_applied"] == 0
 

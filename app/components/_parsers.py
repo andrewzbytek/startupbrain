@@ -15,7 +15,7 @@ def _escape_latex(text: str) -> str:
 
 def _parse_current_state(doc: str) -> list:
     """
-    Parse Current State sections from startup_brain.md.
+    Parse Current State sections from the living document.
     Returns list of dicts: {name, current_position, changelog_entries}
     """
     sections = []
@@ -199,22 +199,33 @@ def _parse_hypotheses(doc: str) -> list:
 def _parse_contacts(doc: str) -> list:
     """
     Parse Key Contacts / Prospects from the living document.
+    Works for both pitch brain (### Key Contacts / Prospects inside ## Current State)
+    and ops brain (## Contacts / Prospects as top-level section).
     Returns list of dicts: {date, name, org, role, type, status, context, last_interaction, next_step}
     """
     contacts = []
-    cs_match = re.search(r"## Current State\n(.*?)(?=\n## |\Z)", doc, re.DOTALL)
-    if not cs_match:
-        return contacts
+    content = None
 
-    kc_match = re.search(
-        r"### Key Contacts / Prospects\n(.*?)(?=\n### |\n## |\Z)",
-        cs_match.group(1),
-        re.DOTALL,
-    )
-    if not kc_match:
-        return contacts
+    # Try ops brain format first: ## Contacts / Prospects (top-level)
+    ops_match = re.search(r"## Contacts / Prospects\n(.*?)(?=\n## |\Z)", doc, re.DOTALL)
+    if ops_match:
+        content = ops_match.group(1).strip()
+    else:
+        # Fall back to pitch brain format: ### Key Contacts / Prospects inside ## Current State
+        cs_match = re.search(r"## Current State\n(.*?)(?=\n## |\Z)", doc, re.DOTALL)
+        if not cs_match:
+            return contacts
+        kc_match = re.search(
+            r"### Key Contacts / Prospects\n(.*?)(?=\n### |\n## |\Z)",
+            cs_match.group(1),
+            re.DOTALL,
+        )
+        if not kc_match:
+            return contacts
+        content = kc_match.group(1).strip()
 
-    content = kc_match.group(1).strip()
+    if not content:
+        return contacts
     if not content or content == "[No contacts tracked yet]":
         return contacts
 
@@ -394,10 +405,10 @@ def _parse_tensions(doc: str, today=None) -> list:
     return result
 
 
-def _read_living_document() -> str:
+def _read_living_document(brain: str = "pitch") -> str:
     """Read the living document, returning empty string on failure."""
     try:
         from services.document_updater import read_living_document
-        return read_living_document()
+        return read_living_document(brain=brain)
     except Exception:
         return ""

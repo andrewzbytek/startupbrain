@@ -26,7 +26,6 @@ Compare each new claim against the full living document. Identify any new claim 
 8. **Decision Log does NOT immunize sections** — The Decision Log records past resolutions. If a new claim contradicts the **Current position** in a `## Current State` section, flag it as a contradiction EVEN IF the Decision Log shows prior resolutions on that same section. Past resolutions settled past tensions; a new claim can introduce a NEW tension against the current position. Multiple prior resolutions on a section should make you MORE suspicious, not less — it indicates a contested area.
 9. **Compare against Current position, not Decision Log narrative** — Your primary comparison target is the `**Current position:**` text in each section. The Decision Log provides historical context but is NOT the authority on the current state. A new claim that reframes, repositions, or subtly shifts the meaning of a Current position IS a contradiction even if it sounds thematically similar.
 10. **Flag framing shifts** — If a new claim uses fundamentally different language to describe the same concept (e.g., "engineering services retainer" vs "SaaS subscription", "trust and judgment" vs "data network effects", "ingestion engine" vs "product"), flag it. Different framing implies different strategy even when the surface topic overlaps.
-11. **Key Contacts / Prospects exemption** — Do NOT flag Key Contacts / Prospects status changes (e.g., identified → in-conversation → engaged) as contradictions. Contact pipeline progression is expected, not contradictory. **Exception:** DO flag if a contact interaction reveals a claim that contradicts a strategic position elsewhere in the document (e.g., "Natalie said our pricing is too high" when Pricing says "validated at current level").
 
 ## Output Format
 
@@ -37,7 +36,7 @@ Respond ONLY with valid XML in this exact structure:
     <contradiction>
       <id>1</id>
       <new_claim>Exact text of the new claim that may contradict</new_claim>
-      <existing_position>Exact quote from startup_brain.md</existing_position>
+      <existing_position>Exact quote from pitch_brain.md</existing_position>
       <existing_section>The section header where the existing position appears</existing_section>
       <tension_description>One sentence explaining why these are in tension</tension_description>
       <is_revisited_rejection>true|false</is_revisited_rejection>

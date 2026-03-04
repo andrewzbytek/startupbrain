@@ -10,7 +10,7 @@ from app.state import set_mode
 
 def render_top_bar():
     """Render the persistent top bar with title, actions, and status pills."""
-    col_title, col_spacer, col_actions, col_status = st.columns([2, 3, 3.5, 2.5])
+    col_title, col_brain, col_spacer, col_actions, col_status = st.columns([2, 1.5, 1.5, 3.5, 2.5])
 
     with col_title:
         st.markdown(
@@ -18,6 +18,25 @@ def render_top_bar():
             '<div class="top-bar-subtitle">Your startup\'s memory</div>',
             unsafe_allow_html=True,
         )
+
+    with col_brain:
+        brain_options = ["Pitch", "Ops"]
+        current_brain = st.session_state.get("active_brain", "pitch")
+        default_idx = 0 if current_brain == "pitch" else 1
+        selected = st.radio(
+            "Brain",
+            brain_options,
+            index=default_idx,
+            horizontal=True,
+            label_visibility="collapsed",
+            key="brain_toggle",
+        )
+        new_brain = selected.lower()
+        if new_brain != current_brain:
+            st.session_state.active_brain = new_brain
+            st.session_state.chat_brain_context = new_brain
+            st.session_state.sidebar_data = {}
+            st.rerun()
 
     # col_spacer intentionally left empty
 
@@ -36,7 +55,8 @@ def render_top_bar():
 
         with btn_col1:
             ingest_disabled = mode != "chat" or ingestion_locked
-            ingest_label = "Ingestion in progress..." if ingestion_locked else "Ingest Session"
+            brain_label = st.session_state.get("active_brain", "pitch").capitalize()
+            ingest_label = "Ingestion in progress..." if ingestion_locked else f"Ingest → {brain_label}"
             if st.button(
                 ingest_label,
                 type="primary",
@@ -44,13 +64,16 @@ def render_top_bar():
                 use_container_width=True,
                 key="top_bar_ingest",
             ):
-                set_mode("ingesting")
+                if st.session_state.get("active_brain", "pitch") == "ops":
+                    set_mode("ops_ingesting")
+                else:
+                    set_mode("ingesting")
                 st.rerun()
 
         with btn_col2:
             if st.button(
                 "Run Audit",
-                disabled=mode != "chat",
+                disabled=mode != "chat" or st.session_state.get("active_brain", "pitch") == "ops",
                 use_container_width=True,
                 key="top_bar_audit",
             ):

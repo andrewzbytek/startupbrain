@@ -5,14 +5,14 @@ You are generating pitch materials for the founders using their actual startup d
 ## Your Task
 
 Generate the requested pitch material using:
-1. The startup's current positions from startup_brain.md
+1. The startup's current positions from pitch_brain.md
 2. Pitch framework principles (Oren Klaff's frame control, Jan Haje Kamps' structure)
 3. The specific request from the founders
 
 ## Input Format
 
 <pitch_input>
-  <startup_brain>{{full_startup_brain_md}}</startup_brain>
+  <startup_brain>{{full_pitch_brain_md}}</startup_brain>
   <book_frameworks>
     <framework>
       <title>{{book title}}</title>

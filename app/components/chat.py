@@ -337,7 +337,15 @@ def _get_system_prompt() -> str:
     """Build a system prompt including current living document state."""
     try:
         from services.document_updater import read_living_document
-        doc = read_living_document()
+        brain_ctx = st.session_state.get("chat_brain_context", "pitch")
+        if brain_ctx == "both":
+            pitch_doc = read_living_document(brain="pitch")
+            ops_doc = read_living_document(brain="ops")
+            doc = f"## PITCH BRAIN\n{pitch_doc}\n\n## OPS BRAIN\n{ops_doc}"
+        elif brain_ctx == "ops":
+            doc = read_living_document(brain="ops")
+        else:
+            doc = read_living_document(brain="pitch")
     except Exception:
         doc = ""
 
@@ -572,6 +580,7 @@ def _apply_contact(contact_text: str) -> str:
         result = update_document(
             new_info=f"Contact update from founder: {contact_text}",
             update_reason="Contact note",
+            brain="ops",
         )
 
         try:
@@ -623,11 +632,11 @@ def _apply_hypothesis(user_message: str) -> str:
         )
 
         try:
-            doc = read_living_document()
+            doc = read_living_document(brain="ops")
             doc = _add_hypothesis(doc, entry)
-            write_living_document(doc)
-            upsert_living_document(doc, metadata={"last_updated": date_str, "update_reason": "New hypothesis"})
-            _git_commit(f"Add hypothesis: {hypothesis_text[:50]}")
+            write_living_document(doc, brain="ops")
+            upsert_living_document(doc, metadata={"last_updated": date_str, "update_reason": "New hypothesis"}, brain="ops")
+            _git_commit(f"Add hypothesis: {hypothesis_text[:50]}", brain="ops")
         finally:
             release_doc_lock()
 
@@ -680,15 +689,15 @@ def _apply_hypothesis_status_update(user_message: str) -> str:
 
         date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
-        # Update living document
-        doc = read_living_document()
+        # Update living document (hypotheses live in ops brain)
+        doc = read_living_document(brain="ops")
         updated_doc = _update_hypothesis_status(doc, fragment, new_status)
         if updated_doc == doc:
             return f"Could not find a hypothesis matching: **{fragment}**. Check the sidebar for exact text."
 
-        write_living_document(updated_doc)
-        upsert_living_document(updated_doc, metadata={"last_updated": date_str})
-        _git_commit(f"Hypothesis {new_status}: {fragment[:50]}")
+        write_living_document(updated_doc, brain="ops")
+        upsert_living_document(updated_doc, metadata={"last_updated": date_str}, brain="ops")
+        _git_commit(f"Hypothesis {new_status}: {fragment[:50]}", brain="ops")
 
         # Update MongoDB
         try:
@@ -809,6 +818,25 @@ def render_chat():
     from services.mongo_client import is_mongo_available
     if not is_mongo_available():
         st.warning("MongoDB is unavailable. Running in degraded mode — chat works but ingestion and history are disabled.")
+
+    # Brain context selector
+    brain_ctx = st.session_state.get("chat_brain_context", "pitch")
+    ctx_col1, ctx_col2 = st.columns([8, 2])
+    with ctx_col2:
+        context_options = ["Pitch", "Ops", "Both"]
+        ctx_idx = {"pitch": 0, "ops": 1, "both": 2}.get(brain_ctx, 0)
+        selected_ctx = st.radio(
+            "Context",
+            context_options,
+            index=ctx_idx,
+            horizontal=True,
+            label_visibility="collapsed",
+            key="chat_context_toggle",
+        )
+        new_ctx = selected_ctx.lower()
+        if new_ctx != brain_ctx:
+            st.session_state.chat_brain_context = new_ctx
+            st.rerun()
 
     # --- Chat frame: bordered container for the conversation area ---
     with st.container(border=True):

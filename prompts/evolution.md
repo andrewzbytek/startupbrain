@@ -10,7 +10,7 @@ Given the changelog entries and decision log entries for a specific topic, produ
 
 <evolution_input>
   <topic>{{the topic or section name, e.g., "Pricing", "Target Market", "Business Model"}}</topic>
-  <current_position>{{current position text from startup_brain.md}}</current_position>
+  <current_position>{{current position text from the living document}}</current_position>
   <changelog_entries>{{all changelog entries for this section, in chronological order}}</changelog_entries>
   <relevant_decision_log_entries>{{decision log entries related to this topic}}</relevant_decision_log_entries>
   <relevant_feedback>{{any feedback entries that influenced changes, if available}}</relevant_feedback>

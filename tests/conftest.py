@@ -15,8 +15,8 @@ from unittest.mock import MagicMock, patch
 # ---------------------------------------------------------------------------
 
 def _sample_living_document_content():
-    """Return a populated startup_brain.md string with real nuclear compliance content."""
-    return """# Startup Brain — NuclearCompliance.ai
+    """Return a populated pitch_brain.md string with real nuclear compliance content."""
+    return """# Pitch Brain — NuclearCompliance.ai
 Last updated: 2026-02-15
 
 ## Current State
@@ -58,51 +58,15 @@ Last updated: 2026-02-15
 **Changelog:**
 - 2026-02-08: Competitive landscape assessed. Source: Session 3
 
-### Key Assumptions
-- Nuclear operators currently use manual spreadsheets for compliance tracking
-- LLM extraction accuracy is sufficient with human confirmation step
-- Small operators have 6-12 month procurement cycles
-- Azure infrastructure preference eases IT approval at target customers
-
-### Open Questions
-- Direct vs. channel sales (unresolved)
-- How to handle multi-site licences for operators with 2-3 facilities
-- Data security and data residency requirements for nuclear documents
-
-### Key Risks
-**Current position:** (1) LLM accuracy for highly technical documents. (2) Regulatory approval risk — ONR may require certification we have not scoped. (3) Procurement cycle longer than expected.
-**Changelog:**
-- 2026-02-08: Initial risks identified. Source: Session 3
-
-### Team / Hiring Plans
+### Team
 **Current position:** First hire must be a nuclear domain expert, not a developer. Domain access is the scarcer resource. Commercial hire (sales) needed before Series A.
 **Changelog:**
 - 2026-02-05: First hire decision: nuclear domain expert. Source: Session 2
-
-### Key Contacts / Prospects
-- [2026-02-10] **Sarah Chen** (Beacon Capital)
-  Role: Partner | Type: investor | Status: in-conversation
-  Context: Met at nuclear energy conference. Interested in compliance tech.
-  Last interaction: 2026-02-10 — Positive on technical approach, wants first customer before investing
-  Next step: Send demo after first customer signed
-- [2026-02-14] **Marcus Webb** (Frontier Ventures)
-  Role: Managing Director | Type: investor | Status: identified
-  Context: Warm intro from Sarah Chen. Focus on deep tech investments.
-  Last interaction: 2026-02-14 — Questioned unit economics, wants live demo
-  Next step: Schedule live demo
 
 ### Fundraising Status / Strategy
 **Current position:** Pre-seed, self-funded. Targeting seed round after first paying customer. Need warm intros to nuclear-focused investors.
 **Changelog:**
 - 2026-02-10: Started investor outreach. No term sheets yet. Source: Investor meetings
-
-## Active Hypotheses
-- [2026-02-10] **Small nuclear plants have procurement cycles under 12 months**
-  Status: unvalidated | Test: Ask 3 plant operators directly
-  Evidence: ---
-- [2026-02-12] **LLM extraction accuracy exceeds 95% on nuclear PDFs**
-  Status: testing | Test: Run 50 sample documents through pipeline
-  Evidence: Initial batch of 10 docs showed 93% accuracy
 
 ## Decision Log
 
@@ -126,15 +90,6 @@ Last updated: 2026-02-15
 **Why:** Shorter procurement cycles (6-12 months). Concentrated market (reachable through direct outreach). Clear regulatory pain point (ONR compliance).
 **Status:** Active
 
-## Feedback Tracker
-
-### Recurring Themes
-- Branding/logo concerns: 2 sources (Sarah Chen - Beacon Capital 2026-02-10, Marcus Webb - Frontier Ventures 2026-02-14)
-
-### Individual Feedback
-- 2026-02-10 | Sarah Chen (Beacon Capital, investor): Positive on technical approach. Concerned about branding — name and logo feel like government contractor. Wants to see first customer before investing.
-- 2026-02-14 | Marcus Webb (Frontier Ventures, investor): Questioned unit economics and onboarding costs. Same branding concern as Sarah Chen (independently raised). Wants live demo.
-
 ## Dismissed Contradictions
 - 2026-02-12: Claim that BP/Shell enterprise accounts would close faster — Dismissed because: small nuclear operators have shorter procurement cycles and we can reach the whole market directly. Large enterprise sales cycles would be 18+ months.
 """
@@ -146,8 +101,67 @@ get_sample_living_document = _sample_living_document_content
 
 @pytest.fixture
 def sample_living_document():
-    """Return a populated startup_brain.md string with real nuclear compliance content."""
+    """Return a populated pitch_brain.md string with real nuclear compliance content."""
     return _sample_living_document_content()
+
+
+@pytest.fixture
+def sample_ops_document():
+    """Return a populated ops_brain.md sample for testing."""
+    return """# Ops Brain — NuclearCompliance.ai
+Last updated: 2026-03-01
+
+## Contacts / Prospects
+
+- [2026-02-15] **Sarah Chen** (Entergy)
+  Role: VP Engineering | Type: customer | Status: in-conversation
+  Context: Met at NEI conference, interested in pilot
+  Last interaction: 2026-02-20 demo call
+  Next step: Send pricing proposal by 2026-03-01
+
+## Active Hypotheses
+
+- [2026-02-10] **Nuclear utilities will pay premium for compliance automation**
+  Status: testing | Test: Validate with 3 utility pricing conversations
+  Evidence: Entergy showed strong interest at $50k/yr price point
+
+## Key Assumptions
+
+- Regulatory burden increasing (NRC backlog growing)
+- Utilities prefer vendor-managed solutions over in-house builds
+
+## Key Risks
+
+- Long sales cycles (6-12 months for enterprise nuclear)
+- Regulatory approval process for AI tools in nuclear unclear
+
+## Open Questions
+
+- What's the minimum viable compliance module to start with?
+- Should we target operating plants or new builds first?
+
+## Feedback Tracker
+
+### Recurring Themes
+
+- Compliance documentation is painful (3 sources)
+- Integration with existing plant systems is key concern (2 sources)
+
+### Individual Feedback
+
+- [2026-02-20] Sarah Chen (customer): Excited about automated documentation, concerned about integration with Maximo
+- [2026-02-15] Tom Rivera (advisor): Focus on one regulation first, don't try to boil the ocean
+
+## Hiring Plans
+
+- Looking for nuclear domain expert (part-time advisor)
+- Need ML engineer with NLP experience by Q2
+
+## Scratchpad Notes
+
+- Check NRC ADAMS database for public compliance docs as training data
+- Competitor analysis: no one doing AI-specific nuclear compliance yet
+"""
 
 
 @pytest.fixture
@@ -328,8 +342,8 @@ def mock_claude_client(mock_claude_response):
 
 @pytest.fixture
 def living_doc_path():
-    """Return the path to the real living document (documents/startup_brain.md)."""
-    return Path(__file__).parent.parent / "documents" / "startup_brain.md"
+    """Return the path to the real living document (documents/pitch_brain.md)."""
+    return Path(__file__).parent.parent / "documents" / "pitch_brain.md"
 
 
 @pytest.fixture
@@ -353,27 +367,62 @@ def mock_mongo_client():
         storage[collection].append(doc)
         return f"mock_id_{len(storage[collection])}"
 
+    def _insert_session(session_doc, brain="pitch"):
+        return _insert_one("sessions", {**session_doc, "brain": brain})
+
+    def _insert_claim(claim_doc, brain="pitch"):
+        return _insert_one("claims", {**claim_doc, "brain": brain})
+
     def _find_many(collection, query=None, sort_by="created_at", sort_order=-1, limit=100):
         return storage.get(collection, [])[:limit]
 
     def _find_one(collection, query):
         items = storage.get(collection, [])
+        if query and "_id" in query:
+            # Support _id-based lookup for living_document
+            return next((d for d in items if d.get("_id") == query["_id"]), None)
         return items[0] if items else None
 
     def _update_one(collection, query, update, upsert=False):
         return True
 
+    def _upsert_living_document(content, metadata=None, brain="pitch"):
+        doc_id = f"{brain}_brain"
+        docs = storage["living_document"]
+        for d in docs:
+            if d.get("_id") == doc_id:
+                d["content"] = content
+                d["metadata"] = metadata or {}
+                return True
+        docs.append({"_id": doc_id, "content": content, "metadata": metadata or {}})
+        return True
+
+    def _get_living_document(brain="pitch"):
+        doc_id = f"{brain}_brain"
+        return next(
+            (d for d in storage["living_document"] if d.get("_id") == doc_id),
+            None,
+        )
+
     mock = MagicMock()
     mock.insert_one.side_effect = _insert_one
+    mock.insert_session.side_effect = _insert_session
+    mock.insert_claim.side_effect = _insert_claim
     mock.find_many.side_effect = _find_many
     mock.find_one.side_effect = _find_one
     mock.update_one.side_effect = _update_one
+    mock.upsert_living_document.side_effect = _upsert_living_document
+    mock.get_living_document.side_effect = _get_living_document
     mock._storage = storage
 
     with patch("services.mongo_client.insert_one", side_effect=_insert_one), \
+         patch("services.mongo_client.insert_session", side_effect=_insert_session), \
+         patch("services.mongo_client.insert_claim", side_effect=_insert_claim), \
          patch("services.mongo_client.find_many", side_effect=_find_many), \
          patch("services.mongo_client.find_one", side_effect=_find_one), \
          patch("services.mongo_client.update_one", side_effect=_update_one), \
+         patch("services.mongo_client.upsert_living_document", side_effect=_upsert_living_document), \
+         patch("services.mongo_client.get_living_document", side_effect=_get_living_document), \
          patch("services.mongo_client.get_db", return_value=MagicMock()), \
          patch("services.mongo_client.get_mongo_client", return_value=MagicMock()):
         yield mock, storage

@@ -39,6 +39,12 @@ _CONTACT_STATUS_COLORS = {
 def render_dashboard():
     """Main dashboard rendering function. Called when user selects the Dashboard tab."""
 
+    # Brain dispatch — delegate to Ops dashboard when active
+    if st.session_state.get("active_brain", "pitch") == "ops":
+        from app.components.ops_dashboard import render_ops_dashboard
+        render_ops_dashboard()
+        return
+
     # --- Load living document (cached in sidebar_data) ---
     if not st.session_state.get("sidebar_data"):
         doc = _read_living_document()
@@ -116,23 +122,32 @@ def render_dashboard():
                                     _update_hypothesis_status, _git_commit,
                                 )
                                 from services.mongo_client import update_hypothesis_status, upsert_living_document
+                                from services.ingestion_lock import acquire_doc_lock, release_doc_lock
                                 from datetime import datetime, timezone
 
-                                fresh_doc = read_living_document()
-                                updated = _update_hypothesis_status(fresh_doc, h["text"], new_status)
-                                if updated != fresh_doc:
-                                    write_living_document(updated)
-                                    date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-                                    upsert_living_document(updated, metadata={"last_updated": date_str})
-                                    _git_commit(f"Hypothesis {new_status}: {h['text'][:50]}")
+                                if not acquire_doc_lock():
+                                    st.warning("Document is being updated by another process. Try again shortly.")
+                                else:
                                     try:
-                                        update_hypothesis_status(h["text"], new_status)
-                                    except Exception:
-                                        pass
-                                    st.session_state.sidebar_data = {}
-                                    st.rerun()
+                                        fresh_doc = read_living_document()
+                                        updated = _update_hypothesis_status(fresh_doc, h["text"], new_status)
+                                        if updated != fresh_doc:
+                                            write_living_document(updated)
+                                            date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+                                            upsert_living_document(updated, metadata={"last_updated": date_str})
+                                            _git_commit(f"Hypothesis {new_status}: {h['text'][:50]}")
+                                            try:
+                                                update_hypothesis_status(h["text"], new_status)
+                                            except Exception:
+                                                pass
+                                            st.session_state.sidebar_data = {}
+                                            st.rerun()
+                                    finally:
+                                        release_doc_lock()
                             except Exception as e:
-                                st.error(f"Update failed: {e}")
+                                import logging
+                                logging.error(f"Hypothesis status update failed: {e}")
+                                st.error("Update failed. Please try again.")
             else:
                 st.caption("No active hypotheses.")
 
@@ -162,42 +177,51 @@ def render_dashboard():
                             read_living_document, write_living_document, _add_hypothesis, _git_commit,
                         )
                         from services.mongo_client import insert_claim, upsert_living_document
+                        from services.ingestion_lock import acquire_doc_lock, release_doc_lock
                         from datetime import datetime, timezone
 
-                        date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-                        test_plan = hyp_test.strip() if hyp_test.strip() else "[to be defined]"
-                        entry = (
-                            f"- [{date_str}] **{hyp_text.strip()}**\n"
-                            f"  Status: unvalidated | Test: {test_plan}\n"
-                            f"  Evidence: ---"
-                        )
+                        if not acquire_doc_lock():
+                            st.warning("Document is being updated by another process. Try again shortly.")
+                        else:
+                            try:
+                                date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+                                test_plan = hyp_test.strip() if hyp_test.strip() else "[to be defined]"
+                                entry = (
+                                    f"- [{date_str}] **{hyp_text.strip()}**\n"
+                                    f"  Status: unvalidated | Test: {test_plan}\n"
+                                    f"  Evidence: ---"
+                                )
 
-                        fresh_doc = read_living_document()
-                        updated = _add_hypothesis(fresh_doc, entry)
-                        write_living_document(updated)
-                        upsert_living_document(updated, metadata={"last_updated": date_str, "update_reason": "New hypothesis"})
-                        _git_commit(f"Add hypothesis: {hyp_text.strip()[:50]}")
+                                fresh_doc = read_living_document()
+                                updated = _add_hypothesis(fresh_doc, entry)
+                                write_living_document(updated)
+                                upsert_living_document(updated, metadata={"last_updated": date_str, "update_reason": "New hypothesis"})
+                                _git_commit(f"Add hypothesis: {hyp_text.strip()[:50]}")
 
-                        try:
-                            insert_claim({
-                                "claim_text": hyp_text.strip(),
-                                "claim_type": "hypothesis",
-                                "confidence": "speculative",
-                                "source_type": "hypothesis",
-                                "who_said_it": "Founder",
-                                "confirmed": True,
-                                "status": "unvalidated",
-                                "test_plan": test_plan,
-                                "created_at": datetime.now(timezone.utc),
-                            })
-                        except Exception:
-                            pass
+                                try:
+                                    insert_claim({
+                                        "claim_text": hyp_text.strip(),
+                                        "claim_type": "hypothesis",
+                                        "confidence": "speculative",
+                                        "source_type": "hypothesis",
+                                        "who_said_it": "Founder",
+                                        "confirmed": True,
+                                        "status": "unvalidated",
+                                        "test_plan": test_plan,
+                                        "created_at": datetime.now(timezone.utc),
+                                    })
+                                except Exception:
+                                    pass
 
-                        st.success(f"Tracking: {hyp_text.strip()}")
-                        st.session_state.sidebar_data = {}
-                        st.rerun()
+                                st.success(f"Tracking: {hyp_text.strip()}")
+                                st.session_state.sidebar_data = {}
+                                st.rerun()
+                            finally:
+                                release_doc_lock()
                     except Exception as e:
-                        st.error(f"Could not track hypothesis: {e}")
+                        import logging
+                        logging.error(f"Could not track hypothesis: {e}")
+                        st.error("Could not track hypothesis. Please try again.")
 
         # Contacts panel
         contacts = _parse_contacts(doc)
@@ -315,7 +339,7 @@ def render_dashboard():
             st.download_button(
                 "Download Living Document",
                 data=doc,
-                file_name="startup_brain.md",
+                file_name="pitch_brain.md",
                 mime="text/markdown",
                 use_container_width=True,
             )
@@ -330,7 +354,9 @@ def render_dashboard():
                         st.session_state["_context_export_data"] = context_export
                         st.rerun()
                     except Exception as e:
-                        st.error(f"Export failed: {e}")
+                        import logging
+                        logging.error(f"Export failed: {e}")
+                        st.error("Export failed. Please try again.")
 
             export_data = st.session_state.get("_context_export_data")
             if export_data:
