@@ -38,6 +38,7 @@ startupbrain/
 │       ├── sidebar.py          # Dashboard sidebar (current view, feedback, actions, download)
 │       └── styles.py           # Custom CSS injection
 ├── services/                   # Backend service layer
+│   ├── __init__.py             # Package marker
 │   ├── claude_client.py        # Anthropic API wrapper (Sonnet/Opus routing, cost tracking)
 │   ├── consistency.py          # 3-pass consistency engine (the core feature)
 │   ├── cost_tracker.py         # Monthly cost tracking with budget alerts
@@ -46,7 +47,7 @@ startupbrain/
 │   ├── export.py               # Full context export (living doc + sessions + claims)
 │   ├── feedback.py             # Feedback patterns, evolution narratives, pitch generation
 │   ├── ingestion.py            # Transcript → claims → storage pipeline
-│   ├── ingestion_lock.py       # MongoDB-based concurrent ingestion lock
+│   ├── ingestion_lock.py       # MongoDB-based ingestion lock + document write lock
 │   └── mongo_client.py         # MongoDB Atlas client (sessions, claims, feedback, vector search)
 ├── prompts/                    # LLM prompt templates (12 markdown files)
 │   ├── extraction.md           # Claim extraction from session transcripts
@@ -164,7 +165,7 @@ python -m pytest tests/ -v --tb=short -m "not integration"
 
 ### Render (primary)
 
-Deployed on **Render** free tier via `render.yaml` Blueprint.
+Deployed on **Render** free tier via `render.yaml` Blueprint. Live at **https://startupbrain.onrender.com**.
 
 ```bash
 # Push to GitHub → Render auto-deploys
@@ -173,6 +174,7 @@ Deployed on **Render** free tier via `render.yaml` Blueprint.
 
 - Entry point: `app/main.py`
 - Env vars (set in Render dashboard): `ANTHROPIC_API_KEY`, `MONGODB_URI`, `APP_USERNAME`, `APP_PASSWORD`
+- MongoDB Atlas Network Access must allow `0.0.0.0/0` (Render uses dynamic outbound IPs)
 - Ephemeral filesystem: living document auto-recovers from MongoDB on restart
 - Git commits no-op gracefully (no repo on Render)
 
@@ -185,11 +187,14 @@ Still supported. Secrets via Cloud dashboard.
 
 ### Authentication
 
-Set `APP_USERNAME` and `APP_PASSWORD` env vars to enable login. When unset, auth is skipped (local dev). Login uses HMAC-signed cookies for 7-day session persistence.
+Set `APP_USERNAME` and `APP_PASSWORD` env vars to enable login. In production (detected via `RENDER`/`PORT` env vars), credentials are required — set `DISABLE_AUTH=true` to explicitly skip. In local dev, auth is skipped when env vars are unset. Login uses HMAC-signed cookies for 7-day session persistence.
 
 ### Concurrent Access
 
-An ingestion lock prevents two users from ingesting simultaneously. The lock is MongoDB-based with a 30-minute stale timeout (handles browser close / crash). The top bar shows "Ingestion in progress..." when locked.
+Two-tier MongoDB-based locking ensures multi-user safety:
+
+- **Ingestion lock** — prevents two users from ingesting simultaneously. 30-minute stale timeout handles browser close / crash. Top bar shows "Ingestion in progress..." when locked.
+- **Document write lock** — short-lived lock (2-minute timeout) prevents concurrent read-modify-write corruption on the living document across chat corrections, feedback, hypothesis updates, and batch commits.
 
 ## Cost Model
 
@@ -201,7 +206,13 @@ An ingestion lock prevents two users from ingesting simultaneously. The lock is 
 
 ## Project Status
 
-All 24 sections of the spec are implemented. The system is production-ready for daily use. The living document template has 17 sections under Current State, ordered for pitch narrative flow based on a Kamps pitch guide cross-check.
+All 24 sections of the spec are implemented. The system is **deployed and running in production** on Render. The living document template has 17 sections under Current State, ordered for pitch narrative flow based on a Kamps pitch guide cross-check.
+
+**Security and multi-user safety:**
+- Auth hardened for production (requires credentials or explicit opt-out)
+- Two-tier MongoDB locking (ingestion lock + document write lock)
+- Atomic lock operations, UUID-based session IDs, sanitized error messages
+- Consistency engine properly filters dismissed contradictions
 
 **Deliberate deviations from spec:**
 - **Vector search**: Code is in place but Atlas free tier (M0) doesn't support Voyage AI autoEmbed. System uses time-based retrieval with a health monitor that alerts at 200 claims when upgrading to M10+ becomes worthwhile.

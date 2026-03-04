@@ -19,8 +19,10 @@ AI-powered knowledge management for a 2-person startup. See `docs/SPEC.md` for f
 - Living document at `documents/startup_brain.md` — git-tracked, mirrored to MongoDB, auto-recovered from MongoDB on ephemeral filesystems (Render)
 - All state management via `st.session_state` — Streamlit re-runs on every interaction
 - State machine: `chat → ingesting → confirming_claims → checking_consistency → resolving_contradiction → done`
-- Auth gate at top of `app/main.py` — cookie-based login when `APP_USERNAME` + `APP_PASSWORD` env vars are set, skipped entirely when unset (local dev)
+- `app/main.py` inserts project root into `sys.path` at startup — required because Streamlit only adds the script's directory (`app/`) to the path, not the project root
+- Auth gate at top of `app/main.py` — cookie-based login when `APP_USERNAME` + `APP_PASSWORD` env vars are set, requires explicit `DISABLE_AUTH=true` to skip in production (auto-detected via `RENDER`/`PORT` env vars), skipped in local dev when env vars unset
 - Ingestion lock via `services/ingestion_lock.py` — MongoDB-based atomic lock prevents concurrent ingestion, 30-min stale timeout for crash recovery
+- Document write lock via `services/ingestion_lock.py` — short-lived MongoDB lock (2-min timeout) prevents concurrent read-modify-write on living document across chat corrections, feedback, hypothesis updates, and ingestion batch_commit
 
 ## Session Rollback
 - `from services.deferred_writer import rollback_last_session; rollback_last_session()` — rolls back the most recent session (deletes session + claims from MongoDB, reverts startup_brain.md to previous git version, mirrors to MongoDB, git commits the revert)
@@ -34,8 +36,11 @@ AI-powered knowledge management for a 2-person startup. See `docs/SPEC.md` for f
 - Git commit `documents/startup_brain.md` after every update with descriptive message (no-ops gracefully when git unavailable, e.g. Render)
 - Session types (defined in `app/state.py:SESSION_TYPES`) flow through extraction, consistency, pushback, audit, and storage
 - All new service function parameters must default to empty string/None for backward compatibility
-- Auth: shared credentials via `APP_USERNAME` + `APP_PASSWORD` env vars. Cookie-based 7-day sessions (`streamlit-cookies-controller`). Auth skipped when env vars unset.
+- Auth: shared credentials via `APP_USERNAME` + `APP_PASSWORD` env vars. Cookie-based 7-day sessions (`streamlit-cookies-controller`). Auth skipped in local dev when env vars unset; production (Render) requires credentials or explicit `DISABLE_AUTH=true`.
 - Ingestion lock: MongoDB-based (`services/ingestion_lock.py`). Only one user can ingest at a time. Lock auto-expires after 30 min (crash recovery). Top bar shows lock status.
+- Document write lock: MongoDB-based (`services/ingestion_lock.py`). Short-lived lock (2-min timeout) for living document writes. Prevents concurrent corruption from chat corrections, feedback, hypothesis, and batch_commit.
+- Session IDs: UUID-based (`uuid.uuid4()`), not Python memory addresses. Stored in `st.session_state._lock_session_id`.
+- Error messages: sanitized for users (generic messages), full details logged server-side only. Prevents MongoDB URI / path leakage.
 
 ## File Ownership (for parallel agent work)
 When splitting tasks across agents, avoid overlapping file edits:
@@ -55,14 +60,16 @@ When splitting tasks across agents, avoid overlapping file edits:
 
 ## Deployment
 - **Render** (primary): `render.yaml` Blueprint — free tier, auto-deploy from GitHub
+  - Live at: `https://startupbrain.onrender.com`
   - Start command: `streamlit run app/main.py --server.port $PORT --server.address 0.0.0.0 --server.headless true`
   - Ephemeral filesystem: living document auto-recovers from MongoDB on restart
   - Git commits no-op (no git repo on Render)
   - Set env vars in Render dashboard: `ANTHROPIC_API_KEY`, `MONGODB_URI`, `APP_USERNAME`, `APP_PASSWORD`
+  - MongoDB Atlas Network Access must allow `0.0.0.0/0` (Render uses dynamic outbound IPs)
 - **Streamlit Community Cloud** (legacy): still works, secrets via Cloud dashboard
 - Entry point: `app/main.py`
 - Required secrets/env vars: `ANTHROPIC_API_KEY`, `MONGODB_URI`
-- Optional secrets/env vars: `APP_USERNAME`, `APP_PASSWORD` (enables login gate)
+- Optional secrets/env vars: `APP_USERNAME`, `APP_PASSWORD` (enables login gate), `DISABLE_AUTH` (set to `true` to skip auth in production)
 
 ## Current Status (as of 2026-03-04)
 
@@ -73,9 +80,13 @@ All 24 sections of `docs/SPEC.md` are implemented. The system is production-read
 
 **UI:** Dark command center theme (Vercel/Raycast inspired). Two-view layout: Chat (default) with quick command chips, Dashboard (full-page card grid of all 17 sections + panels). Persistent top bar with Ingest/Audit buttons and API cost + RAG health status pills. No sidebar. Conversational chat with query classification and streaming, HTML/CSS step indicators across 4-stage ingestion flow, claim editor with inline editing.
 
-**Features:** Session type categorization through entire pipeline, whiteboard photo processing (vision), feedback pattern detection, evolution narratives, pitch material generation (Opus), cost tracking with budget alerts, book framework cross-check via .md upload in chat, direct corrections with informational consistency check, contradiction resolution writing Decision Log and Dismissed Contradictions entries, scratchpad notes via chat prefix (`note:`, `remember:`, `jot:`, `fyi:`) saved to MongoDB only (no doc update, surfaced in chat system prompt), hypothesis tracking via chat prefix (`hypothesis:`, `validated:`, `invalidated:`) or dashboard form, Socratic system prompt with context surfacing and feedback echo, dashboard tensions indicator (changelog churn, dismissed contradictions, decisions under evaluation), 'challenge' query classification routing to Opus, 3 quick command chips (note, hypothesis, contact) below chat input for prefix discoverability, full context export (living doc + session history + claims as single MD), session rollback command, shared-credential auth with cookie persistence, ingestion lock for concurrent access.
+**Features:** Session type categorization through entire pipeline, whiteboard photo processing (vision), feedback pattern detection, evolution narratives, pitch material generation (Opus), cost tracking with budget alerts, book framework cross-check via .md upload in chat, direct corrections with informational consistency check, contradiction resolution writing Decision Log and Dismissed Contradictions entries, scratchpad notes via chat prefix (`note:`, `remember:`, `jot:`, `fyi:`) saved to MongoDB only (no doc update, surfaced in chat system prompt), hypothesis tracking via chat prefix (`hypothesis:`, `validated:`, `invalidated:`) or dashboard form, Socratic system prompt with context surfacing and feedback echo, dashboard tensions indicator (changelog churn, dismissed contradictions, decisions under evaluation), 'challenge' query classification routing to Opus, 3 quick command chips (note, hypothesis, contact) below chat input for prefix discoverability, full context export (living doc + session history + claims as single MD), session rollback command, shared-credential auth with cookie persistence, ingestion lock + document write lock for concurrent access.
 
-**Infrastructure:** Vector search code ready (`vector_search_text()`, upgraded `_get_rag_evidence()`), time-based fallback on free tier, RAG health monitor (warns at 200 claims). Render deployment via `render.yaml` Blueprint (free tier), ephemeral filesystem handled by MongoDB document recovery, git no-op when not in a repo.
+**Security:** Auth hardened for production (requires credentials or explicit `DISABLE_AUTH=true`), HMAC cookie signing (no fallback key), sanitized error messages (no URI/path leakage), UUID-based session IDs.
+
+**Multi-user safety:** Two-tier locking — long-lived ingestion lock (30-min timeout) for full pipeline, short-lived document write lock (2-min timeout) for individual writes. Atomic lock operations via `find_one_and_update`. DeferredWriter checkpoints track lock ownership to prevent cross-user recovery hijacking. Dismissed contradictions properly filtered in consistency engine Pass 2.
+
+**Infrastructure:** Vector search code ready (`vector_search_text()`, upgraded `_get_rag_evidence()`), time-based fallback on free tier, RAG health monitor (warns at 200 claims). Render deployment live at `https://startupbrain.onrender.com` (free tier), ephemeral filesystem handled by MongoDB document recovery, git no-op when not in a repo.
 
 **Tests:** 893 unit tests, 45 integration tests across 26 test files. All unit tests run fully offline with mocks.
 
