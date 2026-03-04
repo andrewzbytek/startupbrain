@@ -382,6 +382,25 @@ def _get_system_prompt() -> str:
     if doc:
         base += f"<startup_brain>\n{doc}\n</startup_brain>"
 
+    # Append recent scratchpad notes so the AI can reference them
+    try:
+        from services.mongo_client import find_many
+        scratchpad = find_many(
+            "claims",
+            {"source_type": "quick_note", "claim_type": "scratchpad"},
+            sort_by="created_at",
+            sort_order=-1,
+            limit=50,
+        )
+        if scratchpad:
+            notes_text = "\n".join(
+                f"- [{n.get('created_at', '').strftime('%Y-%m-%d %H:%M') if hasattr(n.get('created_at', ''), 'strftime') else 'unknown date'}] {n.get('claim_text', '')}"
+                for n in scratchpad
+            )
+            base += f"\n\n<scratchpad_notes>\nRecent scratchpad notes from the founder (not in the living document):\n{notes_text}\n</scratchpad_notes>"
+    except Exception:
+        pass  # MongoDB unavailable — skip scratchpad
+
     # Append book framework if loaded for cross-check
     book_content = st.session_state.get("book_crosscheck_content", "")
     if book_content:
@@ -510,41 +529,26 @@ def _apply_direct_correction(user_message: str) -> str:
 
 def _apply_quick_note(note_text: str) -> str:
     """
-    Apply a quick note directly to the living document.
-    Skips extraction, claim confirmation, and consistency check.
-    Stores a claim in MongoDB with source_type='quick_note'.
-    Returns a confirmation message.
+    Save a quick note to the scratchpad (MongoDB only).
+    Does NOT update the living document.
+    Stored with claim_type='scratchpad' and source_type='quick_note'.
+    Notes are surfaced in the chat system prompt so the AI can reference them.
     """
     try:
-        from services.document_updater import update_document
         from services.mongo_client import insert_claim
         from datetime import datetime, timezone
 
-        # Update the living document
-        result = update_document(
-            new_info=f"Quick note from founder: {note_text}",
-            update_reason="Quick note",
-        )
+        insert_claim({
+            "claim_text": note_text,
+            "claim_type": "scratchpad",
+            "confidence": "definite",
+            "source_type": "quick_note",
+            "who_said_it": "Founder",
+            "confirmed": True,
+            "created_at": datetime.now(timezone.utc),
+        })
 
-        # Store as a claim in MongoDB
-        try:
-            insert_claim({
-                "claim_text": note_text,
-                "claim_type": "claim",
-                "confidence": "definite",
-                "source_type": "quick_note",
-                "who_said_it": "Founder",
-                "confirmed": True,
-                "created_at": datetime.now(timezone.utc),
-            })
-        except Exception:
-            pass  # MongoDB failure should not block the note
-
-        if result.get("success"):
-            section = result.get("message", "")
-            return f"Noted — {section}"
-        else:
-            return f"Note may not have been saved — document update failed: {result.get('message', 'unknown error')}"
+        return "Noted — saved to scratchpad. I can reference this in our conversation, but it won't appear in the living document."
     except Exception as e:
         return f"Could not save note: {e}"
 
@@ -689,10 +693,10 @@ _QUICK_COMMANDS = [
     (
         "note:", "note: ",
         "We decided to focus on small plants first",
-        "Adds a quick note to your living document",
-        "Updates the living document directly via AI — the AI decides which section "
-        "to update. Also stores a claim in MongoDB. **No extraction, no consistency "
-        "check, no confirmation step.** Use for quick facts, decisions, or reminders.",
+        "Saves to scratchpad (does not update living document)",
+        "Saves the note to MongoDB as a scratchpad entry. **Does not update the living "
+        "document.** The AI can reference your scratchpad notes when answering questions. "
+        "Use for quick facts, decisions, reminders, or things you want to remember.",
     ),
     (
         "hypothesis:", "hypothesis: ",
@@ -709,22 +713,6 @@ _QUICK_COMMANDS = [
         "Updates the Key Contacts section of the living document via AI. "
         "Also stores a claim in MongoDB. Format: name, organization, type "
         "(prospect/investor/advisor/hire/partner), status. **No consistency check.**",
-    ),
-    (
-        "validated:", "validated: ",
-        "Small plants have shorter procurement cycles",
-        "Marks a hypothesis as validated",
-        "Finds a matching hypothesis in the Active Hypotheses section and changes "
-        "its status to 'validated'. Updates both the living document and MongoDB. "
-        "Use the exact hypothesis text (or a close match).",
-    ),
-    (
-        "correction:", "correction: ",
-        "Our target is plant operators, not compliance officers",
-        "Corrects something in the living document",
-        "Applies a direct correction to the living document via AI. The AI figures out "
-        "what to change. Runs an **informational consistency check** (results shown but "
-        "don't block the update). Use when you realize something in the doc is wrong.",
     ),
 ]
 
@@ -914,7 +902,6 @@ def render_chat():
                     response = _apply_quick_note(note_text)
                 st.markdown(response)
             add_message("assistant", response)
-            invalidate_sidebar()
             st.rerun()
             return
 
