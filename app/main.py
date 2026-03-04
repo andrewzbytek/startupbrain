@@ -272,6 +272,7 @@ def render_checking_consistency():
                 session_summary=session_summary,
                 topic_tags=topic_tags,
                 session_type=session_type,
+                brain=st.session_state.get("active_brain", "pitch"),
             )
             writer.lock_session_id = st.session_state.get("_lock_session_id")
             writer.stage = "consistency_check"
@@ -419,8 +420,8 @@ def render_done():
             st.session_state.pipeline_result = pipeline_result
             st.session_state.current_session_id = commit_result.get("session_id", "")
         else:
-            st.error(f"Batch commit failed: {commit_result.get('message', 'unknown error')}")
-            st.info("Your checkpoint is preserved. The system will offer to resume on next load.")
+            logging.error("Batch commit failed: %s", commit_result.get('message', ''))
+            st.error("Saving your session failed. Your checkpoint is preserved and will be offered for recovery on next load.")
 
     doc_updated = pipeline_result.get("document_updated", False)
     changes_applied = pipeline_result.get("changes_applied", 0)
@@ -437,7 +438,7 @@ def render_done():
             "You can try ingesting again or use chat to update the document manually."
         )
         if doc_update_msg:
-            st.error(f"Document update error: {doc_update_msg}")
+            logging.error("Document update error: %s", doc_update_msg)
 
     col1, col2, col3, col4 = st.columns(4)
     with col1:
@@ -482,7 +483,12 @@ def render_ops_ingesting():
         )
         col1, col2 = st.columns(2)
         with col1:
-            session_type = st.selectbox("Session type", SESSION_TYPES, key="ops_session_type")
+            session_type = st.selectbox(
+                "Session type",
+                options=[""] + SESSION_TYPES,
+                format_func=lambda x: "Select session type..." if x == "" else x,
+                key="ops_session_type",
+            )
             participants = st.text_input("Participants", key="ops_participants")
         with col2:
             from datetime import date as _date
@@ -531,7 +537,7 @@ def render_ops_ingesting():
 
 
 def render_claim_editor_for_ops():
-    """Reuse the claim editor for ops claims confirmation."""
+    """Ops claims confirmation — reuses claim list UI but with ops-specific buttons."""
     from app.components.progress import render_step_indicator
     from app.components.claim_editor import render_claim_editor
 
@@ -540,14 +546,25 @@ def render_claim_editor_for_ops():
     st.markdown("## Confirm Operational Items")
     st.caption("Review and edit extracted items before storing in Ops Brain.")
 
-    render_claim_editor()
+    # Render the claim list UI (editing, checkboxes, add/remove) but NOT action buttons.
+    # We pass ops_mode=True so it skips rendering the pitch-specific "Check Consistency" button.
+    render_claim_editor(ops_mode=True)
 
     col1, col2 = st.columns([1, 1])
     with col1:
         if st.button("Store in Ops Brain", type="primary", use_container_width=True):
-            confirmed = [c for c in st.session_state.pending_claims if c.get("confirmed", True)]
-            if confirmed:
-                st.session_state._ops_confirmed_claims = confirmed
+            # Sync widget state before reading claims (mirrors pitch flow sync logic)
+            current_claims = st.session_state.get("pending_claims", [])
+            synced = []
+            for claim in current_claims:
+                text_key = f"claim_text_{claim.get('_uid', '')}"
+                check_key = f"claim_check_{claim.get('_uid', '')}"
+                claim_text = st.session_state.get(text_key, claim.get("claim_text", ""))
+                checked = st.session_state.get(check_key, claim.get("confirmed", True))
+                if checked and claim_text.strip():
+                    synced.append({**claim, "claim_text": claim_text.strip(), "confirmed": True})
+            if synced:
+                st.session_state._ops_confirmed_claims = synced
                 from app.state import set_mode
                 set_mode("ops_done")
                 st.rerun()

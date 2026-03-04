@@ -72,6 +72,9 @@ def init_session_state():
         "_quick_cmd_pending": None,
         "_lock_session_id": None,
         "_lock_acquired": False,
+        "_ops_confirmed_claims": [],
+        "_ops_committed": False,
+        "_ops_result": {},
     }
     for key, value in defaults.items():
         if key not in st.session_state:

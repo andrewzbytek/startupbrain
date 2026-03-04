@@ -12,11 +12,15 @@ from app.state import set_mode, reset_ingestion
 from app.components.progress import render_step_indicator
 
 
-def render_claim_editor():
+def render_claim_editor(ops_mode: bool = False):
     """
     Display the claim confirmation UI.
-    Called when mode="confirming_claims".
+    Called when mode="confirming_claims" (pitch) or "ops_confirming" (ops).
     Users can check/uncheck, edit, remove, and add claims before proceeding.
+
+    Args:
+        ops_mode: If True, skip rendering the pitch-specific action buttons
+                  (Check Consistency / Cancel). The ops flow provides its own buttons.
     """
     st.header("Review Extracted Claims")
     render_step_indicator(2)
@@ -115,9 +119,13 @@ def render_claim_editor():
                 st.toast("Claim added!")
                 st.rerun()
 
+    # In ops_mode, the calling function provides its own action buttons
+    if ops_mode:
+        return
+
     st.markdown("---")
 
-    # Action buttons
+    # Action buttons (pitch flow only)
     col_proceed, col_cancel = st.columns([2, 1])
 
     with col_proceed:

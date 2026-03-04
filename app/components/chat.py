@@ -4,6 +4,7 @@ Handles conversation, query routing, and contradiction resolution UI.
 """
 
 import html
+import logging
 import re
 from datetime import datetime, timedelta, timezone
 
@@ -523,21 +524,25 @@ def _apply_direct_correction(user_message: str) -> str:
         except Exception:
             pass  # Consistency check failure should never block corrections
 
-        # Always apply the correction
+        # Always apply the correction — route to the active brain
+        brain = st.session_state.get("chat_brain_context", "pitch")
+        if brain == "both":
+            brain = "pitch"  # fallback for "both" context
         result = update_document(
             new_info=f"Direct correction from founder: {user_message}",
             update_reason="Direct founder correction",
+            brain=brain,
         )
 
         if result.get("success"):
             base = f"Got it — updated. {result.get('message', '')}"
             return base + info_note + "\n\nWhat else can I help with?"
         else:
-            return (
-                f"I heard you. The document update ran into an issue: {result.get('message', 'unknown error')}."
-            )
+            logging.error("Direct correction failed: %s", result.get('message', ''))
+            return "I heard you, but the document update ran into an issue. Please try again."
     except Exception as e:
-        return f"Understood. Could not auto-update the document: {e}."
+        logging.error("Direct correction error: %s", e)
+        return "Understood. Could not auto-update the document. Please try again."
 
 
 def _apply_quick_note(note_text: str) -> str:
@@ -563,7 +568,8 @@ def _apply_quick_note(note_text: str) -> str:
 
         return "Noted — saved to scratchpad. I can reference this in our conversation, but it won't appear in the living document."
     except Exception as e:
-        return f"Could not save note: {e}"
+        logging.error("Could not save note: %s", e)
+        return "Could not save note. Please try again."
 
 
 def _apply_contact(contact_text: str) -> str:
@@ -599,9 +605,11 @@ def _apply_contact(contact_text: str) -> str:
         if result.get("success"):
             return f"Contact noted — {result.get('message', '')}"
         else:
-            return f"Contact may not have been saved — {result.get('message', 'unknown error')}"
+            logging.error("Contact save issue: %s", result.get('message', ''))
+            return "Contact may not have been saved. Please try again."
     except Exception as e:
-        return f"Could not save contact: {e}"
+        logging.error("Could not save contact: %s", e)
+        return "Could not save contact. Please try again."
 
 
 def _apply_hypothesis(user_message: str) -> str:
@@ -667,7 +675,8 @@ def _apply_hypothesis(user_message: str) -> str:
             confirmation += " (note: database sync pending)"
         return confirmation
     except Exception as e:
-        return f"Could not track hypothesis: {e}"
+        logging.error("Could not track hypothesis: %s", e)
+        return "Could not track hypothesis. Please try again."
 
 
 def _apply_hypothesis_status_update(user_message: str) -> str:
@@ -707,7 +716,8 @@ def _apply_hypothesis_status_update(user_message: str) -> str:
 
         return f"Hypothesis updated to **{new_status}**: {fragment}"
     except Exception as e:
-        return f"Could not update hypothesis: {e}"
+        logging.error("Could not update hypothesis: %s", e)
+        return "Could not update hypothesis. Please try again."
 
 
 _QUICK_COMMANDS = [

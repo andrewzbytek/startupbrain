@@ -203,9 +203,12 @@ def pass2_severity_filter(pass1_results: dict, living_doc: str, session_type: st
     pass1_xml_parts = [f"<total_found>{len(filtered_contradictions)}</total_found>"]
     for c in filtered_contradictions:
         pass1_xml_parts.append("<contradiction>")
-        pass1_xml_parts.append(f"  <existing_claim>{escape_xml(c.get('existing_position', ''))}</existing_claim>")
+        pass1_xml_parts.append(f"  <id>{escape_xml(c.get('id', ''))}</id>")
         pass1_xml_parts.append(f"  <new_claim>{escape_xml(c.get('new_claim', ''))}</new_claim>")
+        pass1_xml_parts.append(f"  <existing_position>{escape_xml(c.get('existing_position', ''))}</existing_position>")
+        pass1_xml_parts.append(f"  <existing_section>{escape_xml(c.get('existing_section', ''))}</existing_section>")
         pass1_xml_parts.append(f"  <tension_description>{escape_xml(c.get('tension_description', ''))}</tension_description>")
+        pass1_xml_parts.append(f"  <is_revisited_rejection>{str(c.get('is_revisited_rejection', False)).lower()}</is_revisited_rejection>")
         pass1_xml_parts.append("</contradiction>")
     pass1_filtered_xml = "\n".join(pass1_xml_parts)
 
@@ -395,7 +398,7 @@ def check_dismissed(contradictions: list, living_doc: str) -> list:
         words = [w for w in claim_text.split() if len(w) > 4]
         dismissed_words = set(re.findall(r'\b\w+\b', dismissed_section))
         match_count = sum(1 for w in words if w in dismissed_words)
-        if len(words) > 0 and match_count / len(words) < 0.4:
+        if len(words) == 0 or match_count / len(words) < 0.4:
             filtered.append(c)
 
     return filtered

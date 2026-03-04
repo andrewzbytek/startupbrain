@@ -85,6 +85,7 @@ class TestInitSessionState:
             "_active_quick_cmd",
             "active_brain", "chat_brain_context",
             "_quick_cmd_pending", "_lock_session_id", "_lock_acquired",
+            "_ops_confirmed_claims", "_ops_committed", "_ops_result",
         }
         assert expected_keys == set(mock_st.session_state.keys())
 

@@ -98,7 +98,7 @@ def render_step_indicator(current_step: int, total_steps: int = 4, labels: list 
 
         # Add connector before steps 2-4
         if i > 1:
-            conn_cls = "completed" if i < current_step else "pending"
+            conn_cls = "completed" if i <= current_step else "pending"
             parts.append(
                 f'<div class="step-connector {conn_cls}"></div>'
             )

@@ -36,9 +36,13 @@ def migrate():
     old_doc = db["living_document"].find_one({"_id": "startup_brain"})
     if old_doc:
         old_doc["_id"] = "pitch_brain"
-        db["living_document"].replace_one({"_id": "pitch_brain"}, old_doc, upsert=True)
-        db["living_document"].delete_one({"_id": "startup_brain"})
-        print("✓ Renamed living_document _id: startup_brain → pitch_brain")
+        replace_result = db["living_document"].replace_one({"_id": "pitch_brain"}, old_doc, upsert=True)
+        if replace_result.upserted_id or replace_result.matched_count:
+            db["living_document"].delete_one({"_id": "startup_brain"})
+            print("✓ Renamed living_document _id: startup_brain → pitch_brain")
+        else:
+            print("ERROR: replace_one did not upsert or match — skipping delete for safety")
+            sys.exit(1)
     else:
         existing = db["living_document"].find_one({"_id": "pitch_brain"})
         if existing:

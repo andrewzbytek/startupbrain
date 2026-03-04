@@ -8,6 +8,11 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional
 import uuid
 
+try:
+    from pymongo import ReturnDocument
+except ImportError:
+    ReturnDocument = None  # pymongo unavailable — lock functions return early
+
 
 # Lock expires after 30 minutes (handles browser close / crash)
 LOCK_TIMEOUT_MINUTES = 30
@@ -64,7 +69,7 @@ def acquire_lock(session_id: Optional[str] = None) -> dict:
                 }
             },
             upsert=False,
-            return_document=True,  # pymongo ReturnDocument.AFTER equivalent
+            return_document=ReturnDocument.AFTER,
         )
 
         if result is not None:
@@ -91,7 +96,7 @@ def acquire_lock(session_id: Optional[str] = None) -> dict:
             refresh = collection.find_one_and_update(
                 {"_id": "ingestion_lock", "session_id": session_id},
                 {"$set": {"locked_at": now}},
-                return_document=True,
+                return_document=ReturnDocument.AFTER,
             )
             if refresh is not None:
                 return {"acquired": True, "locked_by": session_id, "message": "Lock refreshed (same session)"}
@@ -225,7 +230,7 @@ def acquire_doc_lock(timeout_seconds: int = 30) -> bool:
             },
             {"$set": {"locked": True, "locked_at": now}},
             upsert=False,
-            return_document=True,
+            return_document=ReturnDocument.AFTER,
         )
 
         if result is not None:

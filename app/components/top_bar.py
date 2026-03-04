@@ -82,15 +82,18 @@ def render_top_bar():
 
                     with st.spinner("Running audit..."):
                         result = run_audit()
-                    if result.get("has_contradictions"):
+                    discrepancies = result.get("discrepancies", [])
+                    if discrepancies:
                         st.warning(
-                            f"Audit found {result.get('contradiction_count', 0)} issue(s). "
+                            f"Audit found {len(discrepancies)} issue(s). "
                             "Review recommended."
                         )
                     else:
-                        st.success("Audit clean — no contradictions found.")
+                        st.success("Audit clean — no discrepancies found.")
                 except Exception as e:
-                    st.warning(f"Audit failed: {e}")
+                    import logging
+                    logging.error("Audit failed: %s", e)
+                    st.warning("Audit failed. Please try again.")
 
     with col_status:
         # API Cost pill

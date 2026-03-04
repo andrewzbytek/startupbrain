@@ -42,7 +42,7 @@ COLLECTIONS = [
 # Standard indexes: (collection, field, index_name)
 INDEXES = [
     ("sessions", "created_at", "sessions_created_at"),
-    ("sessions", "source_type", "sessions_source_type"),
+    ("sessions", "metadata.session_type", "sessions_metadata_session_type"),
     ("claims", "session_id", "claims_session_id"),
     ("claims", "created_at", "claims_created_at"),
     ("claims", "source_type", "claims_source_type"),

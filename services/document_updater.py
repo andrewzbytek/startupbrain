@@ -379,7 +379,8 @@ def _update_contact(doc: str, contact_name: str, updated_fields: str) -> str:
         rf"- \[\d{{4}}-\d{{2}}-\d{{2}}\] \*\*{escaped_name}\*\*.*?(?=\n- \[|\n###|\n## |\Z)",
         re.DOTALL | re.IGNORECASE,
     )
-    updated = pattern.sub(updated_fields.strip(), doc)
+    _replacement = updated_fields.strip()
+    updated = pattern.sub(lambda _m: _replacement, doc)
     return updated
 
 
@@ -435,8 +436,11 @@ def _add_section(doc: str, section: str, section_content: str) -> str:
             header_line = f"### {subsection}"
             if content_body.strip().startswith(header_line):
                 content_body = content_body.strip()[len(header_line):].lstrip("\n")
+            _g1 = match.group(1)
+            _g3 = match.group(3)
+            _body = content_body
             return existing_pattern.sub(
-                match.group(1) + content_body + "\n" + match.group(3),
+                lambda _m: _g1 + _body + "\n" + _g3,
                 doc,
             )
 

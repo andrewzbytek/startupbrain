@@ -340,11 +340,11 @@ class TestDismissedFiltering:
         assert result == []
 
     def test_claim_with_short_words_only(self):
-        """Claims with only short words (<=4 chars) are filtered out.
+        """Claims with only short words (<=4 chars) pass through.
 
-        When all words are <= 4 chars, len(words)==0, so the condition
-        `len(words) > 0 and match_count / len(words) < 0.4` is False,
-        and the claim is NOT appended to filtered.
+        When all words are <= 4 chars, len(words)==0, so no word-overlap
+        check is possible. These claims cannot match the dismissed section
+        and should be kept (not silently dropped).
         """
         doc = (
             "## Dismissed Contradictions\n"
@@ -354,5 +354,5 @@ class TestDismissedFiltering:
             {"new_claim": "we do it now"},  # all words <= 4 chars
         ]
         result = check_dismissed(contradictions, doc)
-        # With no words > 4 chars, the claim is treated as dismissed (not kept)
-        assert len(result) == 0
+        # Short-word claims pass through — they can't match dismissed text
+        assert len(result) == 1
