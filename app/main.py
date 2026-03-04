@@ -3,6 +3,16 @@ Startup Brain — Streamlit entry point.
 Streamlit Community Cloud deploys from app/main.py.
 """
 
+import sys
+from pathlib import Path
+
+# Ensure project root is on sys.path — Streamlit only adds the script's
+# directory (app/), so absolute imports like "from app.components..." and
+# "from services..." would fail without this.
+_project_root = str(Path(__file__).resolve().parent.parent)
+if _project_root not in sys.path:
+    sys.path.insert(0, _project_root)
+
 import logging
 import uuid
 
