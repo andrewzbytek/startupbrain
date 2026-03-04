@@ -6,6 +6,7 @@ then apply it — never rewriting the full document from scratch.
 
 import logging
 import re
+import shutil
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
@@ -15,11 +16,35 @@ LIVING_DOC_PATH = Path(__file__).parent.parent / "documents" / "startup_brain.md
 
 
 def read_living_document() -> str:
-    """Read and return the current living document content."""
-    if not LIVING_DOC_PATH.exists():
-        return ""
-    with open(LIVING_DOC_PATH, "r", encoding="utf-8") as f:
-        return f.read()
+    """Read and return the current living document content.
+
+    If the file is missing or empty (e.g. ephemeral filesystem after restart),
+    attempts to recover from MongoDB mirror.
+    """
+    content = ""
+    if LIVING_DOC_PATH.exists():
+        with open(LIVING_DOC_PATH, "r", encoding="utf-8") as f:
+            content = f.read()
+
+    if not content:
+        # Recover from MongoDB mirror
+        try:
+            from services.mongo_client import get_living_document
+            doc = get_living_document()
+            if doc and isinstance(doc.get("content"), str) and doc["content"]:
+                content = doc["content"]
+                # Write back to disk for current session
+                try:
+                    LIVING_DOC_PATH.parent.mkdir(parents=True, exist_ok=True)
+                    with open(LIVING_DOC_PATH, "w", encoding="utf-8") as f:
+                        f.write(content)
+                    logging.info("Living document recovered from MongoDB")
+                except Exception:
+                    pass  # Disk write failed — return content from memory anyway
+        except Exception as e:
+            logging.warning("Failed to recover living document from MongoDB: %s", e)
+
+    return content
 
 
 def write_living_document(content: str) -> None:
@@ -261,13 +286,15 @@ def _add_feedback(doc: str, feedback_content: str) -> str:
 
 def _add_dismissed(doc: str, dismissed_content: str) -> str:
     """Add a new entry to the Dismissed Contradictions section."""
-    pattern = re.compile(r"(## Dismissed Contradictions\n)(.*?)(\Z)", re.DOTALL)
+    pattern = re.compile(r"(## Dismissed Contradictions\n)(.*?)(\n## |\Z)", re.DOTALL)
 
     def replacer(m):
         existing = m.group(2).strip()
         if existing == "[No dismissed contradictions]":
             existing = ""
-        return m.group(1) + existing + "\n" + dismissed_content + "\n"
+        if existing:
+            return m.group(1) + existing + "\n" + dismissed_content + "\n" + m.group(3)
+        return m.group(1) + dismissed_content + "\n" + m.group(3)
 
     updated = pattern.sub(replacer, doc)
     if updated != doc:
@@ -415,9 +442,23 @@ def _git_commit(message: str) -> bool:
     """
     Git add and commit the living document.
     Returns True on success, False on failure.
+    Skips gracefully if git is not installed or not in a repo (e.g. Render).
     """
+    # Check if git is available
+    if shutil.which("git") is None:
+        return False
+
     try:
         repo_root = LIVING_DOC_PATH.parent.parent
+        # Check if we're in a git repo
+        check = subprocess.run(
+            ["git", "rev-parse", "--git-dir"],
+            cwd=str(repo_root),
+            capture_output=True,
+        )
+        if check.returncode != 0:
+            return False
+
         subprocess.run(
             ["git", "add", str(LIVING_DOC_PATH)],
             cwd=str(repo_root),
@@ -457,58 +498,65 @@ def update_document(new_info: str, update_reason: str = "", max_retries: int = 2
         dict with keys: success (bool), message (str), changes_applied (int)
     """
     from services.mongo_client import upsert_living_document
+    from services.ingestion_lock import acquire_doc_lock, release_doc_lock
 
-    current_doc = read_living_document()
-    if not current_doc:
-        return {"success": False, "message": "Living document not found.", "changes_applied": 0}
+    if not acquire_doc_lock(timeout_seconds=60):
+        return {"success": False, "message": "Could not acquire document lock — another update is in progress.", "changes_applied": 0}
 
-    diff_output = generate_diff(current_doc, new_info, update_reason)
-    verification_feedback = ""
-
-    for attempt in range(max_retries + 1):
-        verify_prompt = new_info
-        if verification_feedback and attempt > 0:
-            # Retry with feedback: regenerate diff
-            retry_info = f"{new_info}\n\nPrevious verification failed with issues:\n{verification_feedback}"
-            diff_output = generate_diff(current_doc, retry_info, update_reason)
-
-        verification = verify_diff(current_doc, diff_output, new_info)
-
-        if verification["verified"]:
-            break
-
-        verification_feedback = "\n".join(verification["issues"])
-        if attempt == max_retries:
-            return {
-                "success": False,
-                "message": f"Diff verification failed after {max_retries + 1} attempts: {verification_feedback}",
-                "changes_applied": 0,
-            }
-
-    # Parse and apply diff
-    diff_blocks = parse_diff_output(diff_output)
-    if not diff_blocks:
-        return {"success": False, "message": "No changes detected in diff output.", "changes_applied": 0}
-
-    updated_doc = apply_diff(current_doc, diff_blocks)
-
-    # Write file
     try:
-        write_living_document(updated_doc)
-    except Exception as e:
-        return {"success": False, "message": f"Failed to write living document: {e}", "changes_applied": 0}
+        current_doc = read_living_document()
+        if not current_doc:
+            return {"success": False, "message": "Living document not found.", "changes_applied": 0}
 
-    # Mirror to MongoDB
-    date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    upsert_living_document(updated_doc, metadata={"last_updated": date_str, "update_reason": update_reason})
+        diff_output = generate_diff(current_doc, new_info, update_reason)
+        verification_feedback = ""
 
-    # Git commit
-    commit_msg = f"Update startup_brain.md: {update_reason or 'session update'} ({date_str})"
-    git_ok = _git_commit(commit_msg)
+        for attempt in range(max_retries + 1):
+            verify_prompt = new_info
+            if verification_feedback and attempt > 0:
+                # Retry with feedback: regenerate diff
+                retry_info = f"{new_info}\n\nPrevious verification failed with issues:\n{verification_feedback}"
+                diff_output = generate_diff(current_doc, retry_info, update_reason)
 
-    return {
-        "success": True,
-        "message": f"Document updated successfully. {len(diff_blocks)} change(s) applied."
-                   + ("" if git_ok else " (git commit failed — check repo state)"),
-        "changes_applied": len(diff_blocks),
-    }
+            verification = verify_diff(current_doc, diff_output, new_info)
+
+            if verification["verified"]:
+                break
+
+            verification_feedback = "\n".join(verification["issues"])
+            if attempt == max_retries:
+                return {
+                    "success": False,
+                    "message": f"Diff verification failed after {max_retries + 1} attempts: {verification_feedback}",
+                    "changes_applied": 0,
+                }
+
+        # Parse and apply diff
+        diff_blocks = parse_diff_output(diff_output)
+        if not diff_blocks:
+            return {"success": False, "message": "No changes detected in diff output.", "changes_applied": 0}
+
+        updated_doc = apply_diff(current_doc, diff_blocks)
+
+        # Write file
+        try:
+            write_living_document(updated_doc)
+        except Exception as e:
+            return {"success": False, "message": f"Failed to write living document: {e}", "changes_applied": 0}
+
+        # Mirror to MongoDB
+        date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        upsert_living_document(updated_doc, metadata={"last_updated": date_str, "update_reason": update_reason})
+
+        # Git commit
+        commit_msg = f"Update startup_brain.md: {update_reason or 'session update'} ({date_str})"
+        git_ok = _git_commit(commit_msg)
+
+        return {
+            "success": True,
+            "message": f"Document updated successfully. {len(diff_blocks)} change(s) applied."
+                       + ("" if git_ok else " (git commit failed — check repo state)"),
+            "changes_applied": len(diff_blocks),
+        }
+    finally:
+        release_doc_lock()

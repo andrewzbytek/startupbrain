@@ -3,6 +3,9 @@ Startup Brain — Streamlit entry point.
 Streamlit Community Cloud deploys from app/main.py.
 """
 
+import logging
+import uuid
+
 import streamlit as st
 
 st.set_page_config(
@@ -11,6 +14,14 @@ st.set_page_config(
     page_icon="🧠",
     initial_sidebar_state="collapsed",
 )
+
+# --- Auth gate: block unauthenticated access ---
+from app.components.login import is_authenticated, render_login_page
+if not is_authenticated():
+    from app.components.styles import inject_custom_css
+    inject_custom_css()
+    render_login_page()
+    st.stop()
 
 # Must import state before any other app imports to avoid circular refs
 from app.state import init_session_state, set_mode, reset_ingestion, invalidate_sidebar
@@ -41,6 +52,20 @@ from app.components.progress import IngestionProgress, render_step_indicator
 
 def render_ingesting():
     """Ingestion input screen — paste transcript and add metadata."""
+    # Acquire ingestion lock
+    if not st.session_state.get("_lock_acquired"):
+        from services.ingestion_lock import acquire_lock
+        lock_session_id = st.session_state.get("_lock_session_id") or str(uuid.uuid4())
+        st.session_state._lock_session_id = lock_session_id
+        lock_result = acquire_lock(session_id=lock_session_id)
+        if not lock_result["acquired"]:
+            st.error("Another ingestion is in progress. Please wait for it to complete.")
+            if st.button("Back to Chat", key="lock_blocked_back"):
+                set_mode("chat")
+                st.rerun()
+            return
+        st.session_state._lock_acquired = True
+
     st.header("Ingest New Session")
     render_step_indicator(1)
     st.caption("Paste your post-session summary below. This should be a clean summary, not raw brainstorming.")
@@ -136,7 +161,8 @@ def render_ingesting():
                             else:
                                 st.warning("No content extracted from whiteboard.")
                         except Exception as e:
-                            st.error(f"Whiteboard processing failed: {e}")
+                            logging.error("Whiteboard processing failed: %s", e)
+                            st.error("Whiteboard processing failed. Please try again.")
 
     whiteboard_text = st.session_state.get("whiteboard_text", "")
     if whiteboard_text:
@@ -189,8 +215,9 @@ def render_ingesting():
                         st.rerun()
 
                     except Exception as e:
-                        st.error(f"Extraction failed: {e}")
-                        st.info("Check that your ANTHROPIC_API_KEY is configured in st.secrets.")
+                        logging.error("Extraction failed: %s", e)
+                        st.error("Extraction failed. Check that your ANTHROPIC_API_KEY is configured.")
+                        st.info("If the issue persists, try again or check the server logs.")
 
     with col_cancel:
         if st.button("Cancel", use_container_width=True, key="cancel_ingest_btn"):
@@ -236,6 +263,7 @@ def render_checking_consistency():
                 topic_tags=topic_tags,
                 session_type=session_type,
             )
+            writer.lock_session_id = st.session_state.get("_lock_session_id")
             writer.stage = "consistency_check"
             progress.update_step("Pipeline initialized", status="complete")
 
@@ -345,8 +373,8 @@ def render_checking_consistency():
                 set_mode("done")
 
     except Exception as e:
-        st.error(f"Ingestion pipeline failed: {e}")
-        st.info("You can try again or cancel.")
+        logging.error("Ingestion pipeline failed: %s", e)
+        st.error("Ingestion pipeline failed. You can try again or cancel.")
         if st.button("Cancel", key="cancel_after_error"):
             reset_ingestion()
             st.rerun()
@@ -456,7 +484,16 @@ else:
     if st.session_state.get("_has_pending_ingestion"):
         writer = st.session_state.get("deferred_writer")
         if writer is not None:
-            st.warning("A previous ingestion was interrupted before completing.")
+            # Check if this checkpoint belongs to a different session
+            checkpoint_owner = writer.lock_session_id
+            my_session_id = st.session_state.get("_lock_session_id")
+            is_own_checkpoint = checkpoint_owner is None or checkpoint_owner == my_session_id
+
+            if is_own_checkpoint:
+                st.warning("A previous ingestion was interrupted before completing.")
+            else:
+                st.warning("Another session's ingestion was interrupted. You can resume or discard it.")
+
             col_info1, col_info2, col_info3 = st.columns(3)
             with col_info1:
                 st.metric("Stage", writer.stage)
@@ -468,6 +505,17 @@ else:
             col_resume, col_discard = st.columns(2)
             with col_resume:
                 if st.button("Resume", type="primary", use_container_width=True, key="resume_pending"):
+                    # Re-acquire the ingestion lock for this session (fix L3)
+                    from services.ingestion_lock import acquire_lock
+                    lock_session_id = st.session_state.get("_lock_session_id") or str(uuid.uuid4())
+                    st.session_state._lock_session_id = lock_session_id
+                    lock_result = acquire_lock(session_id=lock_session_id)
+                    if not lock_result["acquired"]:
+                        st.error("Cannot resume — another ingestion is in progress.")
+                        st.rerun()
+                    else:
+                        st.session_state._lock_acquired = True
+
                     st.session_state.pending_claims = writer.confirmed_claims
                     st.session_state.current_transcript = writer.transcript
                     st.session_state.ingestion_participants = writer.metadata.get("participants", "")

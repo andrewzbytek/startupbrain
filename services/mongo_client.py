@@ -56,10 +56,14 @@ def get_mongo_client() -> Optional[object]:
         client.admin.command("ping")
         return client
     except (ConnectionFailure, ServerSelectionTimeoutError) as e:
-        st.warning(f"MongoDB connection failed: {e} — MongoDB features disabled.")
+        import logging
+        logging.error("MongoDB connection failed: %s", e)
+        st.warning("MongoDB connection failed — MongoDB features disabled.")
         return None
     except Exception as e:
-        st.warning(f"Unexpected MongoDB error: {e} — MongoDB features disabled.")
+        import logging
+        logging.error("Unexpected MongoDB error: %s", e)
+        st.warning("MongoDB connection error — MongoDB features disabled.")
         return None
 
 

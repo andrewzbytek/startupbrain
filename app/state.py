@@ -96,6 +96,16 @@ def invalidate_sidebar():
 
 def reset_ingestion():
     """Clear all ingestion-related state and return to chat mode."""
+    # Release ingestion lock if held
+    if st.session_state.get("_lock_acquired"):
+        try:
+            from services.ingestion_lock import release_lock
+            release_lock(session_id=st.session_state.get("_lock_session_id"))
+        except Exception:
+            pass
+        st.session_state._lock_acquired = False
+        st.session_state._lock_session_id = None
+
     st.session_state.mode = "chat"
     st.session_state.pending_claims = []
     st.session_state.contradictions = []
@@ -115,3 +125,4 @@ def reset_ingestion():
     st.session_state.pipeline_result = {}
     st.session_state.deferred_writer = None
     st.session_state._batch_committed = False
+    st.session_state._has_pending_ingestion = False

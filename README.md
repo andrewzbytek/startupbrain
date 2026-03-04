@@ -28,11 +28,12 @@ Secrets are configured via Streamlit's `st.secrets` (dashboard for Cloud, `.stre
 ```
 startupbrain/
 ├── app/                        # Streamlit UI layer
-│   ├── main.py                 # Entry point + page routing (state machine)
+│   ├── main.py                 # Entry point + auth gate + page routing (state machine)
 │   ├── state.py                # Session state, mode transitions, constants
 │   └── components/
 │       ├── chat.py             # Chat interface, quick notes, hypothesis tracking, contradiction resolution
 │       ├── claim_editor.py     # Claim confirmation/editing UI
+│       ├── login.py            # Shared-credential login with cookie-based sessions
 │       ├── progress.py         # Pipeline progress + step indicator
 │       ├── sidebar.py          # Dashboard sidebar (current view, feedback, actions, download)
 │       └── styles.py           # Custom CSS injection
@@ -41,10 +42,11 @@ startupbrain/
 │   ├── consistency.py          # 3-pass consistency engine (the core feature)
 │   ├── cost_tracker.py         # Monthly cost tracking with budget alerts
 │   ├── deferred_writer.py      # Batched writes, crash recovery, session rollback
-│   ├── document_updater.py     # Living document diff-and-verify updates
+│   ├── document_updater.py     # Living document diff-and-verify updates + MongoDB recovery
 │   ├── export.py               # Full context export (living doc + sessions + claims)
 │   ├── feedback.py             # Feedback patterns, evolution narratives, pitch generation
 │   ├── ingestion.py            # Transcript → claims → storage pipeline
+│   ├── ingestion_lock.py       # MongoDB-based concurrent ingestion lock
 │   └── mongo_client.py         # MongoDB Atlas client (sessions, claims, feedback, vector search)
 ├── prompts/                    # LLM prompt templates (12 markdown files)
 │   ├── extraction.md           # Claim extraction from session transcripts
@@ -61,7 +63,8 @@ startupbrain/
 │   └── whiteboard.md           # Whiteboard photo extraction (vision)
 ├── documents/
 │   └── startup_brain.md        # The living document (git-tracked, mirrored to MongoDB)
-├── tests/                      # 859 unit tests, 45 integration tests
+├── render.yaml                 # Render Blueprint deployment config
+├── tests/                      # 893 unit tests, 45 integration tests
 │   ├── conftest.py             # Shared fixtures and sample data
 │   ├── test_transcripts/       # Sample transcripts for testing
 │   └── test_*.py               # Test modules (one per service/component)
@@ -97,7 +100,7 @@ Paste transcript → Select session type → [Optional: upload whiteboard]
 
 ### Key Design Decisions
 
-- **Single living document** (`documents/startup_brain.md`) — git-tracked, mirrored to MongoDB
+- **Single living document** (`documents/startup_brain.md`) — git-tracked, mirrored to MongoDB, auto-recovered from MongoDB on ephemeral filesystems
 - **Diff-and-verify updates** — never full rewrite, always minimal structured diffs
 - **3-pass consistency engine** — Pass 1+2 Sonnet (always), Pass 3 Opus (only if Critical)
 - **Cost-aware routing** — Sonnet by default, Opus only for deep analysis and pitch generation
@@ -155,15 +158,38 @@ python -m pytest tests/ -m integration
 python -m pytest tests/ -v --tb=short -m "not integration"
 ```
 
-859 unit tests + 45 integration tests across 24 test files. All service and component tests run fully offline with mocks.
+893 unit tests + 45 integration tests across 26 test files. All service and component tests run fully offline with mocks.
 
 ## Deployment
 
-Deployed on **Streamlit Community Cloud** directly from this repo.
+### Render (primary)
+
+Deployed on **Render** free tier via `render.yaml` Blueprint.
+
+```bash
+# Push to GitHub → Render auto-deploys
+# Or: Render dashboard → New → Blueprint → connect this repo
+```
 
 - Entry point: `app/main.py`
-- Secrets: configured in the Streamlit Cloud dashboard (never in repo)
+- Env vars (set in Render dashboard): `ANTHROPIC_API_KEY`, `MONGODB_URI`, `APP_USERNAME`, `APP_PASSWORD`
+- Ephemeral filesystem: living document auto-recovers from MongoDB on restart
+- Git commits no-op gracefully (no repo on Render)
+
+### Streamlit Community Cloud (legacy)
+
+Still supported. Secrets via Cloud dashboard.
+
 - Required secrets: `ANTHROPIC_API_KEY`, `MONGODB_URI`
+- Optional secrets: `APP_USERNAME`, `APP_PASSWORD`
+
+### Authentication
+
+Set `APP_USERNAME` and `APP_PASSWORD` env vars to enable login. When unset, auth is skipped (local dev). Login uses HMAC-signed cookies for 7-day session persistence.
+
+### Concurrent Access
+
+An ingestion lock prevents two users from ingesting simultaneously. The lock is MongoDB-based with a 30-minute stale timeout (handles browser close / crash). The top bar shows "Ingestion in progress..." when locked.
 
 ## Cost Model
 

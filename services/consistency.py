@@ -202,12 +202,24 @@ def pass2_severity_filter(pass1_results: dict, living_doc: str, session_type: st
 
     prompt_template = load_prompt("consistency_pass2")
 
+    # Build pass1 XML from the filtered contradictions list (not raw output,
+    # which still contains dismissed items that were filtered by check_dismissed)
+    filtered_contradictions = pass1_results.get("contradictions", [])
+    pass1_xml_parts = [f"<total_found>{len(filtered_contradictions)}</total_found>"]
+    for c in filtered_contradictions:
+        pass1_xml_parts.append("<contradiction>")
+        pass1_xml_parts.append(f"  <existing_claim>{escape_xml(c.get('existing_claim', ''))}</existing_claim>")
+        pass1_xml_parts.append(f"  <new_claim>{escape_xml(c.get('new_claim', ''))}</new_claim>")
+        pass1_xml_parts.append(f"  <tension_description>{escape_xml(c.get('tension_description', ''))}</tension_description>")
+        pass1_xml_parts.append("</contradiction>")
+    pass1_filtered_xml = "\n".join(pass1_xml_parts)
+
     prompt = f"""{prompt_template}
 
 <pass2_input>
   <session_type>{escape_xml(session_type)}</session_type>
   <living_document>{living_doc}</living_document>
-  <pass1_results>{pass1_results['raw']}</pass1_results>
+  <pass1_results>{pass1_filtered_xml}</pass1_results>
 </pass2_input>"""
 
     result = call_sonnet(prompt, task_type="consistency_pass2")

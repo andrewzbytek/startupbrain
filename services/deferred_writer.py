@@ -31,6 +31,7 @@ class DeferredWriter:
         self.contradiction_resolutions = []
         self.stage = "initialized"
         self.pipeline_result = {}
+        self.lock_session_id = None  # Ties checkpoint to the session that created it
 
     def initialize(
         self,
@@ -141,27 +142,35 @@ class DeferredWriter:
         from services.document_updater import write_living_document, _git_commit
         from services.mongo_client import upsert_living_document, delete_pending_ingestion
         from services.ingestion import store_session, store_confirmed_claims
+        from services.ingestion_lock import acquire_doc_lock, release_doc_lock
 
         date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         doc_changed = self.in_memory_doc != self.original_doc
 
         try:
-            # 1. Write file (only if changed)
+            # 1. Write file (only if changed) — acquire doc lock to prevent clobbering
             if doc_changed:
-                write_living_document(self.in_memory_doc)
+                if not acquire_doc_lock(timeout_seconds=60):
+                    return {
+                        "success": False,
+                        "message": "Could not acquire document lock — another update is in progress.",
+                        "claims_stored": 0, "session_id": "", "document_updated": False, "changes_applied": 0,
+                    }
+                try:
+                    write_living_document(self.in_memory_doc)
 
-            # 2. Mirror to MongoDB
-            if doc_changed:
-                update_reason = self._build_update_reason()
-                upsert_living_document(
-                    self.in_memory_doc,
-                    metadata={"last_updated": date_str, "update_reason": update_reason},
-                )
+                    # 2. Mirror to MongoDB
+                    update_reason = self._build_update_reason()
+                    upsert_living_document(
+                        self.in_memory_doc,
+                        metadata={"last_updated": date_str, "update_reason": update_reason},
+                    )
 
-            # 3. Single git commit
-            if doc_changed:
-                commit_msg = f"Update startup_brain.md: {self._build_update_reason()} ({date_str})"
-                _git_commit(commit_msg)
+                    # 3. Single git commit
+                    commit_msg = f"Update startup_brain.md: {self._build_update_reason()} ({date_str})"
+                    _git_commit(commit_msg)
+                finally:
+                    release_doc_lock()
 
             # 4. Store session
             session_id = store_session(
@@ -239,6 +248,7 @@ class DeferredWriter:
             "consistency_results": _serialize_consistency(self.consistency_results),
             "contradiction_resolutions": self.contradiction_resolutions,
             "stage": self.stage,
+            "lock_session_id": self.lock_session_id,
             "saved_at": datetime.now(timezone.utc).isoformat(),
         }
 
@@ -257,6 +267,7 @@ class DeferredWriter:
         writer.consistency_results = data.get("consistency_results")
         writer.contradiction_resolutions = data.get("contradiction_resolutions", [])
         writer.stage = data.get("stage", "unknown")
+        writer.lock_session_id = data.get("lock_session_id")
         return writer
 
 

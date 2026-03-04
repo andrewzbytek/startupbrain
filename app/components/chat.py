@@ -275,7 +275,12 @@ def _format_recall_context(sessions, claims=None, feedback=None) -> str:
 
     result = "\n".join(parts)
     if len(result) > _MAX_RECALL_CHARS:
-        result = result[:_MAX_RECALL_CHARS] + "\n</session_recall>"
+        # Truncate at a newline boundary to avoid cutting through XML tags
+        truncated = result[:_MAX_RECALL_CHARS]
+        last_newline = truncated.rfind("\n")
+        if last_newline > 0:
+            truncated = truncated[:last_newline]
+        result = truncated + "\n</session_recall>"
     return result
 
 
@@ -600,11 +605,15 @@ def _apply_hypothesis(user_message: str) -> str:
             read_living_document, write_living_document, _add_hypothesis, _git_commit,
         )
         from services.mongo_client import insert_claim, upsert_living_document
+        from services.ingestion_lock import acquire_doc_lock, release_doc_lock
         from datetime import datetime, timezone
 
         hypothesis_text = _strip_hypothesis_prefix(user_message)
         if not hypothesis_text:
             return "Please provide a hypothesis after the 'hypothesis:' prefix."
+
+        if not acquire_doc_lock(timeout_seconds=30):
+            return "Could not update document — another update is in progress. Please try again."
 
         date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         entry = (
@@ -613,11 +622,14 @@ def _apply_hypothesis(user_message: str) -> str:
             f"  Evidence: ---"
         )
 
-        doc = read_living_document()
-        doc = _add_hypothesis(doc, entry)
-        write_living_document(doc)
-        upsert_living_document(doc, metadata={"last_updated": date_str, "update_reason": "New hypothesis"})
-        _git_commit(f"Add hypothesis: {hypothesis_text[:50]}")
+        try:
+            doc = read_living_document()
+            doc = _add_hypothesis(doc, entry)
+            write_living_document(doc)
+            upsert_living_document(doc, metadata={"last_updated": date_str, "update_reason": "New hypothesis"})
+            _git_commit(f"Add hypothesis: {hypothesis_text[:50]}")
+        finally:
+            release_doc_lock()
 
         # Store in MongoDB as a hypothesis claim
         db_synced = False
@@ -956,7 +968,12 @@ def render_chat():
         with st.chat_message("assistant"):
             response = st.write_stream(_call_claude_stream(user_input, query_type))
 
-        add_message("assistant", response)
+        # Don't pollute conversation history with error messages
+        if response and not str(response).startswith("Error: "):
+            add_message("assistant", response)
+        elif response:
+            # Show error but don't save to history (would pollute future Claude context)
+            add_message("assistant", "I had trouble responding. Please try again.")
         st.rerun()
 
 

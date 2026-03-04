@@ -3,6 +3,7 @@ Full-page dashboard for Startup Brain.
 Replaces the sidebar with a dedicated dashboard tab.
 """
 
+import hashlib
 import html
 
 import streamlit as st
@@ -87,6 +88,8 @@ def render_dashboard():
         with st.expander(f"Hypotheses ({len(active)} active)", expanded=True):
             if active:
                 for i, h in enumerate(active):
+                    # Use hash of hypothesis text for stable widget keys
+                    _hkey = hashlib.md5(h["text"].encode()).hexdigest()[:8]
                     bg, fg = _STATUS_COLORS.get(h["status"], ("rgba(139,148,158,0.12)", "#8B949E"))
                     badge_html = (
                         f'<span style="background:{bg};color:{fg};padding:2px 8px;'
@@ -103,9 +106,9 @@ def render_dashboard():
                         "Update status",
                         options=["unvalidated", "testing", "validated", "invalidated"],
                         index=["unvalidated", "testing", "validated", "invalidated"].index(h["status"]),
-                        key=f"dash_hyp_status_{i}",
+                        key=f"dash_hyp_status_{_hkey}",
                     )
-                    if st.button("Save", key=f"dash_hyp_save_{i}"):
+                    if st.button("Save", key=f"dash_hyp_save_{_hkey}"):
                         if new_status != h["status"]:
                             try:
                                 from services.document_updater import (

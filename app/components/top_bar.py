@@ -25,11 +25,22 @@ def render_top_bar():
         btn_col1, btn_col2 = st.columns(2)
         mode = st.session_state.get("mode", "chat")
 
+        # Check ingestion lock status
+        ingestion_locked = False
+        try:
+            from services.ingestion_lock import check_lock
+            lock_status = check_lock()
+            ingestion_locked = lock_status.get("locked", False) and not lock_status.get("stale", False)
+        except Exception:
+            pass
+
         with btn_col1:
+            ingest_disabled = mode != "chat" or ingestion_locked
+            ingest_label = "Ingestion in progress..." if ingestion_locked else "Ingest Session"
             if st.button(
-                "Ingest Session",
+                ingest_label,
                 type="primary",
-                disabled=mode != "chat",
+                disabled=ingest_disabled,
                 use_container_width=True,
                 key="top_bar_ingest",
             ):

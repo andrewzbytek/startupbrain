@@ -215,11 +215,12 @@ class TestGitCommit:
     def test_success_returns_true(self):
         """Should return True on successful git commands."""
         from services.document_updater import _git_commit
-        with patch("services.document_updater.subprocess.run") as mock_run:
+        with patch("services.document_updater.shutil.which", return_value="/usr/bin/git"), \
+             patch("services.document_updater.subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(returncode=0)
             result = _git_commit("test commit")
             assert result is True
-            assert mock_run.call_count == 2  # git add + git commit
+            assert mock_run.call_count == 3  # git rev-parse + git add + git commit
 
     def test_called_process_error_returns_false(self):
         """Should return False when git command fails."""
