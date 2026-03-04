@@ -255,8 +255,8 @@ All 24 sections of the spec are implemented plus the two-brain architecture exte
 **Security and multi-user safety:**
 - Auth hardened for production (requires credentials or explicit opt-out)
 - Two-tier MongoDB locking (ingestion lock + document write lock)
-- Atomic lock operations, UUID-based session IDs, sanitized error messages
-- Consistency engine properly filters dismissed contradictions
+- Atomic lock operations (`ReturnDocument.AFTER`), UUID-based session IDs, sanitized error messages
+- Consistency engine properly filters dismissed contradictions (including short-word claims)
 
 **Deliberate deviations from spec:**
 - **Vector search**: Code is in place but Atlas free tier (M0) doesn't support Voyage AI autoEmbed. System uses time-based retrieval with a health monitor that alerts at 200 claims when upgrading to M10+ becomes worthwhile.
