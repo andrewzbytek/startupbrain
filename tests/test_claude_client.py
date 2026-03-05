@@ -232,7 +232,7 @@ class TestCallSonnet:
             assert result["tokens_in"] == 0
 
     def test_api_exception_returns_error(self):
-        """API exception should be caught and returned as error dict."""
+        """API exception should be caught and returned as sanitized error dict."""
         mock_client = MagicMock()
         mock_client.messages.create.side_effect = Exception("API rate limit exceeded")
 
@@ -240,8 +240,9 @@ class TestCallSonnet:
         with patch.object(cc, "_get_client", return_value=mock_client), \
              patch("services.cost_tracker.log_api_call"):
             result = cc.call_sonnet("Hello")
-            assert "Error" in result["text"]
-            assert "API rate limit exceeded" in result["text"]
+            assert "unavailable" in result["text"].lower()
+            # Raw exception details should NOT leak to user
+            assert "API rate limit exceeded" not in result["text"]
 
     def test_cost_logged_via_tracker(self):
         """Successful call should log cost via cost_tracker."""
@@ -308,7 +309,7 @@ class TestCallOpus:
             assert result["tokens_out"] == 100
 
     def test_api_exception(self):
-        """API exception should be caught and returned as error dict."""
+        """API exception should be caught and returned as sanitized error dict."""
         mock_client = MagicMock()
         mock_client.messages.create.side_effect = Exception("Server error")
 
@@ -316,8 +317,9 @@ class TestCallOpus:
         with patch.object(cc, "_get_client", return_value=mock_client), \
              patch("services.cost_tracker.log_api_call"):
             result = cc.call_opus("Analyze this")
-            assert "Error" in result["text"]
-            assert "Server error" in result["text"]
+            assert "unavailable" in result["text"].lower()
+            # Raw exception details should NOT leak to user
+            assert "Server error" not in result["text"]
 
     def test_no_client_returns_error(self):
         """Should return error when client is None."""
@@ -502,6 +504,6 @@ class TestStreamResponse:
         chunks = list(gen)
         # Should contain the partial text and then an error message
         assert "partial" in chunks
-        assert any("Error" in c for c in chunks)
+        assert any("unavailable" in c.lower() for c in chunks)
         # Cost should still be logged (in finally block) with 0 tokens
         mock_cost_tracker.log_api_call.assert_called_once_with(SONNET_MODEL, 0, 0, "general")

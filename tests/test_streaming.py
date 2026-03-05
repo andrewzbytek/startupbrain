@@ -44,7 +44,7 @@ class TestStreamResponse:
         chunks = list(gen)
 
         assert len(chunks) == 1
-        assert "Error" in chunks[0]
+        assert "unavailable" in chunks[0].lower()
 
     def test_cost_logged_on_completion(self):
         """Cost tracker should be called after stream completes."""

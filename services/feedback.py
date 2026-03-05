@@ -252,7 +252,7 @@ def ingest_feedback(
     }
 
 
-def generate_evolution_narrative(topic: str) -> dict:
+def generate_evolution_narrative(topic: str, brain: str = "pitch") -> dict:
     """
     Generate a narrative of how thinking on a topic has evolved.
     Uses Sonnet with evolution.md prompt.
@@ -267,7 +267,7 @@ def generate_evolution_narrative(topic: str) -> dict:
     from services.document_updater import read_living_document
 
     prompt_template = load_prompt("evolution")
-    doc = read_living_document()
+    doc = read_living_document(brain=brain)
 
     # Extract relevant section and decision log entries
     # Find the section for this topic
@@ -331,7 +331,7 @@ def generate_evolution_narrative(topic: str) -> dict:
     }
 
 
-def generate_pitch_materials(request: str, book_frameworks: Optional[list] = None) -> dict:
+def generate_pitch_materials(request: str, book_frameworks: Optional[list] = None, brain: str = "pitch") -> dict:
     """
     Generate pitch materials using Opus and pitch_generation.md prompt.
 
@@ -347,7 +347,7 @@ def generate_pitch_materials(request: str, book_frameworks: Optional[list] = Non
     from services.mongo_client import get_book_frameworks
 
     prompt_template = load_prompt("pitch_generation")
-    startup_brain = read_living_document()
+    startup_brain = read_living_document(brain=brain)
 
     # Get book frameworks from MongoDB if not provided
     if book_frameworks is None:

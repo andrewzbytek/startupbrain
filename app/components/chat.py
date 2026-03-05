@@ -14,6 +14,7 @@ from app.state import add_message, set_mode, reset_ingestion, invalidate_sidebar
 
 
 from app.components._parsers import _escape_latex
+from services.claude_client import escape_xml
 
 
 # Minimum transcript length to suggest ingestion flow
@@ -332,7 +333,7 @@ def _build_recall_context(user_message: str) -> str:
     return _format_recall_context(sessions, claims, feedback_list)
 
 
-def _get_system_prompt() -> str:
+def _get_system_prompt(query_type: str = "") -> str:
     """Build a system prompt including current living document state."""
     try:
         from services.document_updater import read_living_document
@@ -392,7 +393,7 @@ def _get_system_prompt() -> str:
         "- Respond in plain markdown.\n\n"
     )
     if doc:
-        base += f"<startup_brain>\n{doc}\n</startup_brain>"
+        base += f"<startup_brain>\n{escape_xml(doc)}\n</startup_brain>"
 
     # Append recent scratchpad notes so the AI can reference them
     try:
@@ -409,14 +410,15 @@ def _get_system_prompt() -> str:
                 f"- [{n.get('created_at', '').strftime('%Y-%m-%d %H:%M') if hasattr(n.get('created_at', ''), 'strftime') else 'unknown date'}] {n.get('claim_text', '')}"
                 for n in scratchpad
             )
-            base += f"\n\n<scratchpad_notes>\nRecent scratchpad notes from the founder (not in the living document):\n{notes_text}\n</scratchpad_notes>"
+            base += f"\n\n<scratchpad_notes>\nRecent scratchpad notes from the founder (not in the living document):\n{escape_xml(notes_text)}\n</scratchpad_notes>"
     except Exception:
         pass  # MongoDB unavailable — skip scratchpad
 
-    # Append book framework if loaded for cross-check
-    book_content = st.session_state.get("book_crosscheck_content", "")
-    if book_content:
-        base += f"\n\n<book_framework>{book_content}</book_framework>"
+    # Append book framework if loaded for cross-check (skip for recall/historical to avoid inflating prompts)
+    if query_type not in ("recall", "historical"):
+        book_content = st.session_state.get("book_crosscheck_content", "")
+        if book_content:
+            base += f"\n\n<book_framework>{escape_xml(book_content)}</book_framework>"
 
     return base
 
@@ -431,7 +433,7 @@ def _build_claude_prompt(user_message: str, query_type: str):
     history_text = ""
     for msg in recent_history[:-1]:
         role_label = "Founder" if msg["role"] == "user" else "Startup Brain"
-        history_text += f"{role_label}: {msg['content']}\n\n"
+        history_text += f"{role_label}: {escape_xml(msg['content'])}\n\n"
 
     if history_text:
         full_prompt = f"<conversation_history>\n{history_text}</conversation_history>\n\nFounder: {user_message}"
@@ -454,7 +456,7 @@ def _build_claude_prompt(user_message: str, query_type: str):
         "general": "general",
     }
     task_type = task_map.get(query_type, "general")
-    system = _get_system_prompt()
+    system = _get_system_prompt(query_type=query_type)
     return full_prompt, task_type, system
 
 

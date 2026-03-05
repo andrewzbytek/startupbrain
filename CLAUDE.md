@@ -31,8 +31,9 @@ AI-powered knowledge management for a 2-person startup. See `docs/SPEC.md` for f
 - `services/mongo_client.py` also exposes `delete_many(collection, query)` and `get_latest_session()` for manual cleanup
 
 ## Key Conventions
-- Use `@st.cache_resource` for MongoDB connections
-- Every Claude API call goes through `services/claude_client.py` which handles cost tracking and Sonnet/Opus routing
+- Use `@st.cache_resource` for MongoDB connections and the Anthropic client
+- Every Claude API call goes through `services/claude_client.py` which handles cost tracking, Sonnet/Opus routing, and error sanitization
+- Shared XML parsing utility: `from services.claude_client import extract_xml_tag` — used by ingestion.py, consistency.py, feedback.py (eliminates duplication)
 - Prompts are markdown files in `/prompts` — read them with open(), never inline them
 - Use XML tags for structured LLM input/output
 - Git commit living documents after every update with descriptive message (no-ops gracefully when git unavailable, e.g. Render)
@@ -73,7 +74,7 @@ When splitting tasks across agents, avoid overlapping file edits:
 - Required secrets/env vars: `ANTHROPIC_API_KEY`, `MONGODB_URI`
 - Optional secrets/env vars: `APP_USERNAME`, `APP_PASSWORD` (enables login gate), `DISABLE_AUTH` (set to `true` to skip auth in production)
 
-## Current Status (as of 2026-03-04)
+## Current Status (as of 2026-03-05)
 
 ### Implementation: Complete
 All 24 sections of `docs/SPEC.md` are implemented plus brain split architecture. The system is production-ready for daily use.
@@ -86,9 +87,11 @@ All 24 sections of `docs/SPEC.md` are implemented plus brain split architecture.
 
 **Features:** Session type categorization through entire pipeline, whiteboard photo processing (vision), feedback pattern detection, evolution narratives, pitch material generation (Opus), cost tracking with budget alerts, book framework cross-check via .md upload in chat, direct corrections with informational consistency check (brain-aware — routes to active brain), contradiction resolution writing Decision Log and Dismissed Contradictions entries, scratchpad notes via chat prefix (`note:`, `remember:`, `jot:`, `fyi:`) saved to MongoDB only (no doc update, surfaced in chat system prompt), hypothesis tracking via chat prefix (`hypothesis:`, `validated:`, `invalidated:`) or dashboard form, Socratic system prompt with context surfacing and feedback echo, dashboard tensions indicator (changelog churn, dismissed contradictions, decisions under evaluation), 'challenge' query classification routing to Opus, 3 quick command chips (note, hypothesis, contact) below chat input for prefix discoverability, full context export (living doc + session history + claims as single MD), session rollback command, shared-credential auth with cookie persistence, ingestion lock + document write lock for concurrent access.
 
-**Security:** Auth hardened for production (requires credentials or explicit `DISABLE_AUTH=true`), HMAC cookie signing (no fallback key), sanitized error messages (no URI/path leakage — all MongoDB errors use `logging.error()` server-side + generic `st.warning()` to users), UUID-based session IDs, XML-escaped living document content in all LLM prompts.
+**Security:** Auth hardened for production (requires credentials or explicit `DISABLE_AUTH=true`), HMAC cookie signing (no fallback key), sanitized error messages (no URI/path/API key leakage — all API and MongoDB errors use `logging.error()` server-side + generic user-facing messages), UUID-based session IDs, XML-escaped living document content in all LLM prompts (system prompt, scratchpad notes, book frameworks, conversation history all escaped via `escape_xml()`).
 
 **Multi-user safety:** Two-tier locking — long-lived ingestion lock (30-min timeout) for full pipeline, short-lived document write lock (2-min timeout) for individual writes (including dashboard hypothesis forms, chat hypothesis status updates, and contradiction resolution fallback path). Atomic lock operations via `find_one_and_update` with `ReturnDocument.AFTER`. DeferredWriter checkpoints track lock ownership to prevent cross-user recovery hijacking. Dismissed contradictions properly filtered in consistency engine Pass 2. Doc lock acquisition resilient to transient MongoDB errors (try/except with retry).
+
+**LLM integration hardening:** Anthropic client cached via `@st.cache_resource` (not recreated per call). Consistency engine detects API errors and surfaces "check failed" instead of silently producing "no contradictions". All 3 consistency passes, evolution narratives, and pitch material generation are brain-aware. Pass 2 input properly wrapped in `<pass1_output>` tags. Book framework content excluded from recall/historical query types to avoid inflating system prompts.
 
 **Infrastructure:** Vector search code ready (`vector_search_text()`, upgraded `_get_rag_evidence()`), time-based fallback on free tier, RAG health monitor (warns at 200 claims). Render deployment live at `https://startupbrain.onrender.com` (free tier), ephemeral filesystem handled by MongoDB document recovery, git no-op when not in a repo.
 

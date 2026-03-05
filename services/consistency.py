@@ -10,15 +10,25 @@ Pass 3 (Opus): Deep analysis — ONLY if Pass 2 found Critical contradictions
 import re
 from typing import Optional
 
+import logging
+
+from services.claude_client import extract_xml_tag as _extract_tag
+
+
+def _is_api_error(result: dict) -> bool:
+    """Check if an API call result indicates an error."""
+    text = result.get("text", "")
+    return text.startswith("AI service temporarily unavailable") or text.startswith("Error:")
+
 # When claim count exceeds this, time-based retrieval starts missing relevant evidence.
 # At this point, semantic vector search (Atlas M10+ with autoEmbed) becomes worth it.
 RAG_UPGRADE_CLAIM_THRESHOLD = 200
 
 
-def read_living_document() -> str:
+def read_living_document(brain: str = "pitch") -> str:
     """Read and return the current living document content."""
     from services.document_updater import read_living_document as _read_doc
-    return _read_doc(brain="pitch")
+    return _read_doc(brain=brain)
 
 
 def _claims_to_xml(claims: list) -> str:
@@ -154,12 +164,6 @@ def _parse_pass3_output(raw_output: str) -> list:
     return analyses
 
 
-def _extract_tag(text: str, tag: str) -> str:
-    """Extract content of first XML tag from text."""
-    match = re.search(rf"<{tag}>(.*?)</{tag}>", text, re.DOTALL)
-    return match.group(1).strip() if match else ""
-
-
 def pass1_wide_net(living_doc: str, claims: list, session_type: str = "") -> dict:
     """
     Pass 1: Find ALL potential contradictions using Sonnet.
@@ -179,6 +183,9 @@ def pass1_wide_net(living_doc: str, claims: list, session_type: str = "") -> dic
 </consistency_input>"""
 
     result = call_sonnet(prompt, task_type="consistency_pass1")
+    if _is_api_error(result):
+        logging.error("Consistency Pass 1 API call failed: %s", result["text"])
+        return {"contradictions": [], "total_found": 0, "raw": result["text"], "api_error": True}
     raw = result["text"]
     contradictions = parse_contradictions(raw)
 
@@ -210,7 +217,7 @@ def pass2_severity_filter(pass1_results: dict, living_doc: str, session_type: st
         pass1_xml_parts.append(f"  <tension_description>{escape_xml(c.get('tension_description', ''))}</tension_description>")
         pass1_xml_parts.append(f"  <is_revisited_rejection>{str(c.get('is_revisited_rejection', False)).lower()}</is_revisited_rejection>")
         pass1_xml_parts.append("</contradiction>")
-    pass1_filtered_xml = "\n".join(pass1_xml_parts)
+    pass1_filtered_xml = "<pass1_output>\n" + "\n".join(pass1_xml_parts) + "\n</pass1_output>"
 
     prompt = f"""{prompt_template}
 
@@ -221,6 +228,9 @@ def pass2_severity_filter(pass1_results: dict, living_doc: str, session_type: st
 </pass2_input>"""
 
     result = call_sonnet(prompt, task_type="consistency_pass2")
+    if _is_api_error(result):
+        logging.error("Consistency Pass 2 API call failed: %s", result["text"])
+        return {"retained": [], "has_critical": False, "total_retained": 0, "filtered_out": [], "raw": result["text"], "api_error": True}
     return _parse_pass2_output(result["text"])
 
 
@@ -290,8 +300,8 @@ def _get_rag_evidence(claims: list) -> list:
     evidence = []
 
     # Fetch recent claims from MongoDB to provide evidence context
-    recent_claims = get_claims(limit=50)
-    for claim in recent_claims[:10]:
+    recent_claims = get_claims(limit=10)
+    for claim in recent_claims:
         _ca = claim.get("created_at", "")
         evidence.append({
             "source_date": _ca[:10] if isinstance(_ca, str) else (_ca.strftime("%Y-%m-%d") if hasattr(_ca, 'strftime') else ""),
@@ -314,7 +324,6 @@ def _get_rag_evidence(claims: list) -> list:
         from services.mongo_client import count_documents
         total = count_documents("claims")
         if total >= RAG_UPGRADE_CLAIM_THRESHOLD:
-            import logging
             logging.warning(
                 "RAG using time-based fallback with %d claims (threshold: %d). "
                 "Consistency checks may miss older relevant evidence.",
@@ -372,6 +381,9 @@ def pass3_deep_analysis(critical_items: list, living_doc: str, rag_evidence: lis
 </pass3_input>"""
 
     result = call_opus(prompt, task_type="consistency_pass3")
+    if _is_api_error(result):
+        logging.error("Consistency Pass 3 API call failed: %s", result["text"])
+        return {"analyses": [], "raw": result["text"], "api_error": True}
     raw = result["text"]
     analyses = _parse_pass3_output(raw)
 
@@ -404,7 +416,7 @@ def check_dismissed(contradictions: list, living_doc: str) -> list:
     return filtered
 
 
-def run_consistency_check(claims: list, session_type: str = "") -> dict:
+def run_consistency_check(claims: list, session_type: str = "", brain: str = "pitch") -> dict:
     """
     Orchestrate all consistency check passes.
 
@@ -430,7 +442,7 @@ def run_consistency_check(claims: list, session_type: str = "") -> dict:
             "summary": "No claims to check.",
         }
 
-    living_doc = read_living_document()
+    living_doc = read_living_document(brain=brain)
     if not living_doc:
         return {
             "pass1": None,
@@ -443,6 +455,16 @@ def run_consistency_check(claims: list, session_type: str = "") -> dict:
 
     # Pass 1
     pass1 = pass1_wide_net(living_doc, claims, session_type=session_type)
+
+    if pass1.get("api_error"):
+        return {
+            "pass1": pass1,
+            "pass2": None,
+            "pass3": None,
+            "has_contradictions": False,
+            "has_critical": False,
+            "summary": "Consistency check failed — API error during Pass 1.",
+        }
 
     if pass1["total_found"] == 0:
         return {
@@ -509,7 +531,7 @@ def run_consistency_check(claims: list, session_type: str = "") -> dict:
     }
 
 
-def run_audit(num_sessions: int = 10) -> dict:
+def run_audit(num_sessions: int = 10, brain: str = "pitch") -> dict:
     """
     Living document audit (SPEC Section 4.3).
     Retrieves last N sessions, independently assesses Current State, diffs against actual.
@@ -520,7 +542,7 @@ def run_audit(num_sessions: int = 10) -> dict:
     from services.claude_client import call_sonnet, escape_xml, load_prompt
     from services.mongo_client import get_sessions
 
-    living_doc = read_living_document()
+    living_doc = read_living_document(brain=brain)
     sessions = get_sessions(limit=num_sessions)
 
     if not sessions:

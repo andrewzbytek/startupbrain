@@ -9,11 +9,7 @@ import re
 from datetime import datetime, timezone
 from typing import Optional
 
-
-def _extract_tag(text: str, tag: str) -> str:
-    """Extract content of first XML tag from text."""
-    match = re.search(rf"<{tag}>(.*?)</{tag}>", text, re.DOTALL)
-    return match.group(1).strip() if match else ""
+from services.claude_client import extract_xml_tag as _extract_tag
 
 
 def extract_claims(

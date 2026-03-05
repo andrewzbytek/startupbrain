@@ -4,6 +4,7 @@ Handles cost-aware routing between Sonnet and Opus.
 Every call logs via cost_tracker.
 """
 
+import logging
 import os
 from pathlib import Path
 from typing import Generator, Optional
@@ -35,8 +36,9 @@ def _get_api_key() -> Optional[str]:
         return os.environ.get("ANTHROPIC_API_KEY")
 
 
-def _get_client() -> Optional[object]:
-    """Get anthropic client, or None if unavailable."""
+@st.cache_resource
+def _get_client():
+    """Get cached anthropic client, or None if unavailable."""
     if not ANTHROPIC_AVAILABLE:
         return None
     api_key = _get_api_key()
@@ -55,6 +57,13 @@ def escape_xml(text: str) -> str:
     text = text.replace('"', "&quot;")
     text = text.replace("'", "&apos;")
     return text
+
+
+def extract_xml_tag(text: str, tag: str) -> str:
+    """Extract content of first XML tag from text. Shared utility for LLM response parsing."""
+    import re
+    match = re.search(rf"<{tag}>(.*?)</{tag}>", text, re.DOTALL)
+    return match.group(1).strip() if match else ""
 
 
 def load_prompt(prompt_name: str) -> str:
@@ -101,7 +110,7 @@ def call_sonnet(
 
     kwargs = {
         "model": SONNET_MODEL,
-        "max_tokens": 8096,
+        "max_tokens": 8192,
         "messages": messages,
     }
     if system:
@@ -120,7 +129,8 @@ def call_sonnet(
         cost_tracker.log_api_call(SONNET_MODEL, tokens_in, tokens_out, task_type)
         return {"text": text, "tokens_in": tokens_in, "tokens_out": tokens_out, "model": SONNET_MODEL}
     except Exception as e:
-        return {"text": f"Error: {e}", "tokens_in": 0, "tokens_out": 0, "model": SONNET_MODEL}
+        logging.error("Claude API call failed (%s): %s", task_type, e)
+        return {"text": "AI service temporarily unavailable. Please try again.", "tokens_in": 0, "tokens_out": 0, "model": SONNET_MODEL}
 
 
 def call_opus(
@@ -150,7 +160,7 @@ def call_opus(
     messages = [{"role": "user", "content": prompt}]
     kwargs = {
         "model": OPUS_MODEL,
-        "max_tokens": 8096,
+        "max_tokens": 8192,
         "messages": messages,
     }
     if system:
@@ -169,7 +179,8 @@ def call_opus(
         cost_tracker.log_api_call(OPUS_MODEL, tokens_in, tokens_out, task_type)
         return {"text": text, "tokens_in": tokens_in, "tokens_out": tokens_out, "model": OPUS_MODEL}
     except Exception as e:
-        return {"text": f"Error: {e}", "tokens_in": 0, "tokens_out": 0, "model": OPUS_MODEL}
+        logging.error("Claude API call failed (%s): %s", task_type, e)
+        return {"text": "AI service temporarily unavailable. Please try again.", "tokens_in": 0, "tokens_out": 0, "model": OPUS_MODEL}
 
 
 def call_with_routing(
@@ -247,7 +258,10 @@ def _stream_response(client, kwargs: dict, model: str, task_type: str, cost_trac
                 tokens_in = final.usage.input_tokens
                 tokens_out = final.usage.output_tokens
         except Exception as e:
-            yield f"Error: {e}"
+            logging.error("Claude API stream failed (%s): %s", task_type, e)
+            yield "AI service temporarily unavailable."
+        # Note: On stream error, token counts may be 0 — Anthropic still charges
+        # for partial streams but we can't reliably get usage after an error.
         finally:
             cost_tracker.log_api_call(model, tokens_in, tokens_out, task_type)
 

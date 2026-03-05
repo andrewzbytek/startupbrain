@@ -145,6 +145,8 @@ Paste transcript → Select session type
 - **Informational pushback** — surfaces context on direction changes, never blocks
 - **Book cross-check** — upload a .md book summary in chat for temporary framework cross-referencing
 - **Semantic RAG** — Atlas Vector Search with Voyage AI automated embedding for consistency evidence (graceful fallback to time-based)
+- **Cached Anthropic client** — `@st.cache_resource` avoids creating a new client per API call
+- **Shared XML utilities** — `extract_xml_tag()` and `escape_xml()` in `claude_client.py`, used by all LLM response parsers
 - **Direct corrections** — "no, actually X" runs a lightweight consistency check before applying (informational only)
 - **Scratchpad notes** — prefix-based (`note:`, `remember:`, `jot:`, `fyi:`) saved to MongoDB as scratchpad entries (no living document update); surfaced in chat system prompt so the AI can reference them
 - **Hypothesis tracking** — prefix-based (`hypothesis:`, `validated:`, `invalidated:`) testable assumption tracking with dashboard status management
@@ -256,9 +258,11 @@ All 24 sections of the spec are implemented plus the two-brain architecture exte
 - Auth hardened for production (requires credentials or explicit opt-out)
 - Two-tier MongoDB locking (ingestion lock + document write lock) — all document write paths protected
 - Atomic lock operations (`ReturnDocument.AFTER`), UUID-based session IDs, sanitized error messages
-- XML-escaped living document content in all LLM prompts prevents prompt boundary confusion
+- API error messages sanitized — no exception details, API keys, or internal paths leak to users (logged server-side via `logging.error()`)
+- XML-escaped living document content in all LLM prompts (system prompt, scratchpad, book frameworks, conversation history) prevents prompt boundary confusion
 - All MongoDB errors sanitized (generic user messages, full details server-side only)
 - Consistency engine properly filters dismissed contradictions (including short-word claims)
+- Consistency engine detects API errors and surfaces "check failed" instead of silently producing "no contradictions"
 
 **Deliberate deviations from spec:**
 - **Vector search**: Code is in place but Atlas free tier (M0) doesn't support Voyage AI autoEmbed. System uses time-based retrieval with a health monitor that alerts at 200 claims when upgrading to M10+ becomes worthwhile.

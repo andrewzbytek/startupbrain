@@ -24,7 +24,7 @@ class TestAPIFailures:
     """Test that Claude API call wrappers handle errors gracefully."""
 
     def test_call_sonnet_rate_limit_error(self):
-        """Rate limit exception returns error dict, no crash."""
+        """Rate limit exception returns sanitized error dict, no crash."""
         from services.claude_client import call_sonnet
 
         mock_client = MagicMock()
@@ -32,12 +32,12 @@ class TestAPIFailures:
 
         with patch("services.claude_client._get_client", return_value=mock_client):
             result = call_sonnet("test prompt")
-        assert "Error" in result["text"]
+        assert "unavailable" in result["text"].lower()
         assert result["tokens_in"] == 0
         assert result["tokens_out"] == 0
 
     def test_call_sonnet_auth_error(self):
-        """Auth error (401) returns error dict."""
+        """Auth error (401) returns sanitized error dict."""
         from services.claude_client import call_sonnet
 
         mock_client = MagicMock()
@@ -45,11 +45,11 @@ class TestAPIFailures:
 
         with patch("services.claude_client._get_client", return_value=mock_client):
             result = call_sonnet("test prompt")
-        assert "Error" in result["text"]
+        assert "unavailable" in result["text"].lower()
         assert result["tokens_in"] == 0
 
     def test_call_sonnet_timeout_error(self):
-        """Timeout exception returns error dict."""
+        """Timeout exception returns sanitized error dict."""
         from services.claude_client import call_sonnet
 
         mock_client = MagicMock()
@@ -57,10 +57,10 @@ class TestAPIFailures:
 
         with patch("services.claude_client._get_client", return_value=mock_client):
             result = call_sonnet("test prompt")
-        assert "Error" in result["text"]
+        assert "unavailable" in result["text"].lower()
 
     def test_call_sonnet_network_error(self):
-        """Network/connection error returns error dict."""
+        """Network/connection error returns sanitized error dict."""
         from services.claude_client import call_sonnet
 
         mock_client = MagicMock()
@@ -68,7 +68,7 @@ class TestAPIFailures:
 
         with patch("services.claude_client._get_client", return_value=mock_client):
             result = call_sonnet("test prompt")
-        assert "Error" in result["text"]
+        assert "unavailable" in result["text"].lower()
 
     def test_call_sonnet_empty_response_content(self):
         """Empty response.content list returns error message."""
@@ -92,7 +92,7 @@ class TestAPIFailures:
         assert "unavailable" in result["text"].lower()
 
     def test_call_opus_rate_limit_error(self):
-        """Opus rate limit exception returns error dict."""
+        """Opus rate limit exception returns sanitized error dict."""
         from services.claude_client import call_opus
 
         mock_client = MagicMock()
@@ -100,7 +100,7 @@ class TestAPIFailures:
 
         with patch("services.claude_client._get_client", return_value=mock_client):
             result = call_opus("test prompt")
-        assert "Error" in result["text"]
+        assert "unavailable" in result["text"].lower()
 
     def test_call_opus_empty_response(self):
         """Opus empty response.content returns error message."""
