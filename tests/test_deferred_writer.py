@@ -367,7 +367,7 @@ class TestBatchCommit:
         assert result["success"] is False
         assert "lock" in result["message"].lower()
         mock_write.assert_not_called()
-        mock_delete.assert_not_called()
+        mock_delete.assert_called_once()
 
 
 # ---------------------------------------------------------------------------

@@ -666,64 +666,6 @@ div[role="alert"].st-emotion-cache-error,
     margin-bottom: 0.5rem;
 }
 
-/* Suggestion chips — small ghost buttons in a centered row */
-.suggestion-chips {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 6px;
-    padding: 0.25rem 0 0.75rem;
-}
-
-.suggestion-chip {
-    font-family: var(--font-display);
-    font-size: 0.78rem;
-    font-weight: 500;
-    color: var(--text-secondary);
-    background: transparent;
-    border: 1px solid var(--border-default);
-    border-radius: 999px;
-    padding: 5px 14px;
-    cursor: pointer;
-    transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
-    white-space: nowrap;
-}
-
-.suggestion-chip:hover {
-    color: var(--text-primary);
-    border-color: var(--border-hover);
-    background-color: var(--bg-surface);
-}
-
-/* Quick command inline chips — tiny, monospace, unobtrusive */
-.qcmd-row {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 4px;
-    padding: 0 0 0.5rem;
-}
-
-.qcmd-chip {
-    font-family: var(--font-mono);
-    font-size: 0.68rem;
-    color: var(--accent-cyan);
-    background: transparent;
-    border: 1px solid rgba(57, 210, 192, 0.15);
-    border-radius: 999px;
-    padding: 2px 10px;
-    cursor: pointer;
-    transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
-    opacity: 0.7;
-    white-space: nowrap;
-}
-
-.qcmd-chip:hover {
-    opacity: 1;
-    border-color: rgba(57, 210, 192, 0.4);
-    background-color: rgba(57, 210, 192, 0.06);
-}
-
 /* ===== 24. Responsive breakpoints ===== */
 @media (max-width: 1440px) {
     .main .block-container {

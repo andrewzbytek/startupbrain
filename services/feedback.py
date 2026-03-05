@@ -202,7 +202,7 @@ def ingest_feedback(
         "meeting_context": meeting_context,
         "themes": [],
     }
-    feedback_id = insert_feedback(feedback_doc)
+    feedback_id = insert_feedback(feedback_doc, brain=brain)
 
     # Get current feedback tracker for context
     feedback_tracker = _get_feedback_tracker_section(brain=brain)

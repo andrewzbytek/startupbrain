@@ -23,6 +23,8 @@ LIVING_DOC_PATH = _BRAIN_DOC_PATHS["pitch"]
 
 def _doc_path(brain: str = "pitch") -> Path:
     """Return the filesystem path for the given brain's living document."""
+    if brain not in _BRAIN_DOC_PATHS:
+        logging.warning("Unknown brain value %r — defaulting to pitch", brain)
     return _BRAIN_DOC_PATHS.get(brain, _BRAIN_DOC_PATHS["pitch"])
 
 
@@ -97,7 +99,7 @@ def generate_diff(current_doc: str, new_info: str, update_reason: str = "", brai
     return result["text"]
 
 
-def verify_diff(original_doc: str, proposed_changes: str, new_info: str) -> dict:
+def verify_diff(original_doc: str, proposed_changes: str, new_info: str, brain: str = "pitch") -> dict:
     """
     Call Sonnet with diff_verify.md prompt to verify the proposed diff.
 
@@ -106,7 +108,8 @@ def verify_diff(original_doc: str, proposed_changes: str, new_info: str) -> dict
     """
     from services.claude_client import call_sonnet, load_prompt, escape_xml
 
-    prompt_template = load_prompt("diff_verify")
+    prompt_name = "ops_diff_verify" if brain == "ops" else "diff_verify"
+    prompt_template = load_prompt(prompt_name)
 
     prompt = f"""{prompt_template}
 
@@ -166,12 +169,18 @@ def parse_diff_output(raw_output: str) -> list:
     return blocks
 
 
-def apply_diff(document: str, diff_blocks: list) -> str:
+def apply_diff(document: str, diff_blocks: list, brain: str = "pitch") -> str:
     """
     Apply parsed diff blocks to the document.
     Handles UPDATE_POSITION, ADD_CHANGELOG, ADD_DECISION, ADD_FEEDBACK,
     ADD_DISMISSED, ADD_HYPOTHESIS, ADD_CONTACT, UPDATE_CONTACT,
     ADD_SECTION actions.
+
+    Args:
+        document: The current document content.
+        diff_blocks: Parsed diff blocks from ``parse_diff_output``.
+        brain: Which brain document ("pitch" or "ops") — threaded to
+            brain-aware helpers like ``_add_contact``.
 
     Returns the updated document string.
     """
@@ -195,7 +204,7 @@ def apply_diff(document: str, diff_blocks: list) -> str:
         elif action == "ADD_HYPOTHESIS":
             updated = _add_hypothesis(updated, content)
         elif action == "ADD_CONTACT":
-            updated = _add_contact(updated, content)
+            updated = _add_contact(updated, content, brain=brain)
         elif action == "UPDATE_CONTACT":
             name_match = re.search(r"\*\*(.+?)\*\*", content)
             if name_match:
@@ -332,15 +341,30 @@ def _add_hypothesis(doc: str, hypothesis_content: str) -> str:
     if updated != doc:
         return updated
 
-    # If section missing, insert before Decision Log
+    # Fallback: insert before Decision Log (pitch brain only; ops falls through to append)
     if "## Decision Log" in doc:
         return doc.replace("## Decision Log", "## Active Hypotheses\n" + hypothesis_content + "\n\n## Decision Log")
     return doc + "\n\n## Active Hypotheses\n" + hypothesis_content + "\n"
 
 
-def _add_contact(doc: str, contact_content: str) -> str:
-    """Add a new entry to the Key Contacts / Prospects section under Current State."""
-    # Match ### Key Contacts / Prospects within ## Current State
+def _add_contact(doc: str, contact_content: str, brain: str = "pitch") -> str:
+    """Add a new entry to the contacts section.
+
+    Pitch brain uses ``### Key Contacts / Prospects`` (subsection under Current State).
+    Ops brain uses ``## Contacts / Prospects`` (top-level section).
+    """
+    if brain == "ops":
+        # ops_brain.md uses top-level ## Contacts / Prospects
+        section_pattern = re.compile(r"(## Contacts / Prospects\n)(.*?)(\n## |\Z)", re.DOTALL)
+        match = section_pattern.search(doc)
+        if match:
+            existing = match.group(2).strip()
+            if existing in ("[No contacts tracked yet]", ""):
+                return doc[:match.start(2)] + contact_content + "\n" + doc[match.end(2):]
+            return doc[:match.end(2)] + "\n" + contact_content + "\n" + doc[match.end(2):]
+        return doc + "\n\n## Contacts / Prospects\n" + contact_content + "\n"
+
+    # Pitch brain: match ### Key Contacts / Prospects within ## Current State
     pattern = re.compile(
         r"(### Key Contacts / Prospects\n)(.*?)(\n###|\n## |\Z)",
         re.DOTALL,
@@ -542,7 +566,7 @@ def update_document(new_info: str, update_reason: str = "", max_retries: int = 2
                 retry_info = f"{new_info}\n\nPrevious verification failed with issues:\n{verification_feedback}"
                 diff_output = generate_diff(current_doc, retry_info, update_reason, brain=brain)
 
-            verification = verify_diff(current_doc, diff_output, new_info)
+            verification = verify_diff(current_doc, diff_output, new_info, brain=brain)
 
             if verification["verified"]:
                 break
@@ -560,7 +584,7 @@ def update_document(new_info: str, update_reason: str = "", max_retries: int = 2
         if not diff_blocks:
             return {"success": True, "message": "No changes needed — information already present.", "changes_applied": 0}
 
-        updated_doc = apply_diff(current_doc, diff_blocks)
+        updated_doc = apply_diff(current_doc, diff_blocks, brain=brain)
 
         # Write file
         try:

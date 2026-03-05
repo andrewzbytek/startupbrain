@@ -21,6 +21,8 @@ from services.claude_client import escape_xml
 TRANSCRIPT_SUGGEST_LENGTH = 500
 
 # Maps user keywords to MongoDB session_type values
+# Values are intentional substrings — search_sessions() uses $regex matching,
+# so "Investor" matches both "Investor meeting" and "Investor email/feedback"
 _SESSION_TYPE_MAP = {
     "investor": "Investor",
     "vc": "Investor",
@@ -236,7 +238,7 @@ def _format_recall_context(sessions, claims=None, feedback=None) -> str:
             stype = escape_xml(meta.get("session_type", "Unknown"))
             participants = escape_xml(meta.get("participants", ""))
             summary = escape_xml(s.get("summary", "")[:500])
-            tags = escape_xml(", ".join(meta.get("tags", [])))
+            tags = escape_xml(", ".join(s.get("topic_tags", meta.get("tags", []))))
             entry = f"- [{date}] {stype}"
             if participants:
                 entry += f" | Participants: {participants}"
@@ -304,6 +306,11 @@ def _build_recall_context(user_message: str) -> str:
     if date_filter:
         kwargs["date_from"] = date_filter.get("from")
         kwargs["date_to"] = date_filter.get("to")
+
+    brain_ctx = st.session_state.get("chat_brain_context", "pitch")
+    brain_filter = brain_ctx if brain_ctx != "both" else ""
+    if brain_filter:
+        kwargs["brain"] = brain_filter
 
     sessions = search_sessions(**kwargs)
 
@@ -399,8 +406,7 @@ def _get_system_prompt(query_type: str = "") -> str:
     try:
         from services.mongo_client import find_many
         scratchpad_query = {"source_type": "quick_note", "claim_type": "scratchpad"}
-        if brain_ctx != "both":
-            scratchpad_query["brain"] = brain_ctx
+        # Don't filter scratchpad by brain — notes should surface in all contexts
         scratchpad = find_many(
             "claims",
             scratchpad_query,
@@ -571,8 +577,7 @@ def _apply_quick_note(note_text: str) -> str:
             "who_said_it": "Founder",
             "confirmed": True,
             "created_at": datetime.now(timezone.utc),
-            "brain": "ops",
-        })
+        }, brain="ops")
 
         return "Noted — saved to scratchpad. I can reference this in our conversation, but it won't appear in the living document."
     except Exception as e:
@@ -606,8 +611,7 @@ def _apply_contact(contact_text: str) -> str:
                 "who_said_it": "Founder",
                 "confirmed": True,
                 "created_at": datetime.now(timezone.utc),
-                "brain": "ops",
-            })
+            }, brain="ops")
         except Exception:
             pass
 

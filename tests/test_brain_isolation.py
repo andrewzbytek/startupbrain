@@ -48,6 +48,19 @@ mock_pymongo.errors = MagicMock()
 mock_pymongo.errors.ConnectionFailure = type("ConnectionFailure", (Exception,), {})
 mock_pymongo.errors.ServerSelectionTimeoutError = type("ServerSelectionTimeoutError", (Exception,), {})
 sys.modules.setdefault("pymongo", mock_pymongo)
+
+
+def _assert_brain_or_filter(query, brain_value):
+    """Assert the query uses the legacy-compatible $or brain filter pattern.
+
+    After the schema drift fix, brain filters use:
+    {"$or": [{"brain": value}, {"brain": {"$exists": False}}]}
+    to also match pre-migration documents that lack the brain field.
+    """
+    assert "$or" in query, f"Expected $or brain filter in query, got: {query}"
+    or_clauses = query["$or"]
+    assert {"brain": brain_value} in or_clauses
+    assert {"brain": {"$exists": False}} in or_clauses
 sys.modules.setdefault("pymongo.errors", mock_pymongo.errors)
 
 import services.mongo_client as mc
@@ -72,24 +85,18 @@ class TestGetSessionsBrainFilter:
             )
 
     def test_brain_pitch_filter(self):
-        """When brain='pitch' is passed, query should include brain filter."""
+        """When brain='pitch' is passed, query should use $or legacy-compat filter."""
         with patch.object(mc, "find_many", return_value=[]) as mock_find:
             mc.get_sessions(limit=10, brain="pitch")
-            call_args = mock_find.call_args
-            assert call_args == call(
-                "sessions", query={"brain": "pitch"},
-                sort_by="created_at", sort_order=-1, limit=10,
-            )
+            query = mock_find.call_args[1]["query"]
+            _assert_brain_or_filter(query, "pitch")
 
     def test_brain_ops_filter(self):
-        """When brain='ops' is passed, query should include brain filter."""
+        """When brain='ops' is passed, query should use $or legacy-compat filter."""
         with patch.object(mc, "find_many", return_value=[]) as mock_find:
             mc.get_sessions(limit=5, brain="ops")
-            call_args = mock_find.call_args
-            assert call_args == call(
-                "sessions", query={"brain": "ops"},
-                sort_by="created_at", sort_order=-1, limit=5,
-            )
+            query = mock_find.call_args[1]["query"]
+            _assert_brain_or_filter(query, "ops")
 
     def test_empty_brain_string_returns_all(self):
         """Passing brain='' should behave like no filter (return all)."""
@@ -120,18 +127,18 @@ class TestSearchSessionsBrainFilter:
             )
 
     def test_brain_pitch_added_to_query(self):
-        """When brain='pitch', it should be in the query dict."""
+        """When brain='pitch', query should use $or legacy-compat filter."""
         with patch.object(mc, "find_many", return_value=[]) as mock_find:
             mc.search_sessions(brain="pitch")
             query = mock_find.call_args[1].get("query", mock_find.call_args[0][1] if len(mock_find.call_args[0]) > 1 else {})
-            assert query.get("brain") == "pitch"
+            _assert_brain_or_filter(query, "pitch")
 
     def test_brain_ops_added_to_query(self):
-        """When brain='ops', it should be in the query dict."""
+        """When brain='ops', query should use $or legacy-compat filter."""
         with patch.object(mc, "find_many", return_value=[]) as mock_find:
             mc.search_sessions(brain="ops")
             query = mock_find.call_args[1].get("query", mock_find.call_args[0][1] if len(mock_find.call_args[0]) > 1 else {})
-            assert query.get("brain") == "ops"
+            _assert_brain_or_filter(query, "ops")
 
     def test_brain_combined_with_session_type(self):
         """Brain filter should be combined with other filters via AND."""
@@ -139,7 +146,7 @@ class TestSearchSessionsBrainFilter:
             mc.search_sessions(session_type="Investor", brain="pitch")
             query = mock_find.call_args[1].get("query", mock_find.call_args[0][1] if len(mock_find.call_args[0]) > 1 else {})
             assert "metadata.session_type" in query
-            assert query.get("brain") == "pitch"
+            _assert_brain_or_filter(query, "pitch")
 
     def test_brain_combined_with_date_range(self):
         """Brain filter should be combined with date filters."""
@@ -147,7 +154,7 @@ class TestSearchSessionsBrainFilter:
             mc.search_sessions(date_from="2026-01-01", date_to="2026-03-01", brain="ops")
             query = mock_find.call_args[1].get("query", mock_find.call_args[0][1] if len(mock_find.call_args[0]) > 1 else {})
             assert "session_date" in query
-            assert query.get("brain") == "ops"
+            _assert_brain_or_filter(query, "ops")
 
     def test_empty_brain_no_filter(self):
         """Passing brain='' should not add brain to the query."""
@@ -480,8 +487,12 @@ class TestScratchpadBrainFilter:
                 return query
         return None
 
-    def test_pitch_brain_filters_scratchpad(self):
-        """When brain context is 'pitch', scratchpad query should include brain='pitch'."""
+    def test_pitch_brain_no_scratchpad_filter(self):
+        """When brain context is 'pitch', scratchpad should NOT filter by brain.
+
+        Scratchpad notes are always stored as brain='ops' but should surface
+        in all brain contexts so the founder's notes are always visible.
+        """
         import streamlit as _st
         _st.session_state["chat_brain_context"] = "pitch"
         _st.session_state["book_crosscheck_content"] = ""
@@ -493,10 +504,13 @@ class TestScratchpadBrainFilter:
 
             query = self._find_scratchpad_call(mock_find)
             assert query is not None, "scratchpad find_many call not found"
-            assert query.get("brain") == "pitch"
+            assert "brain" not in query
 
-    def test_ops_brain_filters_scratchpad(self):
-        """When brain context is 'ops', scratchpad query should include brain='ops'."""
+    def test_ops_brain_no_scratchpad_filter(self):
+        """When brain context is 'ops', scratchpad should NOT filter by brain.
+
+        Notes surface everywhere regardless of brain context.
+        """
         import streamlit as _st
         _st.session_state["chat_brain_context"] = "ops"
         _st.session_state["book_crosscheck_content"] = ""
@@ -508,7 +522,7 @@ class TestScratchpadBrainFilter:
 
             query = self._find_scratchpad_call(mock_find)
             assert query is not None, "scratchpad find_many call not found"
-            assert query.get("brain") == "ops"
+            assert "brain" not in query
 
     def test_both_brain_no_filter(self):
         """When brain context is 'both', scratchpad query should NOT have brain filter."""
@@ -659,18 +673,18 @@ class TestGetClaimsBrainFilter:
             assert "brain" not in query
 
     def test_brain_pitch_filter(self):
-        """When brain='pitch', query should include brain filter."""
+        """When brain='pitch', query should use $or legacy-compat filter."""
         with patch.object(mc, "find_many", return_value=[]) as mock_find:
             mc.get_claims(brain="pitch")
             query = mock_find.call_args[1].get("query", mock_find.call_args[0][1] if len(mock_find.call_args[0]) > 1 else {})
-            assert query.get("brain") == "pitch"
+            _assert_brain_or_filter(query, "pitch")
 
     def test_brain_ops_filter(self):
-        """When brain='ops', query should include brain filter."""
+        """When brain='ops', query should use $or legacy-compat filter."""
         with patch.object(mc, "find_many", return_value=[]) as mock_find:
             mc.get_claims(brain="ops")
             query = mock_find.call_args[1].get("query", mock_find.call_args[0][1] if len(mock_find.call_args[0]) > 1 else {})
-            assert query.get("brain") == "ops"
+            _assert_brain_or_filter(query, "ops")
 
     def test_brain_combined_with_session_id(self):
         """Brain filter should work alongside session_id filter."""
@@ -678,7 +692,7 @@ class TestGetClaimsBrainFilter:
             mc.get_claims(session_id="s1", brain="pitch")
             query = mock_find.call_args[1].get("query", mock_find.call_args[0][1] if len(mock_find.call_args[0]) > 1 else {})
             assert query.get("session_id") == "s1"
-            assert query.get("brain") == "pitch"
+            _assert_brain_or_filter(query, "pitch")
 
 
 # ---------------------------------------------------------------------------
@@ -697,12 +711,12 @@ class TestGetHypothesesBrainFilter:
             assert "brain" not in query
 
     def test_brain_ops_filter(self):
-        """When brain='ops', query should include brain=ops."""
+        """When brain='ops', query should use $or legacy-compat filter."""
         with patch.object(mc, "find_many", return_value=[]) as mock_find:
             mc.get_hypotheses(brain="ops")
             query = mock_find.call_args[1].get("query", mock_find.call_args[0][1] if len(mock_find.call_args[0]) > 1 else {})
             assert query.get("claim_type") == "hypothesis"
-            assert query.get("brain") == "ops"
+            _assert_brain_or_filter(query, "ops")
 
     def test_brain_combined_with_status(self):
         """Brain filter should work alongside status filter."""
@@ -710,7 +724,7 @@ class TestGetHypothesesBrainFilter:
             mc.get_hypotheses(status="active", brain="ops")
             query = mock_find.call_args[1].get("query", mock_find.call_args[0][1] if len(mock_find.call_args[0]) > 1 else {})
             assert query.get("status") == "active"
-            assert query.get("brain") == "ops"
+            _assert_brain_or_filter(query, "ops")
 
 
 # ---------------------------------------------------------------------------

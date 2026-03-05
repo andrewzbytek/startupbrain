@@ -59,7 +59,6 @@ def init_session_state():
         # Book cross-check (temporary .md upload)
         "book_crosscheck_content": "",
         "book_crosscheck_filename": "",
-        "show_hypothesis_form": False,
         # Pipeline result for done screen
         "pipeline_result": {},
         # Deferred writes / crash recovery
@@ -143,3 +142,15 @@ def reset_ingestion():
     st.session_state._ops_confirmed_claims = []
     st.session_state._ops_committed = False
     st.session_state._ops_result = {}
+
+    # Clear any lingering per-contradiction explain state
+    for key in list(st.session_state.keys()):
+        if key.startswith("show_explain_") or key.startswith("explanation_"):
+            del st.session_state[key]
+
+    # Clear top bar TTL cache so lock status refreshes immediately
+    st.session_state.pop("_top_bar_cache", None)
+    st.session_state.pop("_top_bar_cache_ts", None)
+
+    # Clear pending quick command to prevent stale fire after cancel
+    st.session_state.pop("_quick_cmd_pending", None)

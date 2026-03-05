@@ -36,7 +36,7 @@ Respond ONLY with valid XML in this exact structure:
     <contradiction>
       <id>1</id>
       <new_claim>Exact text of the new claim that may contradict</new_claim>
-      <existing_position>Exact quote from pitch_brain.md</existing_position>
+      <existing_position>Exact quote from the living document</existing_position>
       <existing_section>The section header where the existing position appears</existing_section>
       <tension_description>One sentence explaining why these are in tension</tension_description>
       <is_revisited_rejection>true|false</is_revisited_rejection>

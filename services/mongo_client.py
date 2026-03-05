@@ -229,7 +229,7 @@ def get_sessions(limit: int = 50, brain: str = "") -> list:
     """Retrieve recent sessions, newest first."""
     query = {}
     if brain:
-        query["brain"] = brain
+        query["$or"] = [{"brain": brain}, {"brain": {"$exists": False}}]
     return find_many("sessions", query=query, sort_by="created_at", sort_order=-1, limit=limit)
 
 
@@ -244,7 +244,7 @@ def get_claims(session_id: str | None = None, limit: int = 200, brain: str = "")
     if session_id:
         query["session_id"] = session_id
     if brain:
-        query["brain"] = brain
+        query["$or"] = [{"brain": brain}, {"brain": {"$exists": False}}]
     return find_many("claims", query=query, sort_by="created_at", sort_order=-1, limit=limit)
 
 
@@ -253,14 +253,18 @@ def insert_whiteboard_extraction(doc: dict) -> Optional[str]:
     return insert_one("whiteboard_extractions", doc)
 
 
-def insert_feedback(feedback_doc: dict) -> Optional[str]:
+def insert_feedback(feedback_doc: dict, brain: str = "") -> Optional[str]:
     """Store investor/customer feedback."""
+    if brain:
+        feedback_doc = {**feedback_doc, "brain": brain}
     return insert_one("feedback", feedback_doc)
 
 
-def get_feedback(source_type: str | None = None, limit: int = 100) -> list:
-    """Retrieve feedback entries, optionally filtered by source_type."""
+def get_feedback(source_type: str | None = None, limit: int = 100, brain: str = "") -> list:
+    """Retrieve feedback entries, optionally filtered by source_type and/or brain."""
     query = {"source_type": source_type} if source_type else {}
+    if brain:
+        query["$or"] = [{"brain": brain}, {"brain": {"$exists": False}}]
     return find_many("feedback", query=query, sort_by="created_at", sort_order=-1, limit=limit)
 
 
@@ -309,7 +313,7 @@ def get_hypotheses(status=None, limit=50, brain: str = "") -> list:
     if status:
         query["status"] = status
     if brain:
-        query["brain"] = brain
+        query["$or"] = [{"brain": brain}, {"brain": {"$exists": False}}]
     return find_many("claims", query=query, sort_by="created_at", sort_order=-1, limit=limit)
 
 
@@ -345,7 +349,7 @@ def search_sessions(
     """
     query = {}
     if brain:
-        query["brain"] = brain
+        query["$or"] = [{"brain": brain}, {"brain": {"$exists": False}}]
     if session_type:
         query["metadata.session_type"] = {"$regex": session_type, "$options": "i"}
     if participant:

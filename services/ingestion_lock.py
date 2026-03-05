@@ -168,6 +168,8 @@ def check_lock() -> dict:
         locked_at = doc.get("locked_at")
         stale = False
         if locked_at:
+            if locked_at.tzinfo is None:
+                locked_at = locked_at.replace(tzinfo=timezone.utc)
             now = datetime.now(timezone.utc)
             stale = (now - locked_at) > timedelta(minutes=LOCK_TIMEOUT_MINUTES)
 

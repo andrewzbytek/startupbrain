@@ -79,7 +79,7 @@ class TestIngestFeedback:
     def test_feedback_stored_with_correct_fields(self, sample_living_document):
         stored_docs = []
 
-        def mock_insert_feedback(doc):
+        def mock_insert_feedback(doc, brain=""):
             stored_docs.append(doc)
             return "mock_feedback_id_1"
 

@@ -66,6 +66,11 @@ def render_ops_dashboard():
 
         # Hypothesis form
         with st.expander("Track a hypothesis"):
+            lock_failed_key = "_ops_hyp_lock_failed"
+            if st.session_state.get(lock_failed_key):
+                st.warning("Document is currently being updated by another process. Please re-enter your hypothesis and try again.")
+                st.session_state.pop(lock_failed_key, None)
+
             with st.form("ops_hypothesis_form", clear_on_submit=True):
                 hyp_text = st.text_input("Hypothesis statement")
                 hyp_test = st.text_input("How will you test this?")
@@ -77,7 +82,8 @@ def render_ops_dashboard():
                         from services.ingestion_lock import acquire_doc_lock, release_doc_lock
 
                         if not acquire_doc_lock():
-                            st.warning("Document is being updated. Try again shortly.")
+                            st.session_state[lock_failed_key] = True
+                            st.rerun()
                         else:
                             try:
                                 entry = (
@@ -151,6 +157,29 @@ def render_ops_dashboard():
         file_name="ops_brain.md",
         mime="text/markdown",
     )
+
+    # Context Export
+    st.markdown("---")
+    st.subheader("Context Export")
+    if st.button("Generate Full Context Export", key="ops_context_export"):
+        from services.export import generate_context_export
+        with st.spinner("Generating ops context export..."):
+            try:
+                context_export = generate_context_export(brain="ops")
+                st.session_state["_ops_context_export_data"] = context_export
+                st.rerun()
+            except Exception as e:
+                import logging
+                logging.error(f"Ops context export failed: {e}")
+                st.error("Export failed. Please try again.")
+    if st.session_state.get("_ops_context_export_data"):
+        st.download_button(
+            "Save Export File",
+            data=st.session_state["_ops_context_export_data"],
+            file_name="ops_brain_context_export.md",
+            mime="text/markdown",
+            key="ops_export_download",
+        )
 
 
 def _parse_ops_sections(doc: str) -> dict:

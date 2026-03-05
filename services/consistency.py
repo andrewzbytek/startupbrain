@@ -232,7 +232,7 @@ def pass2_severity_filter(pass1_results: dict, living_doc: str, session_type: st
     return _parse_pass2_output(result["text"])
 
 
-def check_rag_health() -> dict:
+def check_rag_health(brain: str = "pitch") -> dict:
     """
     Check whether time-based RAG retrieval is still adequate.
 
@@ -244,7 +244,7 @@ def check_rag_health() -> dict:
     """
     from services.mongo_client import count_documents
 
-    claim_count = count_documents("claims", {"brain": "pitch"})
+    claim_count = count_documents("claims", {"brain": brain})
     needs_upgrade = claim_count >= RAG_UPGRADE_CLAIM_THRESHOLD
 
     if needs_upgrade:
@@ -279,6 +279,7 @@ def _get_rag_evidence(claims: list, brain: str = "pitch") -> list:
         if query_text:
             results = vector_search_text(
                 "claims", query_text, "claims_vector_index", limit=10,
+                filter_query={"brain": brain},
             )
             if results:
                 evidence = []
@@ -320,7 +321,7 @@ def _get_rag_evidence(claims: list, brain: str = "pitch") -> list:
     # Log warning if over threshold and using fallback
     try:
         from services.mongo_client import count_documents
-        total = count_documents("claims")
+        total = count_documents("claims", {"brain": brain})
         if total >= RAG_UPGRADE_CLAIM_THRESHOLD:
             logging.warning(
                 "RAG using time-based fallback with %d claims (threshold: %d). "

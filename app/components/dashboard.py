@@ -203,7 +203,7 @@ def render_dashboard():
                 with st.spinner("Generating context export..."):
                     try:
                         from services.export import generate_context_export
-                        context_export = generate_context_export()
+                        context_export = generate_context_export(brain="pitch")
                         st.session_state["_context_export_data"] = context_export
                         st.rerun()
                     except Exception as e:

@@ -174,6 +174,10 @@ class DeferredWriter:
                             claims_stored_count = len(inserted) if inserted else 0
                     except Exception as store_err:
                         logging.error("Failed to store session/claims on doc-lock failure: %s", store_err)
+                    try:
+                        delete_pending_ingestion()
+                    except Exception as cleanup_err:
+                        logging.warning("Could not delete checkpoint after doc-lock failure: %s", cleanup_err)
                     return {
                         "success": False,
                         "message": "Document lock unavailable — session and claims stored but document not updated. Try again later.",
@@ -342,7 +346,7 @@ def rollback_last_session() -> dict:
     Roll back the most recently committed session:
     1. Find latest session in MongoDB
     2. Delete session + its claims from MongoDB
-    3. Revert pitch_brain.md to previous git version
+    3. Revert the correct brain document (pitch_brain.md or ops_brain.md) to previous git version based on session's brain field
     4. Mirror reverted doc to MongoDB
     5. Git commit the revert
 

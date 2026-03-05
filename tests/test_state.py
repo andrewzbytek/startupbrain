@@ -79,7 +79,6 @@ class TestInitSessionState:
             "consistency_results", "contradiction_index", "whiteboard_text",
             "evolution_result", "ingestion_session_type", "ingestion_session_date",
             "book_crosscheck_content", "book_crosscheck_filename",
-            "show_hypothesis_form",
             "pipeline_result",
             "deferred_writer", "_batch_committed", "_consistency_checked", "_has_pending_ingestion",
             "_active_quick_cmd",

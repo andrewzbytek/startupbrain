@@ -15,7 +15,12 @@ For each potential contradiction from Pass 1:
 <pass2_input>
   <session_type>{{session_type}}</session_type>
   <living_document>{{startup_brain_md_full_text}}</living_document>
-  <pass1_results>{{pass1_output_xml}}</pass1_results>
+  <pass1_results>
+    <pass1_output>
+      <total_found>N</total_found>
+      <contradiction>...</contradiction>
+    </pass1_output>
+  </pass1_results>
 </pass2_input>
 
 ## Severity Calibration

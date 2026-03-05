@@ -359,7 +359,7 @@ def render_checking_consistency():
             # Check if any confirmed claims relate to active hypotheses
             try:
                 from services.mongo_client import get_hypotheses
-                active_hyps = get_hypotheses(status="unvalidated") + get_hypotheses(status="testing")
+                active_hyps = get_hypotheses(status="unvalidated", brain="ops") + get_hypotheses(status="testing", brain="ops")
                 if active_hyps and confirmed_claims:
                     import re as _re
                     _stop_words = {"the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
@@ -669,7 +669,8 @@ def render_ops_done():
     if result.get("success"):
         st.success(f"Ops Brain updated: {result.get('claims_stored', 0)} items stored.")
     else:
-        st.warning(f"Partial result: {result.get('message', 'Unknown issue')}")
+        logging.warning("Ops partial result: %s", result.get('message'))
+        st.warning("Ops Brain update partially completed. Some items may not have been stored.")
 
     st.markdown(f"**Items stored:** {result.get('claims_stored', 0)}")
     if result.get("document_updated"):

@@ -67,12 +67,11 @@ def render_claim_editor(ops_mode: bool = False):
             with col_meta:
                 claim_type = claim.get("claim_type", "claim")
                 confidence = claim.get("confidence", "")
-                badge_color = "rgba(88, 166, 255, 0.12)" if claim_type == "claim" else "rgba(210, 153, 34, 0.12)"
-                text_color = "#58A6FF" if claim_type == "claim" else "#D29922"
+                badge_class = "pill-badge pill-badge-blue" if claim_type == "claim" else "pill-badge pill-badge-yellow"
                 safe_type = html_mod.escape(claim_type)
                 safe_conf = html_mod.escape(confidence) if confidence else ""
                 st.markdown(
-                    f'<span style="background:{badge_color};color:{text_color};padding:2px 6px;border-radius:4px;font-size:0.75rem;">'
+                    f'<span class="{badge_class}">'
                     f'{safe_type}</span>'
                     + (f' <span style="font-size:0.75rem;color:#8B949E;">{safe_conf}</span>' if safe_conf else ""),
                     unsafe_allow_html=True,

@@ -154,7 +154,8 @@ def render_top_bar():
         else:
             try:
                 from services.consistency import check_rag_health
-                health = check_rag_health()
+                active_brain = st.session_state.get("active_brain", "pitch")
+                health = check_rag_health(brain=active_brain)
             except Exception:
                 health = {}
 
