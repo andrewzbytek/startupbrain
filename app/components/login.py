@@ -36,12 +36,12 @@ def _get_credentials():
 
 
 def _get_secret_key():
-    """Derive a signing key from the password (never stored, deterministic)."""
+    """Derive a signing key from the password using PBKDF2 (never stored, deterministic)."""
     _, password = _get_credentials()
     if not password:
         # No password configured — return None to signal tokens cannot be issued
         return None
-    return hashlib.sha256(password.encode()).digest()
+    return hashlib.pbkdf2_hmac("sha256", password.encode(), b"startup_brain_cookie_v1", 100_000)
 
 
 def _create_token(username: str) -> str:

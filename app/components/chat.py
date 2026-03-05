@@ -447,7 +447,7 @@ def _build_claude_prompt(user_message: str, query_type: str):
     if history_text:
         full_prompt = f"<conversation_history>\n{history_text}</conversation_history>\n\nFounder: {escape_xml(user_message)}"
     else:
-        full_prompt = user_message
+        full_prompt = escape_xml(user_message)
 
     # Inject recall context for recall queries
     if query_type == "recall":
@@ -568,7 +568,7 @@ def _apply_quick_note(note_text: str) -> str:
         from datetime import datetime, timezone
 
         # Notes always stored to ops brain — surfaced cross-brain in system prompt (by design)
-        insert_claim({
+        result_id = insert_claim({
             "claim_text": note_text,
             "claim_type": "scratchpad",
             "confidence": "definite",
@@ -577,6 +577,8 @@ def _apply_quick_note(note_text: str) -> str:
             "confirmed": True,
         }, brain="ops")
 
+        if not result_id:
+            return "Could not save note — database unavailable. Please try again."
         return "Noted — saved to scratchpad. I can reference this in our conversation, but it won't appear in the living document."
     except Exception as e:
         logging.error("Could not save note: %s", e)
@@ -1267,9 +1269,9 @@ def _resolve_contradiction(contradiction: dict, action: str, new_claim: str, exp
     Apply a contradiction resolution to the living document.
     action: "update" | "keep" | "explain"
 
-    - "update" / "explain": calls update_document() AND explicitly adds a Decision Log entry.
-    - "keep": does NOT call update_document(); adds a Dismissed Contradiction entry.
-    All paths write the doc, mirror to MongoDB, and git commit.
+    - "update" / "explain": calls update_document() (which manages its own doc lock)
+      AND then separately locks to add a Decision Log entry.
+    - "keep": does NOT call update_document(); locks to add a Dismissed Contradiction entry.
     """
     try:
         from services.document_updater import (
@@ -1287,21 +1289,21 @@ def _resolve_contradiction(contradiction: dict, action: str, new_claim: str, exp
 
         participants = st.session_state.get("ingestion_participants", "Founders")
 
-        if not acquire_doc_lock(timeout_seconds=60):
-            st.warning("Document is being updated by another process. Try again shortly.")
-            return
+        if action == "update":
+            new_info = (
+                f"Contradiction resolved ({date_str}): Updating {section}.\n"
+                f"New position: {new_claim}\n"
+                f"Tension was: {tension}"
+            )
+            reason = f"Contradiction resolved — updated {section} ({date_str})"
+            # update_document manages its own doc lock internally
+            update_document(new_info, update_reason=reason, brain=brain)
 
-        try:
-            if action == "update":
-                new_info = (
-                    f"Contradiction resolved ({date_str}): Updating {section}.\n"
-                    f"New position: {new_claim}\n"
-                    f"Tension was: {tension}"
-                )
-                reason = f"Contradiction resolved — updated {section} ({date_str})"
-                update_document(new_info, update_reason=reason, brain=brain)
-
-                # Explicit Decision Log entry
+            # Separate lock scope for the Decision Log entry
+            if not acquire_doc_lock(timeout_seconds=60):
+                st.warning("Document updated but could not add Decision Log entry — lock busy.")
+                return
+            try:
                 doc = read_living_document(brain=brain)
                 decision_entry = (
                     f"### {date_str} — Resolved: {section}\n"
@@ -1315,10 +1317,15 @@ def _resolve_contradiction(contradiction: dict, action: str, new_claim: str, exp
                 write_living_document(doc, brain=brain)
                 upsert_living_document(doc, metadata={"last_updated": date_str, "update_reason": reason}, brain=brain)
                 _git_commit(f"Decision log: {reason}", brain=brain)
+            finally:
+                release_doc_lock()
 
-            elif action == "keep":
-                # Don't call update_document — nothing to update in Current State
-                # Just add a Dismissed Contradiction entry
+        elif action == "keep":
+            # No content update — just add a Dismissed Contradiction entry
+            if not acquire_doc_lock(timeout_seconds=60):
+                st.warning("Document is being updated by another process. Try again shortly.")
+                return
+            try:
                 doc = read_living_document(brain=brain)
                 dismissed_entry = (
                     f"- [{date_str}] Dismissed: \"{contradiction.get('new_claim', '')}\"\n"
@@ -1329,18 +1336,25 @@ def _resolve_contradiction(contradiction: dict, action: str, new_claim: str, exp
                 write_living_document(doc, brain=brain)
                 upsert_living_document(doc, metadata={"last_updated": date_str}, brain=brain)
                 _git_commit(f"Dismissed contradiction in {section} ({date_str})", brain=brain)
+            finally:
+                release_doc_lock()
 
-            else:  # explain
-                new_info = (
-                    f"Contradiction resolved with explanation ({date_str}): Updating {section}.\n"
-                    f"New position: {new_claim}\n"
-                    f"Explanation: {explanation}\n"
-                    f"Tension was: {tension}"
-                )
-                reason = f"Contradiction resolved with explanation — {section} ({date_str})"
-                update_document(new_info, update_reason=reason, brain=brain)
+        else:  # explain
+            new_info = (
+                f"Contradiction resolved with explanation ({date_str}): Updating {section}.\n"
+                f"New position: {new_claim}\n"
+                f"Explanation: {explanation}\n"
+                f"Tension was: {tension}"
+            )
+            reason = f"Contradiction resolved with explanation — {section} ({date_str})"
+            # update_document manages its own doc lock internally
+            update_document(new_info, update_reason=reason, brain=brain)
 
-                # Explicit Decision Log entry with explanation
+            # Separate lock scope for the Decision Log entry
+            if not acquire_doc_lock(timeout_seconds=60):
+                st.warning("Document updated but could not add Decision Log entry — lock busy.")
+                return
+            try:
                 doc = read_living_document(brain=brain)
                 decision_entry = (
                     f"### {date_str} — Resolved: {section}\n"
@@ -1354,8 +1368,8 @@ def _resolve_contradiction(contradiction: dict, action: str, new_claim: str, exp
                 write_living_document(doc, brain=brain)
                 upsert_living_document(doc, metadata={"last_updated": date_str, "update_reason": reason}, brain=brain)
                 _git_commit(f"Decision log: {reason}", brain=brain)
-        finally:
-            release_doc_lock()
+            finally:
+                release_doc_lock()
 
     except Exception as e:
         logging.error("Contradiction resolution failed: %s", e)

@@ -352,13 +352,15 @@ def search_sessions(
     Search sessions with optional filters, all ANDed together.
     Returns list of session documents, newest first.
     """
+    import re as _re
+
     query = {}
     if brain:
         query["$or"] = [{"brain": brain}, {"brain": {"$exists": False}}]
     if session_type:
-        query["metadata.session_type"] = {"$regex": session_type, "$options": "i"}
+        query["metadata.session_type"] = {"$regex": _re.escape(session_type), "$options": "i"}
     if participant:
-        query["metadata.participants"] = {"$regex": participant, "$options": "i"}
+        query["metadata.participants"] = {"$regex": _re.escape(participant), "$options": "i"}
     date_query = {}
     if date_from:
         date_query["$gte"] = date_from

@@ -206,7 +206,7 @@ def ingest_feedback(
 
     date_str = date or datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
-    # Store in MongoDB
+    # Store in MongoDB (themes populated after pattern detection below)
     feedback_doc = {
         "source_name": source_name,
         "source_type": source_type,
@@ -216,6 +216,8 @@ def ingest_feedback(
         "themes": [],
     }
     feedback_id = insert_feedback(feedback_doc, brain=brain)
+    if not feedback_id:
+        logging.warning("insert_feedback returned None — feedback may not be persisted")
 
     # Get current feedback tracker for context
     feedback_tracker = _get_feedback_tracker_section(brain=brain)
@@ -233,11 +235,14 @@ def ingest_feedback(
 
     # Write detected themes back to the stored feedback document
     detected_themes = pattern_results.get("new_feedback_entry", {}).get("themes", [])
+    themes_synced = False
     if feedback_id and detected_themes:
         from services.mongo_client import update_one
         from bson import ObjectId
         try:
-            update_one("feedback", {"_id": ObjectId(feedback_id)}, {"$set": {"themes": detected_themes}})
+            themes_synced = update_one("feedback", {"_id": ObjectId(feedback_id)}, {"$set": {"themes": detected_themes}})
+            if not themes_synced:
+                logging.warning("Feedback themes update returned False for %s — themes may be empty", feedback_id)
         except Exception as e:
             logging.error("Could not update feedback themes: %s", e)
 

@@ -39,6 +39,26 @@ from app.state import init_session_state, set_mode, reset_ingestion, invalidate_
 # Initialize session state on every rerun
 init_session_state()
 
+# --- Ensure lock documents exist in MongoDB (safe no-op if already present) ---
+try:
+    from services.ingestion_lock import ensure_lock_document
+    ensure_lock_document()
+except Exception:
+    pass  # MongoDB unavailable — locks degrade to single-user mode
+
+# --- Ensure doc_write_lock document exists ---
+try:
+    from services.ingestion_lock import _get_lock_collection
+    _lock_coll = _get_lock_collection()
+    if _lock_coll is not None:
+        _lock_coll.update_one(
+            {"_id": "doc_write_lock"},
+            {"$setOnInsert": {"locked": False, "locked_at": None}},
+            upsert=True,
+        )
+except Exception:
+    pass
+
 # --- Crash recovery: check for pending ingestion checkpoint ---
 if not st.session_state.get("_has_pending_ingestion") and st.session_state.get("deferred_writer") is None:
     try:
@@ -47,8 +67,8 @@ if not st.session_state.get("_has_pending_ingestion") and st.session_state.get("
         if _pending_writer is not None:
             st.session_state.deferred_writer = _pending_writer
             st.session_state._has_pending_ingestion = True
-    except Exception:
-        pass  # MongoDB unavailable — no crash recovery
+    except Exception as _recovery_err:
+        logging.error("Crash recovery check failed: %s", _recovery_err)
 
 from app.components.styles import inject_custom_css
 inject_custom_css()
@@ -742,10 +762,25 @@ else:
             my_session_id = st.session_state.get("_lock_session_id")
             is_own_checkpoint = checkpoint_owner is None or checkpoint_owner == my_session_id
 
+            # Check if the living document has changed since the checkpoint was saved
+            _doc_drifted = False
+            try:
+                from services.document_updater import read_living_document
+                _current_doc = read_living_document(brain=writer.brain)
+                if _current_doc and writer.original_doc and _current_doc != writer.original_doc:
+                    _doc_drifted = True
+            except Exception:
+                pass
+
             if is_own_checkpoint:
                 st.warning("A previous ingestion was interrupted before completing.")
             else:
                 st.warning("Another session's ingestion was interrupted. You can resume or discard it.")
+            if _doc_drifted:
+                st.error(
+                    "The living document has changed since this checkpoint was saved. "
+                    "Resuming may overwrite recent changes. Consider discarding instead."
+                )
 
             col_info1, col_info2, col_info3 = st.columns(3)
             with col_info1:

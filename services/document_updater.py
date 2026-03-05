@@ -62,11 +62,23 @@ def read_living_document(brain: str = "pitch") -> str:
 
 
 def write_living_document(content: str, brain: str = "pitch") -> None:
-    """Write content to the living document file."""
+    """Write content to the living document file (atomic via temp + replace)."""
+    import os
+    import tempfile
+
     path = _doc_path(brain)
     path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "w", encoding="utf-8") as f:
-        f.write(content)
+    fd, tmp_path = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(content)
+        os.replace(tmp_path, path)
+    except BaseException:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
 
 
 def generate_diff(current_doc: str, new_info: str, update_reason: str = "", brain: str = "pitch") -> str:
@@ -600,15 +612,18 @@ def update_document(new_info: str, update_reason: str = "", max_retries: int = 2
 
         updated_doc = apply_diff(current_doc, diff_blocks, brain=brain)
 
+        # Mirror to MongoDB first (source of truth on Render's ephemeral filesystem)
+        date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        try:
+            upsert_living_document(updated_doc, metadata={"last_updated": date_str, "update_reason": update_reason}, brain=brain)
+        except Exception as mirror_err:
+            logging.error("MongoDB mirror failed — continuing with file write: %s", mirror_err)
+
         # Write file
         try:
             write_living_document(updated_doc, brain=brain)
         except Exception as e:
             return {"success": False, "message": f"Failed to write living document: {e}", "changes_applied": 0}
-
-        # Mirror to MongoDB
-        date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        upsert_living_document(updated_doc, metadata={"last_updated": date_str, "update_reason": update_reason}, brain=brain)
 
         # Git commit
         brain_label = "pitch_brain.md" if brain == "pitch" else "ops_brain.md"

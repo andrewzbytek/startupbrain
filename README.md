@@ -229,14 +229,14 @@ Still supported. Secrets via Cloud dashboard.
 
 ### Authentication
 
-Set `APP_USERNAME` and `APP_PASSWORD` env vars to enable login. In production (detected via `RENDER`/`PORT` env vars), credentials are required — set `DISABLE_AUTH=true` to explicitly skip. In local dev, auth is skipped when env vars are unset. Login uses HMAC-signed cookies for 7-day session persistence.
+Set `APP_USERNAME` and `APP_PASSWORD` env vars to enable login. In production (detected via `RENDER`/`PORT` env vars), credentials are required — set `DISABLE_AUTH=true` to explicitly skip. In local dev, auth is skipped when env vars are unset. Login uses HMAC-signed cookies (PBKDF2-stretched key, 100k iterations) for 7-day session persistence.
 
 ### Concurrent Access
 
 Two-tier MongoDB-based locking ensures multi-user safety:
 
 - **Ingestion lock** — prevents two users from ingesting simultaneously. 30-minute stale timeout handles browser close / crash. Top bar shows "Ingestion in progress..." when locked.
-- **Document write lock** — short-lived lock (2-minute timeout) prevents concurrent read-modify-write corruption on the living document across chat corrections, feedback, hypothesis updates, and batch commits.
+- **Document write lock** — short-lived lock (2-minute timeout) prevents concurrent read-modify-write corruption on the living document across chat corrections, feedback, hypothesis updates, and batch commits. Not re-entrant — `update_document()` manages its own lock internally.
 
 ## Cost Model
 
@@ -257,11 +257,16 @@ All 24 sections of the spec are implemented plus the two-brain architecture exte
 
 **Security and multi-user safety:**
 - Auth hardened for production (requires credentials or explicit opt-out)
-- Two-tier MongoDB locking (ingestion lock + document write lock) — all document write paths protected
+- HMAC cookie signing with PBKDF2-stretched key (100k iterations, app-specific salt)
+- Two-tier MongoDB locking (ingestion lock + document write lock) — all document write paths protected, lock documents auto-initialized at startup
 - Atomic lock operations (`ReturnDocument.AFTER`), UUID-based session IDs, sanitized error messages
+- Atomic file writes (`tempfile` + `os.replace`) prevent partial-write corruption on crash
+- MongoDB mirror written before file (source of truth on Render's ephemeral filesystem)
 - API error messages sanitized — no exception details, API keys, or internal paths leak to users (logged server-side via `logging.error()`)
-- XML-escaped living document content in all LLM prompts (system prompt, scratchpad, book frameworks, conversation history) prevents prompt boundary confusion
-- All MongoDB errors sanitized (generic user messages, full details server-side only)
+- XML-escaped living document content in all LLM prompts (system prompt, scratchpad, book frameworks, conversation history — including first-turn messages) prevents prompt injection
+- `re.escape()` on all user-provided values in MongoDB `$regex` queries (prevents ReDoS)
+- Crash recovery detects document drift and warns before overwriting recent changes
+- Rollback safely ordered: file write before MongoDB deletes, orphaned session cleanup on failure
 - Consistency engine properly filters dismissed contradictions (including short-word claims)
 - Consistency engine detects API errors and surfaces "check failed" instead of silently producing "no contradictions"
 - Brain isolation hardened: `active_brain` (write target) vs `chat_brain_context` (read scope) correctly separated across all write/read paths; 26 cross-brain data integrity bugs fixed via targeted review

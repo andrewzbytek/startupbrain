@@ -187,15 +187,18 @@ class DeferredWriter:
                         "changes_applied": 0,
                     }
                 try:
-                    write_living_document(self.in_memory_doc, brain=self.brain)
-
-                    # 2. Mirror to MongoDB
+                    # 2. Mirror to MongoDB first (source of truth on Render's ephemeral FS)
                     update_reason = self._build_update_reason()
-                    upsert_living_document(
-                        self.in_memory_doc,
-                        metadata={"last_updated": date_str, "update_reason": update_reason},
-                        brain=self.brain,
-                    )
+                    try:
+                        upsert_living_document(
+                            self.in_memory_doc,
+                            metadata={"last_updated": date_str, "update_reason": update_reason},
+                            brain=self.brain,
+                        )
+                    except Exception as mirror_err:
+                        logging.error("MongoDB mirror failed in batch_commit — continuing with file write: %s", mirror_err)
+
+                    write_living_document(self.in_memory_doc, brain=self.brain)
 
                     # 3. Single git commit
                     brain_label = "pitch_brain.md" if self.brain == "pitch" else "ops_brain.md"
@@ -236,6 +239,14 @@ class DeferredWriter:
 
         except Exception as e:
             logging.error("batch_commit failed: %s", e)
+            # Clean up orphaned session if claims storage failed
+            if 'session_id' in dir() and session_id and ('claims_stored' not in dir() or claims_stored == 0):
+                try:
+                    from services.mongo_client import delete_one
+                    delete_one("sessions", {"_id": session_id})
+                    logging.info("Cleaned up orphaned session %s after batch_commit failure", session_id)
+                except Exception:
+                    pass
             return {
                 "success": False,
                 "message": f"Batch commit failed: {e}",
@@ -412,13 +423,8 @@ def rollback_last_session() -> dict:
             }
 
     try:
-        # 4. Delete claims for this session
-        claims_deleted = delete_many("claims", {"session_id": session_id})
-
-        # 5. Delete the session document
-        delete_one("sessions", {"_id": session["_id"]})
-
-        # 6. Revert living document if git content was found
+        # 4. Revert living document FIRST (before deleting MongoDB data)
+        #    so that if the file write fails, MongoDB data is still intact.
         if prev_content is not None:
             write_living_document(prev_content, brain=brain)
             date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -428,6 +434,12 @@ def rollback_last_session() -> dict:
                 brain=brain,
             )
             _git_commit(f"Rollback session: {session_id}", brain=brain)
+
+        # 5. Delete the session document first (orphaned claims are less visible than orphaned sessions)
+        delete_one("sessions", {"_id": session["_id"]})
+
+        # 6. Delete claims for this session
+        claims_deleted = delete_many("claims", {"session_id": session_id})
     finally:
         if doc_lock_acquired:
             release_doc_lock()
