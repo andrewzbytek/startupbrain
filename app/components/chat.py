@@ -398,9 +398,12 @@ def _get_system_prompt(query_type: str = "") -> str:
     # Append recent scratchpad notes so the AI can reference them
     try:
         from services.mongo_client import find_many
+        scratchpad_query = {"source_type": "quick_note", "claim_type": "scratchpad"}
+        if brain_ctx != "both":
+            scratchpad_query["brain"] = brain_ctx
         scratchpad = find_many(
             "claims",
-            {"source_type": "quick_note", "claim_type": "scratchpad"},
+            scratchpad_query,
             sort_by="created_at",
             sort_order=-1,
             limit=50,
@@ -498,6 +501,11 @@ def _apply_direct_correction(user_message: str) -> str:
         from services.document_updater import update_document
         from services.consistency import run_consistency_check
 
+        # Determine target brain before consistency check
+        brain = st.session_state.get("chat_brain_context", "pitch")
+        if brain == "both":
+            brain = "pitch"  # fallback for "both" context
+
         # Build synthetic claim for consistency check
         claim = {
             "claim_text": user_message,
@@ -508,7 +516,7 @@ def _apply_direct_correction(user_message: str) -> str:
         # Run lightweight consistency check (informational only)
         info_note = ""
         try:
-            results = run_consistency_check([claim], session_type="Direct correction")
+            results = run_consistency_check([claim], session_type="Direct correction", brain=brain)
             if results.get("has_contradictions"):
                 contradictions = results.get("pass2", {}).get("retained", [])
                 if contradictions:
@@ -527,9 +535,6 @@ def _apply_direct_correction(user_message: str) -> str:
             pass  # Consistency check failure should never block corrections
 
         # Always apply the correction — route to the active brain
-        brain = st.session_state.get("chat_brain_context", "pitch")
-        if brain == "both":
-            brain = "pitch"  # fallback for "both" context
         result = update_document(
             new_info=f"Direct correction from founder: {user_message}",
             update_reason="Direct founder correction",
@@ -566,6 +571,7 @@ def _apply_quick_note(note_text: str) -> str:
             "who_said_it": "Founder",
             "confirmed": True,
             "created_at": datetime.now(timezone.utc),
+            "brain": "ops",
         })
 
         return "Noted — saved to scratchpad. I can reference this in our conversation, but it won't appear in the living document."
@@ -600,6 +606,7 @@ def _apply_contact(contact_text: str) -> str:
                 "who_said_it": "Founder",
                 "confirmed": True,
                 "created_at": datetime.now(timezone.utc),
+                "brain": "ops",
             })
         except Exception:
             pass
@@ -663,6 +670,7 @@ def _apply_hypothesis(user_message: str) -> str:
                 "status": "unvalidated",
                 "test_plan": "",
                 "created_at": datetime.now(timezone.utc),
+                "brain": "ops",
             })
             db_synced = result is not None
         except Exception:
@@ -874,27 +882,50 @@ def render_chat():
                 '</div>',
                 unsafe_allow_html=True,
             )
-            # Suggestion chips — small centered buttons
-            _, sc1, sc2, sc3, sc4, _ = st.columns([1.5, 1, 1, 1, 1, 1.5])
-            with sc1:
-                if st.button("Current state", key="quick_state"):
-                    _handle_quick_action("What's our current state?", "current_state")
-                    return
-            with sc2:
-                if st.button("Open questions", key="quick_questions"):
-                    _handle_quick_action("What are our open questions?", "general")
-                    return
-            with sc3:
-                if st.button("Recent changes", key="quick_changes"):
-                    _handle_quick_action("What are the recent changes?", "historical")
-                    return
-            with sc4:
-                if st.button("Challenge me", key="quick_challenge"):
-                    _handle_quick_action("Challenge our current assumptions. What are we missing?", "challenge")
-                    return
+            # Suggestion chips — small centered buttons, brain-aware
+            active_brain = st.session_state.get("active_brain", "pitch")
+            if active_brain == "ops":
+                # Ops-relevant chips
+                _, sc1, sc2, sc3, sc4, _ = st.columns([1.5, 1, 1, 1, 1, 1.5])
+                with sc1:
+                    if st.button("Open hypotheses", key="quick_hypotheses"):
+                        _handle_quick_action("What are our open hypotheses?", "general")
+                        return
+                with sc2:
+                    if st.button("Key risks", key="quick_risks"):
+                        _handle_quick_action("What are our key risks?", "general")
+                        return
+                with sc3:
+                    if st.button("Recent contacts", key="quick_contacts"):
+                        _handle_quick_action("Who are our recent contacts?", "general")
+                        return
+                with sc4:
+                    if st.button("Open questions", key="quick_ops_questions"):
+                        _handle_quick_action("What are our open questions?", "general")
+                        return
+            else:
+                # Pitch-relevant chips
+                _, sc1, sc2, sc3, sc4, _ = st.columns([1.5, 1, 1, 1, 1, 1.5])
+                with sc1:
+                    if st.button("Current state", key="quick_state"):
+                        _handle_quick_action("What's our current state?", "current_state")
+                        return
+                with sc2:
+                    if st.button("Open questions", key="quick_questions"):
+                        _handle_quick_action("What are our open questions?", "general")
+                        return
+                with sc3:
+                    if st.button("Recent changes", key="quick_changes"):
+                        _handle_quick_action("What are the recent changes?", "historical")
+                        return
+                with sc4:
+                    if st.button("Challenge me", key="quick_challenge"):
+                        _handle_quick_action("Challenge our current assumptions. What are we missing?", "challenge")
+                        return
 
-        # Quick command chips — always visible, tiny row
-        _render_quick_command_panel()
+        # Quick command chips — only when top-level brain is Ops (notes/hypotheses/contacts are Ops features)
+        if st.session_state.get("active_brain", "pitch") == "ops":
+            _render_quick_command_panel()
 
     # Book framework upload — outside frame, near the bottom
     with st.expander("Upload .md for cross-check", expanded=False):
@@ -953,8 +984,11 @@ def render_chat():
 
         add_message("user", user_input)
 
+        # Prefix commands (note:/contact:/hypothesis:/validated:/invalidated:) are ops-only
+        active_brain = st.session_state.get("active_brain", "pitch")
+
         # Handle quick notes — lightweight doc update, no full pipeline
-        if _is_quick_note(user_input):
+        if active_brain == "ops" and _is_quick_note(user_input):
             note_text = _strip_quick_note_prefix(user_input)
             with st.chat_message("assistant"):
                 with st.spinner("Noting..."):
@@ -965,7 +999,7 @@ def render_chat():
             return
 
         # Handle contact notes
-        if _is_contact(user_input):
+        if active_brain == "ops" and _is_contact(user_input):
             contact_text = _strip_contact_prefix(user_input)
             with st.chat_message("assistant"):
                 with st.spinner("Updating contacts..."):
@@ -977,7 +1011,7 @@ def render_chat():
             return
 
         # Handle hypothesis tracking
-        if _is_hypothesis(user_input):
+        if active_brain == "ops" and _is_hypothesis(user_input):
             with st.chat_message("assistant"):
                 with st.spinner("Tracking hypothesis..."):
                     response = _apply_hypothesis(user_input)
@@ -988,7 +1022,7 @@ def render_chat():
             return
 
         # Handle hypothesis status updates
-        if _is_hypothesis_status_update(user_input):
+        if active_brain == "ops" and _is_hypothesis_status_update(user_input):
             with st.chat_message("assistant"):
                 with st.spinner("Updating hypothesis..."):
                     response = _apply_hypothesis_status_update(user_input)
@@ -997,6 +1031,11 @@ def render_chat():
             invalidate_sidebar()
             st.rerun()
             return
+
+        # If user typed an ops prefix in pitch mode, show a helpful toast
+        if active_brain != "ops":
+            if _is_quick_note(user_input) or _is_contact(user_input) or _is_hypothesis(user_input) or _is_hypothesis_status_update(user_input):
+                st.toast("Switch to Ops Brain to use note:/hypothesis:/contact: commands.")
 
         # Handle direct corrections — apply immediately, zero pushback
         if _is_direct_correction(user_input):

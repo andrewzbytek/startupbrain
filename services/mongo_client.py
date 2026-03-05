@@ -225,9 +225,12 @@ def insert_session(session_doc: dict, brain: str = "pitch") -> Optional[str]:
     return insert_one("sessions", {**session_doc, "brain": brain})
 
 
-def get_sessions(limit: int = 50) -> list:
+def get_sessions(limit: int = 50, brain: str = "") -> list:
     """Retrieve recent sessions, newest first."""
-    return find_many("sessions", sort_by="created_at", sort_order=-1, limit=limit)
+    query = {}
+    if brain:
+        query["brain"] = brain
+    return find_many("sessions", query=query, sort_by="created_at", sort_order=-1, limit=limit)
 
 
 def insert_claim(claim_doc: dict, brain: str = "pitch") -> Optional[str]:
@@ -319,7 +322,7 @@ def update_hypothesis_status(claim_text_fragment, new_status):
     try:
         escaped = re.escape(claim_text_fragment)
         result = db["claims"].update_one(
-            {"claim_type": "hypothesis", "claim_text": {"$regex": escaped, "$options": "i"}},
+            {"claim_type": "hypothesis", "brain": "ops", "claim_text": {"$regex": escaped, "$options": "i"}},
             {"$set": {"status": new_status, "updated_at": datetime.now(timezone.utc)}},
         )
         return result.modified_count > 0
@@ -334,12 +337,15 @@ def search_sessions(
     date_from: str | None = None,
     date_to: str | None = None,
     limit: int = 20,
+    brain: str = "",
 ) -> list:
     """
     Search sessions with optional filters, all ANDed together.
     Returns list of session documents, newest first.
     """
     query = {}
+    if brain:
+        query["brain"] = brain
     if session_type:
         query["metadata.session_type"] = {"$regex": session_type, "$options": "i"}
     if participant:

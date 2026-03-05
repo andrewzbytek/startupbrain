@@ -137,6 +137,7 @@ def reset_ingestion():
     st.session_state.pipeline_result = {}
     st.session_state.deferred_writer = None
     st.session_state._batch_committed = False
+    st.session_state._batch_commit_failed = False
     st.session_state._consistency_checked = False
     st.session_state._has_pending_ingestion = False
     st.session_state._ops_confirmed_claims = []

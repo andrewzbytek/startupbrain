@@ -381,7 +381,12 @@ class TestCollectionHelpers:
     def test_get_sessions(self):
         with patch.object(mc, "find_many", return_value=[]) as mock:
             mc.get_sessions(limit=10)
-            mock.assert_called_once_with("sessions", sort_by="created_at", sort_order=-1, limit=10)
+            mock.assert_called_once_with("sessions", query={}, sort_by="created_at", sort_order=-1, limit=10)
+
+    def test_get_sessions_with_brain(self):
+        with patch.object(mc, "find_many", return_value=[]) as mock:
+            mc.get_sessions(limit=10, brain="pitch")
+            mock.assert_called_once_with("sessions", query={"brain": "pitch"}, sort_by="created_at", sort_order=-1, limit=10)
 
     def test_insert_claim(self):
         with patch.object(mc, "insert_one", return_value="id2") as mock:

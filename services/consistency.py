@@ -244,7 +244,7 @@ def check_rag_health() -> dict:
     """
     from services.mongo_client import count_documents
 
-    claim_count = count_documents("claims")
+    claim_count = count_documents("claims", {"brain": "pitch"})
     needs_upgrade = claim_count >= RAG_UPGRADE_CLAIM_THRESHOLD
 
     if needs_upgrade:
@@ -265,7 +265,7 @@ def check_rag_health() -> dict:
     }
 
 
-def _get_rag_evidence(claims: list) -> list:
+def _get_rag_evidence(claims: list, brain: str = "pitch") -> list:
     """
     Retrieve RAG evidence from MongoDB for contradiction analysis.
     Tries Atlas Vector Search first (semantic), falls back to time-based retrieval.
@@ -298,7 +298,7 @@ def _get_rag_evidence(claims: list) -> list:
     evidence = []
 
     # Fetch recent claims from MongoDB to provide evidence context
-    recent_claims = get_claims(limit=10)
+    recent_claims = get_claims(limit=10, brain=brain)
     for claim in recent_claims:
         _ca = claim.get("created_at", "")
         evidence.append({
@@ -308,7 +308,7 @@ def _get_rag_evidence(claims: list) -> list:
         })
 
     # Fetch recent sessions for additional context
-    recent_sessions = get_sessions(limit=5)
+    recent_sessions = get_sessions(limit=5, brain=brain)
     for session in recent_sessions[:3]:
         _ca = session.get("created_at", "")
         evidence.append({
@@ -540,7 +540,7 @@ def run_consistency_check(claims: list, session_type: str = "", brain: str = "pi
     pass3 = None
     if pass2["has_critical"]:
         critical_items = [c for c in pass2["retained"] if c.get("severity", "") == "Critical"]
-        rag_evidence = _get_rag_evidence(claims)
+        rag_evidence = _get_rag_evidence(claims, brain=brain)
         pass3 = pass3_deep_analysis(critical_items, living_doc, rag_evidence)
 
     critical_count = sum(1 for c in pass2["retained"] if c.get("severity", "") == "Critical")
@@ -575,7 +575,7 @@ def run_audit(num_sessions: int = 10, brain: str = "pitch") -> dict:
     from services.mongo_client import get_sessions
 
     living_doc = read_living_document(brain=brain)
-    sessions = get_sessions(limit=num_sessions)
+    sessions = get_sessions(limit=num_sessions, brain=brain)
 
     if not sessions:
         return {

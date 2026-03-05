@@ -36,6 +36,7 @@ def render_top_bar():
         brain_options = ["Pitch", "Ops"]
         current_brain = st.session_state.get("active_brain", "pitch")
         default_idx = 0 if current_brain == "pitch" else 1
+        in_pipeline = st.session_state.get("mode", "chat") != "chat"
         selected = st.radio(
             "Brain",
             brain_options,
@@ -43,12 +44,15 @@ def render_top_bar():
             horizontal=True,
             label_visibility="collapsed",
             key="brain_toggle",
+            disabled=in_pipeline,
         )
         new_brain = selected.lower()
-        if new_brain != current_brain:
+        # Only process brain switch if not in pipeline
+        if not in_pipeline and new_brain != current_brain:
             st.session_state.active_brain = new_brain
             st.session_state.chat_brain_context = new_brain
             st.session_state.sidebar_data = {}
+            st.session_state.pop("_active_quick_cmd", None)
             st.rerun()
 
     # col_spacer intentionally left empty

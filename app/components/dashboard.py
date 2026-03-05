@@ -3,7 +3,6 @@ Full-page dashboard for Startup Brain.
 Replaces the sidebar with a dedicated dashboard tab.
 """
 
-import hashlib
 import html
 
 import streamlit as st
@@ -14,19 +13,10 @@ from app.components._parsers import (
     _parse_recent_changelog,
     _parse_feedback_by_source,
     _parse_feedback_themes,
-    _parse_hypotheses,
     _parse_contacts,
     _parse_tensions,
     _read_living_document,
 )
-
-# Dark-theme status colors using CSS variable palette
-_STATUS_COLORS = {
-    "unvalidated": ("rgba(210,153,34,0.12)", "#D29922"),
-    "testing": ("rgba(88,166,255,0.12)", "#58A6FF"),
-    "validated": ("rgba(63,185,80,0.12)", "#3FB950"),
-    "invalidated": ("rgba(248,81,73,0.12)", "#F85149"),
-}
 
 _CONTACT_STATUS_COLORS = {
     "identified": ("rgba(88,166,255,0.12)", "#58A6FF"),
@@ -86,144 +76,6 @@ def render_dashboard():
 
     # --- LEFT COLUMN ---
     with left_col:
-        # Hypotheses panel — always read from ops brain (Active Hypotheses lives there)
-        ops_doc = _read_living_document(brain="ops")
-        hypotheses = _parse_hypotheses(ops_doc)
-        active = [h for h in hypotheses if h["status"] in ("unvalidated", "testing")] if hypotheses else []
-        resolved = [h for h in hypotheses if h["status"] in ("validated", "invalidated")] if hypotheses else []
-
-        with st.expander(f"Hypotheses ({len(active)} active)", expanded=True):
-            if active:
-                for i, h in enumerate(active):
-                    # Use hash of hypothesis text for stable widget keys
-                    _hkey = hashlib.md5(h["text"].encode()).hexdigest()[:8]
-                    bg, fg = _STATUS_COLORS.get(h["status"], ("rgba(139,148,158,0.12)", "#8B949E"))
-                    badge_html = (
-                        f'<span style="background:{bg};color:{fg};padding:2px 8px;'
-                        f'border-radius:4px;font-size:0.8em;">{html.escape(h["status"])}</span>'
-                    )
-                    st.markdown(
-                        f"{badge_html} {html.escape(h['text'][:60])}",
-                        unsafe_allow_html=True,
-                    )
-                    st.caption(f"Tracked: {h['date']} | Test: {_escape_latex(h['test'])}")
-
-                    # Status update controls
-                    new_status = st.selectbox(
-                        "Update status",
-                        options=["unvalidated", "testing", "validated", "invalidated"],
-                        index=["unvalidated", "testing", "validated", "invalidated"].index(h["status"]),
-                        key=f"dash_hyp_status_{_hkey}",
-                    )
-                    if st.button("Save", key=f"dash_hyp_save_{_hkey}"):
-                        if new_status != h["status"]:
-                            try:
-                                from services.document_updater import (
-                                    read_living_document, write_living_document,
-                                    _update_hypothesis_status, _git_commit,
-                                )
-                                from services.mongo_client import update_hypothesis_status, upsert_living_document
-                                from services.ingestion_lock import acquire_doc_lock, release_doc_lock
-                                from datetime import datetime, timezone
-
-                                if not acquire_doc_lock():
-                                    st.warning("Document is being updated by another process. Try again shortly.")
-                                else:
-                                    try:
-                                        fresh_doc = read_living_document(brain="ops")
-                                        updated = _update_hypothesis_status(fresh_doc, h["text"], new_status)
-                                        if updated != fresh_doc:
-                                            write_living_document(updated, brain="ops")
-                                            date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-                                            upsert_living_document(updated, metadata={"last_updated": date_str}, brain="ops")
-                                            _git_commit(f"Hypothesis {new_status}: {h['text'][:50]}", brain="ops")
-                                            try:
-                                                update_hypothesis_status(h["text"], new_status)
-                                            except Exception:
-                                                pass
-                                            st.session_state.sidebar_data = {}
-                                            st.rerun()
-                                    finally:
-                                        release_doc_lock()
-                            except Exception as e:
-                                import logging
-                                logging.error(f"Hypothesis status update failed: {e}")
-                                st.error("Update failed. Please try again.")
-            else:
-                st.caption("No active hypotheses.")
-
-            if resolved:
-                st.markdown("---")
-                st.markdown(f"**Resolved ({len(resolved)})**")
-                for h in resolved:
-                    bg, fg = _STATUS_COLORS.get(h["status"], ("rgba(139,148,158,0.12)", "#8B949E"))
-                    badge_html = (
-                        f'<span style="background:{bg};color:{fg};padding:2px 8px;'
-                        f'border-radius:4px;font-size:0.8em;">{html.escape(h["status"])}</span>'
-                    )
-                    st.markdown(
-                        f"{badge_html} **{html.escape(h['text'][:60])}** ({h['date']})",
-                        unsafe_allow_html=True,
-                    )
-
-        # Track Hypothesis form
-        with st.expander("Track Hypothesis", expanded=st.session_state.get("show_hypothesis_form", False)):
-            with st.form("hypothesis_form", clear_on_submit=True):
-                hyp_text = st.text_input("Hypothesis", placeholder="e.g., Small plants have <12 month procurement cycles")
-                hyp_test = st.text_input("Test plan (optional)", placeholder="e.g., Ask 3 plant operators")
-                submitted = st.form_submit_button("Track")
-                if submitted and hyp_text.strip():
-                    try:
-                        from services.document_updater import (
-                            read_living_document, write_living_document, _add_hypothesis, _git_commit,
-                        )
-                        from services.mongo_client import insert_claim, upsert_living_document
-                        from services.ingestion_lock import acquire_doc_lock, release_doc_lock
-                        from datetime import datetime, timezone
-
-                        if not acquire_doc_lock():
-                            st.warning("Document is being updated by another process. Try again shortly.")
-                        else:
-                            try:
-                                date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-                                test_plan = hyp_test.strip() if hyp_test.strip() else "[to be defined]"
-                                entry = (
-                                    f"- [{date_str}] **{hyp_text.strip()}**\n"
-                                    f"  Status: unvalidated | Test: {test_plan}\n"
-                                    f"  Evidence: ---"
-                                )
-
-                                fresh_doc = read_living_document(brain="ops")
-                                updated = _add_hypothesis(fresh_doc, entry)
-                                write_living_document(updated, brain="ops")
-                                upsert_living_document(updated, metadata={"last_updated": date_str, "update_reason": "New hypothesis"}, brain="ops")
-                                _git_commit(f"Add hypothesis: {hyp_text.strip()[:50]}", brain="ops")
-
-                                try:
-                                    insert_claim({
-                                        "claim_text": hyp_text.strip(),
-                                        "claim_type": "hypothesis",
-                                        "confidence": "speculative",
-                                        "source_type": "hypothesis",
-                                        "who_said_it": "Founder",
-                                        "confirmed": True,
-                                        "status": "unvalidated",
-                                        "test_plan": test_plan,
-                                        "created_at": datetime.now(timezone.utc),
-                                    })
-                                except Exception:
-                                    pass
-
-                                st.success(f"Tracking: {hyp_text.strip()}")
-                                st.session_state.sidebar_data = {}
-                                st.rerun()
-                            finally:
-                                release_doc_lock()
-                    except Exception as e:
-                        import logging
-                        logging.error(f"Could not track hypothesis: {e}")
-                        st.error("Could not track hypothesis. Please try again.")
-
         # Contacts panel
         contacts = _parse_contacts(doc)
         active_contacts = [c for c in contacts if c["status"] not in ("closed", "inactive")] if contacts else []
@@ -383,7 +235,7 @@ def render_dashboard():
                 with st.spinner(f"Generating evolution narrative for {selected_topic}..."):
                     try:
                         from services.feedback import generate_evolution_narrative
-                        evo_result = generate_evolution_narrative(selected_topic)
+                        evo_result = generate_evolution_narrative(selected_topic, brain=st.session_state.get("active_brain", "pitch"))
                         st.session_state.evolution_result = evo_result
                         st.rerun()
                     except Exception as e:

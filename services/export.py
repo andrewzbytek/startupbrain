@@ -45,7 +45,7 @@ def generate_context_export(brain: str = "pitch") -> str:
     lines.append("## Session History")
     lines.append("")
 
-    sessions = get_sessions(limit=100)
+    sessions = get_sessions(limit=100, brain=brain)
     def _safe_sort_dt(s):
         dt = s.get("created_at")
         if dt is None:
