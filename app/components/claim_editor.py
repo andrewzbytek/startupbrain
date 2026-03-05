@@ -23,7 +23,8 @@ def render_claim_editor(ops_mode: bool = False):
                   (Check Consistency / Cancel). The ops flow provides its own buttons.
     """
     st.header("Review Extracted Claims")
-    render_step_indicator(2)
+    if not ops_mode:
+        render_step_indicator(2)
     st.caption("Review and edit the claims extracted from your session")
 
     claims = st.session_state.get("pending_claims", [])

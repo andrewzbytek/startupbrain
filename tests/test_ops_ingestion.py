@@ -121,7 +121,7 @@ class TestRunOpsIngestion:
         )
 
         call_args = mock_update.call_args
-        update_reason = call_args[1].get("update_reason", "") or call_args[0][1] if len(call_args[0]) > 1 else call_args[1].get("update_reason", "")
+        update_reason = call_args.kwargs.get("update_reason", "")
         assert "Advisor session" in update_reason
         assert "2026-03-01" in update_reason
         assert "John" in update_reason

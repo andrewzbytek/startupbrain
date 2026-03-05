@@ -88,7 +88,7 @@ def generate_diff(current_doc: str, new_info: str, update_reason: str = "", brai
     prompt = f"""{prompt_template}
 
 <diff_input>
-  <current_document>{current_doc}</current_document>
+  <current_document>{escape_xml(current_doc)}</current_document>
   <new_information>{escape_xml(new_info)}</new_information>
   <update_reason>{escape_xml(update_reason)}</update_reason>
 </diff_input>"""
@@ -104,16 +104,16 @@ def verify_diff(original_doc: str, proposed_changes: str, new_info: str) -> dict
     Returns:
         dict with keys: verified (bool), notes (str), issues (list of str)
     """
-    from services.claude_client import call_sonnet, load_prompt
+    from services.claude_client import call_sonnet, load_prompt, escape_xml
 
     prompt_template = load_prompt("diff_verify")
 
     prompt = f"""{prompt_template}
 
 <verify_input>
-  <original_document>{original_doc}</original_document>
-  <proposed_changes>{proposed_changes}</proposed_changes>
-  <new_information>{new_info}</new_information>
+  <original_document>{escape_xml(original_doc)}</original_document>
+  <proposed_changes>{escape_xml(proposed_changes)}</proposed_changes>
+  <new_information>{escape_xml(new_info)}</new_information>
 </verify_input>"""
 
     result = call_sonnet(prompt, task_type="diff_verify")

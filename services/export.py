@@ -7,7 +7,7 @@ plus session history with claims for sharing with external LLMs/advisors.
 from datetime import datetime, timezone
 
 
-def generate_context_export() -> str:
+def generate_context_export(brain: str = "pitch") -> str:
     """
     Generate a complete context export as a single markdown string.
     Includes the living document + all session history with claims.
@@ -37,7 +37,7 @@ def generate_context_export() -> str:
     # Living document
     lines.append("## Living Document")
     lines.append("")
-    doc = read_living_document()
+    doc = read_living_document(brain=brain)
     lines.append(doc if doc else "_No living document found._")
     lines.append("")
 

@@ -88,7 +88,7 @@ def render_ops_dashboard():
                                 current = read_living_document(brain="ops")
                                 updated = _add_hypothesis(current, entry)
                                 write_living_document(updated, brain="ops")
-                                upsert_living_document(updated, brain="ops")
+                                upsert_living_document(updated, metadata={"last_updated": datetime.now(timezone.utc).strftime("%Y-%m-%d"), "update_reason": "New hypothesis"}, brain="ops")
                                 st.rerun()
                             except Exception as e:
                                 import logging

@@ -30,6 +30,7 @@ When generating an UPDATE_POSITION action:
 - `ADD_CONTACT` — Add a new person to Contacts / Prospects (first mention).
 - `UPDATE_CONTACT` — Update an existing contact (new interaction, status change). Match by name.
 - `ADD_HYPOTHESIS` — Add a new entry to Active Hypotheses.
+- `ADD_FEEDBACK` — Add a new entry to the Feedback Tracker section.
 - `ADD_SECTION` — Add an entirely new section (rare — only when genuinely new topic).
 
 ## Output Format

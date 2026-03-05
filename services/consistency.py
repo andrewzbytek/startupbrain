@@ -174,7 +174,7 @@ def pass1_wide_net(living_doc: str, claims: list, session_type: str = "") -> dic
 
 <consistency_input>
   <session_type>{escape_xml(session_type)}</session_type>
-  <living_document>{living_doc}</living_document>
+  <living_document>{escape_xml(living_doc)}</living_document>
   {claims_xml}
 </consistency_input>"""
 
@@ -216,7 +216,7 @@ def pass2_severity_filter(pass1_results: dict, living_doc: str, session_type: st
 
 <pass2_input>
   <session_type>{escape_xml(session_type)}</session_type>
-  <living_document>{living_doc}</living_document>
+  <living_document>{escape_xml(living_doc)}</living_document>
   <pass1_results>{pass1_filtered_xml}</pass1_results>
 </pass2_input>"""
 
@@ -366,7 +366,7 @@ def pass3_deep_analysis(critical_items: list, living_doc: str, rag_evidence: lis
     prompt = f"""{prompt_template}
 
 <pass3_input>
-  <living_document>{living_doc}</living_document>
+  <living_document>{escape_xml(living_doc)}</living_document>
   {critical_xml}
   {rag_xml}
 </pass3_input>"""
@@ -551,7 +551,7 @@ def run_audit(num_sessions: int = 10) -> dict:
     prompt = f"""{prompt_template}
 
 <audit_input>
-  <current_document>{living_doc}</current_document>
+  <current_document>{escape_xml(living_doc)}</current_document>
   {sessions_xml}
   <audit_period>last {num_sessions} sessions</audit_period>
 </audit_input>"""

@@ -217,37 +217,40 @@ def acquire_doc_lock(timeout_seconds: int = 30) -> bool:
     deadline = time.time() + timeout_seconds
 
     while time.time() < deadline:
-        now = datetime.now(timezone.utc)
-        stale_threshold = now - timedelta(seconds=DOC_LOCK_TIMEOUT_SECONDS)
+        try:
+            now = datetime.now(timezone.utc)
+            stale_threshold = now - timedelta(seconds=DOC_LOCK_TIMEOUT_SECONDS)
 
-        result = collection.find_one_and_update(
-            {
-                "_id": "doc_write_lock",
-                "$or": [
-                    {"locked": False},
-                    {"locked_at": {"$lt": stale_threshold}},
-                ],
-            },
-            {"$set": {"locked": True, "locked_at": now}},
-            upsert=False,
-            return_document=ReturnDocument.AFTER,
-        )
-
-        if result is not None:
-            return True
-
-        # Lock document may not exist yet
-        existing = collection.find_one({"_id": "doc_write_lock"})
-        if existing is None:
-            try:
-                collection.insert_one({
+            result = collection.find_one_and_update(
+                {
                     "_id": "doc_write_lock",
-                    "locked": True,
-                    "locked_at": now,
-                })
+                    "$or": [
+                        {"locked": False},
+                        {"locked_at": {"$lt": stale_threshold}},
+                    ],
+                },
+                {"$set": {"locked": True, "locked_at": now}},
+                upsert=False,
+                return_document=ReturnDocument.AFTER,
+            )
+
+            if result is not None:
                 return True
-            except Exception:
-                pass  # Another process just created it — retry
+
+            # Lock document may not exist yet
+            existing = collection.find_one({"_id": "doc_write_lock"})
+            if existing is None:
+                try:
+                    collection.insert_one({
+                        "_id": "doc_write_lock",
+                        "locked": True,
+                        "locked_at": now,
+                    })
+                    return True
+                except Exception:
+                    pass  # Another process just created it — retry
+        except Exception:
+            pass  # Transient MongoDB error — retry
 
         time.sleep(1)
 

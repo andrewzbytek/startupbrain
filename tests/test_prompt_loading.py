@@ -1,6 +1,6 @@
 """
 Prompt file integrity tests for Startup Brain.
-Verifies all 12 prompt files exist, are loadable, non-empty, and valid UTF-8.
+Verifies all 14 prompt files exist, are loadable, non-empty, and valid UTF-8.
 """
 
 import sys
@@ -17,13 +17,15 @@ import pytest
 
 from services.claude_client import PROMPTS_DIR, load_prompt
 
-# All 12 prompt files defined in the SPEC
+# All 14 prompt files (12 from SPEC + 2 ops-brain prompts)
 ALL_PROMPT_NAMES = [
     "extraction",
+    "ops_extraction",
     "consistency_pass1",
     "consistency_pass2",
     "consistency_pass3",
     "diff_generate",
+    "ops_diff_generate",
     "diff_verify",
     "pushback",
     "evolution",
@@ -35,7 +37,7 @@ ALL_PROMPT_NAMES = [
 
 
 # ---------------------------------------------------------------------------
-# Parametrized tests over all 12 prompts
+# Parametrized tests over all 14 prompts
 # ---------------------------------------------------------------------------
 
 class TestPromptFilesExist:
@@ -126,16 +128,16 @@ class TestPromptsDirectory:
         """The prompts path must be a directory."""
         assert PROMPTS_DIR.is_dir(), f"PROMPTS_DIR is not a directory: {PROMPTS_DIR}"
 
-    def test_prompts_dir_contains_exactly_12_md_files(self):
-        """The prompts directory should contain at least the 12 expected .md files."""
+    def test_prompts_dir_contains_at_least_14_md_files(self):
+        """The prompts directory should contain at least the 14 expected .md files."""
         md_files = list(PROMPTS_DIR.glob("*.md"))
-        assert len(md_files) >= 12, (
-            f"Expected at least 12 .md files, found {len(md_files)}: "
+        assert len(md_files) >= 14, (
+            f"Expected at least 14 .md files, found {len(md_files)}: "
             f"{[f.stem for f in md_files]}"
         )
 
     def test_all_expected_prompts_present(self):
-        """All 12 expected prompt names should be present in the directory."""
+        """All 14 expected prompt names should be present in the directory."""
         existing_stems = {f.stem for f in PROMPTS_DIR.glob("*.md")}
         missing = set(ALL_PROMPT_NAMES) - existing_stems
         assert not missing, f"Missing prompt files: {missing}"

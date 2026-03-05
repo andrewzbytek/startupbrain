@@ -76,7 +76,7 @@ startupbrain/
 │   ├── bootstrap.py            # Vector search index bootstrap
 │   └── migrate_brain_split.py  # One-time MongoDB migration for brain split
 ├── render.yaml                 # Render Blueprint deployment config
-├── tests/                      # 901 unit tests, 45 integration tests
+├── tests/                      # 915 unit tests, 45 integration tests
 │   ├── conftest.py             # Shared fixtures and sample data
 │   ├── test_transcripts/       # Sample transcripts for testing
 │   └── test_*.py               # 29 test modules (one per service/component)
@@ -198,7 +198,7 @@ python -m pytest tests/ -m integration
 python -m pytest tests/ -v --tb=short -m "not integration"
 ```
 
-901 unit tests + 45 integration tests across 29 test files. All service and component tests run fully offline with mocks.
+915 unit tests + 45 integration tests across 29 test files. All service and component tests run fully offline with mocks.
 
 ## Deployment
 
@@ -254,8 +254,10 @@ All 24 sections of the spec are implemented plus the two-brain architecture exte
 
 **Security and multi-user safety:**
 - Auth hardened for production (requires credentials or explicit opt-out)
-- Two-tier MongoDB locking (ingestion lock + document write lock)
+- Two-tier MongoDB locking (ingestion lock + document write lock) — all document write paths protected
 - Atomic lock operations (`ReturnDocument.AFTER`), UUID-based session IDs, sanitized error messages
+- XML-escaped living document content in all LLM prompts prevents prompt boundary confusion
+- All MongoDB errors sanitized (generic user messages, full details server-side only)
 - Consistency engine properly filters dismissed contradictions (including short-word claims)
 
 **Deliberate deviations from spec:**

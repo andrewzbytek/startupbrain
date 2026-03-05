@@ -58,7 +58,7 @@ When splitting tasks across agents, avoid overlapping file edits:
 - Test transcripts in `tests/test_transcripts/`
 - Run unit tests: `python -m pytest tests/ -m "not integration"`
 - Run integration tests: `python -m pytest tests/ -m integration` (requires API key + MongoDB)
-- 901 unit tests + 45 integration tests across 29 test files, all unit tests run fully offline with mocks
+- 915 unit tests + 45 integration tests across 29 test files, all unit tests run fully offline with mocks
 
 ## Deployment
 - **Render** (primary): `render.yaml` Blueprint — free tier, auto-deploy from GitHub
@@ -86,13 +86,13 @@ All 24 sections of `docs/SPEC.md` are implemented plus brain split architecture.
 
 **Features:** Session type categorization through entire pipeline, whiteboard photo processing (vision), feedback pattern detection, evolution narratives, pitch material generation (Opus), cost tracking with budget alerts, book framework cross-check via .md upload in chat, direct corrections with informational consistency check (brain-aware — routes to active brain), contradiction resolution writing Decision Log and Dismissed Contradictions entries, scratchpad notes via chat prefix (`note:`, `remember:`, `jot:`, `fyi:`) saved to MongoDB only (no doc update, surfaced in chat system prompt), hypothesis tracking via chat prefix (`hypothesis:`, `validated:`, `invalidated:`) or dashboard form, Socratic system prompt with context surfacing and feedback echo, dashboard tensions indicator (changelog churn, dismissed contradictions, decisions under evaluation), 'challenge' query classification routing to Opus, 3 quick command chips (note, hypothesis, contact) below chat input for prefix discoverability, full context export (living doc + session history + claims as single MD), session rollback command, shared-credential auth with cookie persistence, ingestion lock + document write lock for concurrent access.
 
-**Security:** Auth hardened for production (requires credentials or explicit `DISABLE_AUTH=true`), HMAC cookie signing (no fallback key), sanitized error messages (no URI/path leakage), UUID-based session IDs.
+**Security:** Auth hardened for production (requires credentials or explicit `DISABLE_AUTH=true`), HMAC cookie signing (no fallback key), sanitized error messages (no URI/path leakage — all MongoDB errors use `logging.error()` server-side + generic `st.warning()` to users), UUID-based session IDs, XML-escaped living document content in all LLM prompts.
 
-**Multi-user safety:** Two-tier locking — long-lived ingestion lock (30-min timeout) for full pipeline, short-lived document write lock (2-min timeout) for individual writes (including dashboard hypothesis forms). Atomic lock operations via `find_one_and_update` with `ReturnDocument.AFTER`. DeferredWriter checkpoints track lock ownership to prevent cross-user recovery hijacking. Dismissed contradictions properly filtered in consistency engine Pass 2.
+**Multi-user safety:** Two-tier locking — long-lived ingestion lock (30-min timeout) for full pipeline, short-lived document write lock (2-min timeout) for individual writes (including dashboard hypothesis forms, chat hypothesis status updates, and contradiction resolution fallback path). Atomic lock operations via `find_one_and_update` with `ReturnDocument.AFTER`. DeferredWriter checkpoints track lock ownership to prevent cross-user recovery hijacking. Dismissed contradictions properly filtered in consistency engine Pass 2. Doc lock acquisition resilient to transient MongoDB errors (try/except with retry).
 
 **Infrastructure:** Vector search code ready (`vector_search_text()`, upgraded `_get_rag_evidence()`), time-based fallback on free tier, RAG health monitor (warns at 200 claims). Render deployment live at `https://startupbrain.onrender.com` (free tier), ephemeral filesystem handled by MongoDB document recovery, git no-op when not in a repo.
 
-**Tests:** 901 unit tests, 45 integration tests across 29 test files. All unit tests run fully offline with mocks.
+**Tests:** 915 unit tests, 45 integration tests across 29 test files. All unit tests run fully offline with mocks.
 
 ### Decided Against
 

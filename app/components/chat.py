@@ -699,14 +699,20 @@ def _apply_hypothesis_status_update(user_message: str) -> str:
         date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
         # Update living document (hypotheses live in ops brain)
-        doc = read_living_document(brain="ops")
-        updated_doc = _update_hypothesis_status(doc, fragment, new_status)
-        if updated_doc == doc:
-            return f"Could not find a hypothesis matching: **{fragment}**. Check the sidebar for exact text."
+        from services.ingestion_lock import acquire_doc_lock, release_doc_lock
+        if not acquire_doc_lock():
+            return "Document is being updated by another process. Try again shortly."
+        try:
+            doc = read_living_document(brain="ops")
+            updated_doc = _update_hypothesis_status(doc, fragment, new_status)
+            if updated_doc == doc:
+                return f"Could not find a hypothesis matching: **{fragment}**. Check the sidebar for exact text."
 
-        write_living_document(updated_doc, brain="ops")
-        upsert_living_document(updated_doc, metadata={"last_updated": date_str}, brain="ops")
-        _git_commit(f"Hypothesis {new_status}: {fragment[:50]}", brain="ops")
+            write_living_document(updated_doc, brain="ops")
+            upsert_living_document(updated_doc, metadata={"last_updated": date_str}, brain="ops")
+            _git_commit(f"Hypothesis {new_status}: {fragment[:50]}", brain="ops")
+        finally:
+            release_doc_lock()
 
         # Update MongoDB
         try:
@@ -1134,7 +1140,7 @@ def _resolve_contradiction_deferred(contradiction: dict, action: str, new_claim:
     """
     writer = st.session_state.get("deferred_writer")
     if writer is None:
-        st.warning("No deferred writer found — falling back to immediate write.")
+        logging.warning("No deferred_writer in session state — falling back to immediate contradiction resolution.")
         _resolve_contradiction(contradiction, action, new_claim, explanation)
         return
 
@@ -1198,7 +1204,8 @@ def _resolve_contradiction_deferred(contradiction: dict, action: str, new_claim:
         writer.save_checkpoint()
 
     except Exception as e:
-        st.warning(f"Could not apply deferred resolution: {e}")
+        logging.error("Deferred resolution failed: %s", e)
+        st.warning("Could not apply resolution. Please try again.")
 
 
 def _resolve_contradiction(contradiction: dict, action: str, new_claim: str, explanation: str):
@@ -1216,79 +1223,89 @@ def _resolve_contradiction(contradiction: dict, action: str, new_claim: str, exp
             _add_decision, _add_dismissed, _git_commit,
         )
         from services.mongo_client import upsert_living_document
+        from services.ingestion_lock import acquire_doc_lock, release_doc_lock
         from datetime import datetime, timezone
 
+        brain = st.session_state.get("active_brain", "pitch")
         date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         section = contradiction.get("existing_section", "Unknown Section")
         tension = contradiction.get("tension_description", "")
 
         participants = st.session_state.get("ingestion_participants", "Founders")
 
-        if action == "update":
-            new_info = (
-                f"Contradiction resolved ({date_str}): Updating {section}.\n"
-                f"New position: {new_claim}\n"
-                f"Tension was: {tension}"
-            )
-            reason = f"Contradiction resolved — updated {section} ({date_str})"
-            update_document(new_info, update_reason=reason)
+        if not acquire_doc_lock(timeout_seconds=60):
+            st.warning("Document is being updated by another process. Try again shortly.")
+            return
 
-            # Explicit Decision Log entry
-            doc = read_living_document()
-            decision_entry = (
-                f"### {date_str} — Resolved: {section}\n"
-                f"**Decision:** Updated to: {new_claim}\n"
-                f"**Alternatives considered:** Keep previous position\n"
-                f"**Why alternatives were rejected:** New information contradicted existing position. {tension}\n"
-                f"**Context:** Contradiction resolution during ingestion.\n"
-                f"**Participants:** {participants}"
-            )
-            doc = _add_decision(doc, decision_entry)
-            write_living_document(doc)
-            upsert_living_document(doc, metadata={"last_updated": date_str, "update_reason": reason})
-            _git_commit(f"Decision log: {reason}")
+        try:
+            if action == "update":
+                new_info = (
+                    f"Contradiction resolved ({date_str}): Updating {section}.\n"
+                    f"New position: {new_claim}\n"
+                    f"Tension was: {tension}"
+                )
+                reason = f"Contradiction resolved — updated {section} ({date_str})"
+                update_document(new_info, update_reason=reason, brain=brain)
 
-        elif action == "keep":
-            # Don't call update_document — nothing to update in Current State
-            # Just add a Dismissed Contradiction entry
-            doc = read_living_document()
-            dismissed_entry = (
-                f"- [{date_str}] Dismissed: \"{contradiction.get('new_claim', '')}\"\n"
-                f"  Kept: {contradiction.get('existing_position', '')}\n"
-                f"  Section: {section}"
-            )
-            doc = _add_dismissed(doc, dismissed_entry)
-            write_living_document(doc)
-            upsert_living_document(doc, metadata={"last_updated": date_str})
-            _git_commit(f"Dismissed contradiction in {section} ({date_str})")
+                # Explicit Decision Log entry
+                doc = read_living_document(brain=brain)
+                decision_entry = (
+                    f"### {date_str} — Resolved: {section}\n"
+                    f"**Decision:** Updated to: {new_claim}\n"
+                    f"**Alternatives considered:** Keep previous position\n"
+                    f"**Why alternatives were rejected:** New information contradicted existing position. {tension}\n"
+                    f"**Context:** Contradiction resolution during ingestion.\n"
+                    f"**Participants:** {participants}"
+                )
+                doc = _add_decision(doc, decision_entry)
+                write_living_document(doc, brain=brain)
+                upsert_living_document(doc, metadata={"last_updated": date_str, "update_reason": reason}, brain=brain)
+                _git_commit(f"Decision log: {reason}", brain=brain)
 
-        else:  # explain
-            new_info = (
-                f"Contradiction resolved with explanation ({date_str}): Updating {section}.\n"
-                f"New position: {new_claim}\n"
-                f"Explanation: {explanation}\n"
-                f"Tension was: {tension}"
-            )
-            reason = f"Contradiction resolved with explanation — {section} ({date_str})"
-            update_document(new_info, update_reason=reason)
+            elif action == "keep":
+                # Don't call update_document — nothing to update in Current State
+                # Just add a Dismissed Contradiction entry
+                doc = read_living_document(brain=brain)
+                dismissed_entry = (
+                    f"- [{date_str}] Dismissed: \"{contradiction.get('new_claim', '')}\"\n"
+                    f"  Kept: {contradiction.get('existing_position', '')}\n"
+                    f"  Section: {section}"
+                )
+                doc = _add_dismissed(doc, dismissed_entry)
+                write_living_document(doc, brain=brain)
+                upsert_living_document(doc, metadata={"last_updated": date_str}, brain=brain)
+                _git_commit(f"Dismissed contradiction in {section} ({date_str})", brain=brain)
 
-            # Explicit Decision Log entry with explanation
-            doc = read_living_document()
-            decision_entry = (
-                f"### {date_str} — Resolved: {section}\n"
-                f"**Decision:** Updated to: {new_claim}\n"
-                f"**Alternatives considered:** Keep previous position\n"
-                f"**Why alternatives were rejected:** {explanation}\n"
-                f"**Context:** Contradiction resolution during ingestion.\n"
-                f"**Participants:** {participants}"
-            )
-            doc = _add_decision(doc, decision_entry)
-            write_living_document(doc)
-            upsert_living_document(doc, metadata={"last_updated": date_str, "update_reason": reason})
-            _git_commit(f"Decision log: {reason}")
+            else:  # explain
+                new_info = (
+                    f"Contradiction resolved with explanation ({date_str}): Updating {section}.\n"
+                    f"New position: {new_claim}\n"
+                    f"Explanation: {explanation}\n"
+                    f"Tension was: {tension}"
+                )
+                reason = f"Contradiction resolved with explanation — {section} ({date_str})"
+                update_document(new_info, update_reason=reason, brain=brain)
+
+                # Explicit Decision Log entry with explanation
+                doc = read_living_document(brain=brain)
+                decision_entry = (
+                    f"### {date_str} — Resolved: {section}\n"
+                    f"**Decision:** Updated to: {new_claim}\n"
+                    f"**Alternatives considered:** Keep previous position\n"
+                    f"**Why alternatives were rejected:** {explanation}\n"
+                    f"**Context:** Contradiction resolution during ingestion.\n"
+                    f"**Participants:** {participants}"
+                )
+                doc = _add_decision(doc, decision_entry)
+                write_living_document(doc, brain=brain)
+                upsert_living_document(doc, metadata={"last_updated": date_str, "update_reason": reason}, brain=brain)
+                _git_commit(f"Decision log: {reason}", brain=brain)
+        finally:
+            release_doc_lock()
 
     except Exception as e:
-        st.warning(f"Could not update document: {e}")
+        logging.error("Contradiction resolution failed: %s", e)
+        st.warning("Could not update document. Please try again.")
 
 
 def _advance_contradiction():

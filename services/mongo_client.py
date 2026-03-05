@@ -4,6 +4,7 @@ Uses @st.cache_resource for connection pooling.
 Gracefully degrades if MongoDB is unavailable.
 """
 
+import logging
 import os
 from datetime import datetime, timezone
 from typing import Optional
@@ -98,7 +99,8 @@ def insert_one(collection_name: str, document: dict) -> Optional[str]:
         result = db[collection_name].insert_one(document)
         return str(result.inserted_id)
     except Exception as e:
-        st.warning(f"MongoDB insert failed ({collection_name}): {e}")
+        logging.error("MongoDB insert failed (%s): %s", collection_name, e)
+        st.warning("Database operation failed. Please try again.")
         return None
 
 
@@ -125,7 +127,8 @@ def find_many(
         )
         return list(cursor)
     except Exception as e:
-        st.warning(f"MongoDB find failed ({collection_name}): {e}")
+        logging.error("MongoDB find failed (%s): %s", collection_name, e)
+        st.warning("Database operation failed. Please try again.")
         return []
 
 
@@ -140,7 +143,8 @@ def find_one(collection_name: str, query: dict) -> Optional[dict]:
     try:
         return db[collection_name].find_one(query)
     except Exception as e:
-        st.warning(f"MongoDB find_one failed ({collection_name}): {e}")
+        logging.error("MongoDB find_one failed (%s): %s", collection_name, e)
+        st.warning("Database operation failed. Please try again.")
         return None
 
 
@@ -168,7 +172,8 @@ def update_one(
         db[collection_name].update_one(query, update, upsert=upsert)
         return True
     except Exception as e:
-        st.warning(f"MongoDB update failed ({collection_name}): {e}")
+        logging.error("MongoDB update failed (%s): %s", collection_name, e)
+        st.warning("Database operation failed. Please try again.")
         return False
 
 
@@ -181,7 +186,8 @@ def delete_one(collection_name: str, query: dict) -> bool:
         db[collection_name].delete_one(query)
         return True
     except Exception as e:
-        st.warning(f"MongoDB delete failed ({collection_name}): {e}")
+        logging.error("MongoDB delete failed (%s): %s", collection_name, e)
+        st.warning("Database operation failed. Please try again.")
         return False
 
 
@@ -194,7 +200,8 @@ def delete_many(collection_name: str, query: dict) -> int:
         result = db[collection_name].delete_many(query)
         return result.deleted_count
     except Exception as e:
-        st.warning(f"MongoDB delete_many failed ({collection_name}): {e}")
+        logging.error("MongoDB delete_many failed (%s): %s", collection_name, e)
+        st.warning("Database operation failed. Please try again.")
         return 0
 
 
@@ -206,7 +213,8 @@ def get_latest_session() -> Optional[dict]:
     try:
         return db["sessions"].find_one(sort=[("created_at", -1)])
     except Exception as e:
-        st.warning(f"MongoDB get_latest_session failed: {e}")
+        logging.error("MongoDB get_latest_session failed: %s", e)
+        st.warning("Database operation failed. Please try again.")
         return None
 
 
@@ -443,7 +451,8 @@ def vector_search(
     try:
         return list(db[collection_name].aggregate(pipeline))
     except Exception as e:
-        st.warning(f"Vector search failed ({collection_name}): {e}")
+        logging.error("Vector search failed (%s): %s", collection_name, e)
+        st.warning("Database operation failed. Please try again.")
         return []
 
 
