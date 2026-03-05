@@ -71,7 +71,7 @@ def render_ingesting():
         if not lock_result["acquired"]:
             st.error("Another ingestion is in progress. Please wait for it to complete.")
             if st.button("Back to Chat", key="lock_blocked_back"):
-                set_mode("chat")
+                reset_ingestion()
                 st.rerun()
             return
         st.session_state._lock_acquired = True
@@ -157,7 +157,7 @@ def render_ingesting():
                     with st.spinner("Extracting whiteboard content..."):
                         try:
                             from services.ingestion import process_whiteboard
-                            image_bytes = uploaded_file.read()
+                            image_bytes = uploaded_file.getvalue()
                             result = process_whiteboard(
                                 image_bytes,
                                 transcript_context=st.session_state.get("current_transcript", ""),
@@ -250,6 +250,22 @@ def render_checking_consistency():
             # Pipeline completed but mode wasn't updated (edge case) — go to done
             set_mode("done")
             st.rerun()
+        return
+
+    # Failure guard — don't auto-retry expensive LLM calls after an exception
+    if st.session_state.get("_consistency_failed"):
+        st.header("Checking Consistency")
+        render_step_indicator(3)
+        st.error("Ingestion pipeline failed. You can retry or cancel.")
+        col_retry, col_cancel_err = st.columns(2)
+        with col_retry:
+            if st.button("Retry", type="primary", key="retry_after_error"):
+                st.session_state._consistency_failed = False
+                st.rerun()
+        with col_cancel_err:
+            if st.button("Cancel", key="cancel_after_error"):
+                reset_ingestion()
+                st.rerun()
         return
 
     st.header("Checking Consistency")
@@ -407,10 +423,8 @@ def render_checking_consistency():
 
     except Exception as e:
         logging.error("Ingestion pipeline failed: %s", e)
-        st.error("Ingestion pipeline failed. You can try again or cancel.")
-        if st.button("Cancel", key="cancel_after_error"):
-            reset_ingestion()
-            st.rerun()
+        st.session_state._consistency_failed = True
+        st.rerun()
         return
 
 
@@ -505,7 +519,7 @@ def render_ops_ingesting():
         if not lock_result["acquired"]:
             st.error("Another ingestion is in progress. Please wait for it to complete.")
             if st.button("Back to Chat", key="ops_lock_blocked_back"):
-                set_mode("chat")
+                reset_ingestion()
                 st.rerun()
             return
         st.session_state._lock_acquired = True
@@ -638,7 +652,7 @@ def render_ops_done():
         return
 
     # Run ops ingestion (synchronous, no deferred writer)
-    if not st.session_state.get("_ops_committed"):
+    if not st.session_state.get("_ops_committed") and not st.session_state.get("_ops_commit_failed"):
         from services.ops_ingestion import run_ops_ingestion
 
         try:
@@ -661,8 +675,14 @@ def render_ops_done():
         except Exception as e:
             import logging
             logging.error(f"Ops ingestion failed: {e}")
-            result = {"success": False, "message": "Storage failed. Please try again."}
-            st.session_state._ops_result = result
+            st.session_state._ops_commit_failed = True
+            st.session_state._ops_result = {"success": False, "message": "Storage failed. Please try again."}
+
+    if st.session_state.get("_ops_commit_failed") and not st.session_state.get("_ops_committed"):
+        st.error("Saving ops items failed. Click below to retry.")
+        if st.button("Retry Save", type="primary", key="retry_ops_commit"):
+            st.session_state._ops_commit_failed = False
+            st.rerun()
 
     result = st.session_state.get("_ops_result", {})
 
@@ -677,9 +697,6 @@ def render_ops_done():
         st.markdown(f"**Document changes:** {result.get('changes_applied', 0)}")
 
     if st.button("Done — Back to Chat", type="primary"):
-        st.session_state._ops_confirmed_claims = []
-        st.session_state._ops_committed = False
-        st.session_state._ops_result = {}
         from app.state import reset_ingestion
         reset_ingestion()
         st.rerun()

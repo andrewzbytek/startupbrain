@@ -55,6 +55,9 @@ def render_top_bar():
             st.session_state.pop("_active_quick_cmd", None)
             st.session_state.pop("_top_bar_cache", None)
             st.session_state.pop("_top_bar_cache_ts", None)
+            st.session_state.evolution_result = None
+            st.session_state.pop("_context_export_data", None)
+            st.session_state.pop("_ops_context_export_data", None)
             st.rerun()
 
     # col_spacer intentionally left empty

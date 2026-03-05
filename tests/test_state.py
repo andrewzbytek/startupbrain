@@ -30,7 +30,7 @@ class _AttrDict(dict):
 # Mock streamlit before importing app modules
 mock_st = MagicMock()
 mock_st.session_state = _AttrDict()
-mock_st.cache_resource = lambda f: f
+mock_st.cache_resource = lambda f=None, **kw: (lambda fn: fn) if f is None else f
 mock_st.secrets = MagicMock()
 sys.modules.setdefault("streamlit", mock_st)
 # If streamlit was already mocked by another test file, grab that reference instead
@@ -73,18 +73,19 @@ class TestInitSessionState:
         init_session_state()
         expected_keys = {
             "mode", "active_view", "conversation_history", "pending_claims", "contradictions",
-            "current_session_id", "current_transcript", "ingestion_status",
+            "current_session_id", "current_transcript",
             "sidebar_data", "ingestion_participants", "ingestion_topic",
             "ingestion_session_summary", "ingestion_topic_tags",
             "consistency_results", "contradiction_index", "whiteboard_text",
             "evolution_result", "ingestion_session_type", "ingestion_session_date",
             "book_crosscheck_content", "book_crosscheck_filename",
             "pipeline_result",
-            "deferred_writer", "_batch_committed", "_consistency_checked", "_has_pending_ingestion",
+            "deferred_writer", "_batch_committed", "_batch_commit_failed",
+            "_consistency_checked", "_consistency_failed", "_has_pending_ingestion",
             "_active_quick_cmd",
             "active_brain", "chat_brain_context",
             "_quick_cmd_pending", "_lock_session_id", "_lock_acquired",
-            "_ops_confirmed_claims", "_ops_committed", "_ops_result",
+            "_ops_confirmed_claims", "_ops_committed", "_ops_commit_failed", "_ops_result",
         }
         assert expected_keys.issubset(set(mock_st.session_state.keys()))
 

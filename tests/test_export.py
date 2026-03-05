@@ -10,7 +10,7 @@ import pytest
 
 # Mock streamlit before importing
 mock_st = MagicMock()
-mock_st.cache_resource = lambda f: f
+mock_st.cache_resource = lambda f=None, **kw: (lambda fn: fn) if f is None else f
 mock_st.secrets = MagicMock()
 mock_st.session_state = {}
 sys.modules.setdefault("streamlit", mock_st)

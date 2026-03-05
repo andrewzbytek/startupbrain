@@ -38,7 +38,7 @@ class _AttrDict(dict):
 
 mock_st = MagicMock()
 mock_st.session_state = _AttrDict()
-mock_st.cache_resource = lambda f: f
+mock_st.cache_resource = lambda f=None, **kw: (lambda fn: fn) if f is None else f
 mock_st.secrets = MagicMock()
 sys.modules.setdefault("streamlit", mock_st)
 

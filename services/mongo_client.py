@@ -31,7 +31,7 @@ COLLECTIONS = [
 ]
 
 
-@st.cache_resource
+@st.cache_resource(ttl=300)
 def get_mongo_client() -> Optional[object]:
     """
     Returns a cached MongoDB client, or None if unavailable.

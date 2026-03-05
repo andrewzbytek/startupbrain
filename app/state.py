@@ -39,7 +39,6 @@ def init_session_state():
         "contradictions": [],
         "current_session_id": None,
         "current_transcript": None,
-        "ingestion_status": {},
         "sidebar_data": {},
         # Ingestion metadata
         "ingestion_participants": "",
@@ -64,7 +63,9 @@ def init_session_state():
         # Deferred writes / crash recovery
         "deferred_writer": None,
         "_batch_committed": False,
+        "_batch_commit_failed": False,
         "_consistency_checked": False,
+        "_consistency_failed": False,
         "_has_pending_ingestion": False,
         "_active_quick_cmd": None,
         "active_brain": "pitch",
@@ -74,6 +75,7 @@ def init_session_state():
         "_lock_acquired": False,
         "_ops_confirmed_claims": [],
         "_ops_committed": False,
+        "_ops_commit_failed": False,
         "_ops_result": {},
     }
     for key, value in defaults.items():
@@ -122,7 +124,6 @@ def reset_ingestion():
     st.session_state.contradictions = []
     st.session_state.current_session_id = None
     st.session_state.current_transcript = None
-    st.session_state.ingestion_status = {}
     st.session_state.ingestion_participants = ""
     st.session_state.ingestion_topic = ""
     st.session_state.ingestion_session_summary = ""
@@ -132,7 +133,7 @@ def reset_ingestion():
     st.session_state.whiteboard_text = ""
     st.session_state.ingestion_session_type = ""
     st.session_state.ingestion_session_date = None
-    st.session_state.active_view = "chat"
+    # Don't reset active_view — preserve Dashboard/Chat tab the user was on
     st.session_state.pipeline_result = {}
     st.session_state.deferred_writer = None
     st.session_state._batch_committed = False
@@ -142,6 +143,12 @@ def reset_ingestion():
     st.session_state._ops_confirmed_claims = []
     st.session_state._ops_committed = False
     st.session_state._ops_result = {}
+    st.session_state._ops_commit_failed = False
+    st.session_state._consistency_failed = False
+    st.session_state.evolution_result = None
+    st.session_state.pop("_context_export_data", None)
+    st.session_state.pop("_ops_context_export_data", None)
+    st.session_state.pop("_active_quick_cmd", None)
 
     # Clear any lingering per-contradiction explain state
     for key in list(st.session_state.keys()):

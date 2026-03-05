@@ -31,7 +31,7 @@ class _AttrDict(dict):
 # Mock streamlit before importing app modules
 mock_st = MagicMock()
 mock_st.session_state = _AttrDict()
-mock_st.cache_resource = lambda f: f
+mock_st.cache_resource = lambda f=None, **kw: (lambda fn: fn) if f is None else f
 sys.modules.setdefault("streamlit", mock_st)
 
 _DOC_WITH_HYPOTHESES = """## Active Hypotheses

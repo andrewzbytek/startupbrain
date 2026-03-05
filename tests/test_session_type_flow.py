@@ -33,7 +33,7 @@ class _AttrDict(dict):
 
 mock_st = sys.modules.get("streamlit") or MagicMock()
 mock_st.session_state = _AttrDict()
-mock_st.cache_resource = lambda f: f
+mock_st.cache_resource = lambda f=None, **kw: (lambda fn: fn) if f is None else f
 mock_st.warning = MagicMock()
 sys.modules["streamlit"] = mock_st
 
@@ -73,7 +73,6 @@ class TestSessionTypes:
             "contradictions": [],
             "current_session_id": None,
             "current_transcript": None,
-            "ingestion_status": {},
             "ingestion_participants": "",
             "ingestion_topic": "",
             "ingestion_session_summary": "",

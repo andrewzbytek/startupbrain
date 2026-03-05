@@ -50,7 +50,7 @@ def _get_api_key() -> Optional[str]:
         return os.environ.get("ANTHROPIC_API_KEY")
 
 
-@st.cache_resource
+@st.cache_resource(ttl=300)
 def _get_client():
     """Get cached anthropic client, or None if unavailable."""
     if not ANTHROPIC_AVAILABLE:

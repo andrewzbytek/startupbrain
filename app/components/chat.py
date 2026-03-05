@@ -932,7 +932,7 @@ def render_chat():
             "Choose file", type=["md"], key="book_upload",
             label_visibility="collapsed",
         )
-        if uploaded_file is not None:
+        if uploaded_file is not None and uploaded_file.name != st.session_state.get("book_crosscheck_filename", ""):
             try:
                 content = uploaded_file.read().decode("utf-8")
             except UnicodeDecodeError:
@@ -1172,6 +1172,19 @@ def render_contradiction_resolution():
                 _advance_contradiction()
             else:
                 st.error("Please enter an explanation before submitting.")
+
+    # Cancel button — escape hatch to abandon ingestion mid-resolution
+    st.markdown("---")
+    if st.button("Cancel Ingestion", key=f"cancel_resolution_{idx}"):
+        writer = st.session_state.get("deferred_writer")
+        if writer is not None:
+            try:
+                writer.rollback()
+            except Exception as e:
+                logging.error("Rollback during cancel failed: %s", e)
+        from app.state import reset_ingestion
+        reset_ingestion()
+        st.rerun()
 
 
 def _resolve_contradiction_deferred(contradiction: dict, action: str, new_claim: str, explanation: str):

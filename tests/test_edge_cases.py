@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 
 # Mock streamlit before importing any services
 mock_st = MagicMock()
-mock_st.cache_resource = lambda f: f
+mock_st.cache_resource = lambda f=None, **kw: (lambda fn: fn) if f is None else f
 mock_st.secrets = {}
 sys.modules.setdefault("streamlit", mock_st)
 

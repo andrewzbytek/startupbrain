@@ -76,7 +76,7 @@ startupbrain/
 │   ├── bootstrap.py            # Vector search index bootstrap
 │   └── migrate_brain_split.py  # One-time MongoDB migration for brain split
 ├── render.yaml                 # Render Blueprint deployment config
-├── tests/                      # 1012 unit tests, 45 integration tests
+├── tests/                      # 1011 unit tests, 45 integration tests
 │   ├── conftest.py             # Shared fixtures and sample data
 │   ├── test_transcripts/       # Sample transcripts for testing
 │   └── test_*.py               # 29 test modules (one per service/component)
@@ -145,7 +145,7 @@ Paste transcript → Select session type
 - **Informational pushback** — surfaces context on direction changes, never blocks
 - **Book cross-check** — upload a .md book summary in chat for temporary framework cross-referencing
 - **Semantic RAG** — Atlas Vector Search with Voyage AI automated embedding for consistency evidence (graceful fallback to time-based)
-- **Cached Anthropic client** — `@st.cache_resource` avoids creating a new client per API call
+- **Cached Anthropic client** — `@st.cache_resource(ttl=300)` avoids creating a new client per API call, with 5-min TTL to prevent permanent `None` caching on startup failure
 - **Shared XML utilities** — `extract_xml_tag()` and `escape_xml()` in `claude_client.py`, used by all LLM response parsers
 - **Direct corrections** — "no, actually X" runs a lightweight consistency check before applying (informational only)
 - **Scratchpad notes** — prefix-based (`note:`, `remember:`, `jot:`, `fyi:`) saved to MongoDB as scratchpad entries (no living document update); surfaced in chat system prompt so the AI can reference them
@@ -201,7 +201,7 @@ python -m pytest tests/ -m integration
 python -m pytest tests/ -v --tb=short -m "not integration"
 ```
 
-1012 unit tests + 45 integration tests across 29 test files. All service and component tests run fully offline with mocks.
+1011 unit tests + 45 integration tests across 29 test files. All service and component tests run fully offline with mocks.
 
 ## Deployment
 
