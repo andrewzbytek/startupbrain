@@ -625,7 +625,7 @@ def generate_pushback(change_description: str, relevant_decisions: list, session
     prompt = f"""{prompt_template}
 
 <pushback_input>
-  <proposed_change>{change_description}</proposed_change>
+  <proposed_change>{escape_xml(change_description)}</proposed_change>
   {decisions_xml}
   <relevant_changelog_entries/>
   <session_type>{escape_xml(session_type)}</session_type>

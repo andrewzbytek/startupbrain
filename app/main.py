@@ -240,6 +240,15 @@ def render_checking_consistency():
     Run consistency check with deferred writes.
     LLM calls run eagerly; all disk/MongoDB/git writes are deferred to batch_commit().
     """
+    # Idempotency guard — prevent re-running LLM pipeline on Streamlit reruns
+    if st.session_state.get("_consistency_checked"):
+        mode = st.session_state.get("mode", "chat")
+        if mode == "checking_consistency":
+            # Pipeline completed but mode wasn't updated (edge case) — go to done
+            set_mode("done")
+            st.rerun()
+        return
+
     st.header("Checking Consistency")
     render_step_indicator(3)
 
@@ -369,6 +378,9 @@ def render_checking_consistency():
             except Exception:
                 pass  # Hypothesis check is a nudge, never blocking
 
+            # Mark as checked BEFORE setting mode — prevents re-run on rerun
+            st.session_state._consistency_checked = True
+
             # Determine if we have contradictions to resolve
             if has_contradictions:
                 pass2 = consistency_results.get("pass2", {})
@@ -376,7 +388,6 @@ def render_checking_consistency():
                 st.session_state.contradictions = contradictions
                 st.session_state.contradiction_index = 0
                 progress.complete("Consistency check found issues. Review required.")
-                st.info(f"Found {len(contradictions)} contradiction(s) to review.")
                 set_mode("resolving_contradiction")
             else:
                 progress.complete("All checks passed. Committing...")
@@ -410,9 +421,9 @@ def render_done():
     if writer is not None and not batch_committed:
         with st.spinner("Committing all changes..."):
             commit_result = writer.batch_commit()
-        st.session_state._batch_committed = True
 
         if commit_result.get("success"):
+            st.session_state._batch_committed = True
             # Update pipeline_result with actual values from commit
             pipeline_result["claims_stored"] = commit_result.get("claims_stored", 0)
             pipeline_result["session_id"] = commit_result.get("session_id", "")
@@ -469,6 +480,20 @@ def render_done():
 def render_ops_ingesting():
     """Ops Brain ingestion — simpler form, no whiteboard support."""
     from app.components.progress import render_step_indicator
+
+    # Acquire ingestion lock (same as pitch brain path)
+    if not st.session_state.get("_lock_acquired"):
+        from services.ingestion_lock import acquire_lock
+        lock_session_id = st.session_state.get("_lock_session_id") or str(uuid.uuid4())
+        st.session_state._lock_session_id = lock_session_id
+        lock_result = acquire_lock(session_id=lock_session_id)
+        if not lock_result["acquired"]:
+            st.error("Another ingestion is in progress. Please wait for it to complete.")
+            if st.button("Back to Chat", key="ops_lock_blocked_back"):
+                set_mode("chat")
+                st.rerun()
+            return
+        st.session_state._lock_acquired = True
 
     render_step_indicator(current_step=1, total_steps=3, labels=["Input", "Confirm", "Store"])
 
@@ -715,6 +740,7 @@ else:
                     st.session_state.ingestion_session_summary = writer.session_summary
                     st.session_state.ingestion_topic_tags = writer.topic_tags
                     st.session_state.consistency_results = writer.consistency_results
+                    st.session_state.active_brain = writer.brain
                     st.session_state._has_pending_ingestion = False
 
                     if writer.stage == "ready_to_commit":

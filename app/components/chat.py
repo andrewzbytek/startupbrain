@@ -13,9 +13,7 @@ import streamlit as st
 from app.state import add_message, set_mode, reset_ingestion, invalidate_sidebar
 
 
-def _escape_latex(text: str) -> str:
-    """Escape dollar signs so Streamlit doesn't render them as LaTeX math."""
-    return text.replace("$", "\\$")
+from app.components._parsers import _escape_latex
 
 
 # Minimum transcript length to suggest ingestion flow

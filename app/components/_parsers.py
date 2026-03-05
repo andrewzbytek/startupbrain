@@ -121,23 +121,36 @@ def _parse_feedback_by_source(doc: str) -> dict:
         if not content or content == "[No feedback recorded yet]":
             return result
 
-        type_map = {"investor": "vc", "customer": "customer", "advisor": "advisor"}
+        type_map = {"investor": "vc", "customer": "customer", "advisor": "advisor",
+                    "vc": "vc", "prospect": "customer"}
 
         for line in content.split("\n"):
             line = line.strip().lstrip("- ").strip()
             if not line:
                 continue
             # Match pattern: [DATE] NAME (TYPE): SUMMARY
+            # Also handles: [DATE] **Name (Org)** — "quote..." format from ops_diff_generate
             m = re.match(
-                r"\[.*?\]\s+\S.*?\((\w+)\):\s*(.+)",
+                r"\[.*?\]\s+(?:\*\*)?(\S.*?)\((\w[\w\s]*?)\)(?:\*\*)?[\s:—–-]+(.+)",
                 line,
             )
             if m:
-                source_type = m.group(1).strip().lower()
-                summary = m.group(2).strip()
-                bucket = type_map.get(source_type)
-                if bucket:
-                    result[bucket].append(summary)
+                # Try to identify source type from the captured group or line context
+                org_or_type = m.group(2).strip().lower()
+                summary = m.group(3).strip()
+                bucket = type_map.get(org_or_type)
+                if not bucket:
+                    # Check line content for type keywords
+                    lower_line = line.lower()
+                    if any(kw in lower_line for kw in ("investor", "vc", "fund", "capital")):
+                        bucket = "vc"
+                    elif any(kw in lower_line for kw in ("customer", "user", "prospect", "pilot")):
+                        bucket = "customer"
+                    elif any(kw in lower_line for kw in ("advisor", "mentor", "board")):
+                        bucket = "advisor"
+                    else:
+                        bucket = "vc"  # Default fallback
+                result[bucket].append(summary)
 
     except Exception:
         pass

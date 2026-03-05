@@ -72,7 +72,7 @@ def render_ops_dashboard():
                 if st.form_submit_button("Add Hypothesis", type="primary"):
                     if hyp_text:
                         from datetime import datetime, timezone
-                        from services.document_updater import _add_hypothesis, read_living_document, write_living_document
+                        from services.document_updater import _add_hypothesis, read_living_document, write_living_document, _git_commit
                         from services.mongo_client import upsert_living_document
                         from services.ingestion_lock import acquire_doc_lock, release_doc_lock
 
@@ -89,6 +89,7 @@ def render_ops_dashboard():
                                 updated = _add_hypothesis(current, entry)
                                 write_living_document(updated, brain="ops")
                                 upsert_living_document(updated, metadata={"last_updated": datetime.now(timezone.utc).strftime("%Y-%m-%d"), "update_reason": "New hypothesis"}, brain="ops")
+                                _git_commit(f"Add ops hypothesis: {hyp_text[:50]}", brain="ops")
                                 st.rerun()
                             except Exception as e:
                                 import logging

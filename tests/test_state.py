@@ -81,7 +81,7 @@ class TestInitSessionState:
             "book_crosscheck_content", "book_crosscheck_filename",
             "show_hypothesis_form",
             "pipeline_result",
-            "deferred_writer", "_batch_committed", "_has_pending_ingestion",
+            "deferred_writer", "_batch_committed", "_consistency_checked", "_has_pending_ingestion",
             "_active_quick_cmd",
             "active_brain", "chat_brain_context",
             "_quick_cmd_pending", "_lock_session_id", "_lock_acquired",

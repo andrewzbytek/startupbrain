@@ -129,7 +129,7 @@ CONTENT:
 
 ```
 SECTION: Feedback Tracker
-ACTION: UPDATE_POSITION
+ACTION: ADD_FEEDBACK
 CONTENT:
 - [2026-03-04] **James Liu (Acme Energy)** — "The demo looked good but we need SSO before we can pilot." Action: Add SSO to roadmap priority list.
 ```

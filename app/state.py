@@ -65,6 +65,7 @@ def init_session_state():
         # Deferred writes / crash recovery
         "deferred_writer": None,
         "_batch_committed": False,
+        "_consistency_checked": False,
         "_has_pending_ingestion": False,
         "_active_quick_cmd": None,
         "active_brain": "pitch",
@@ -136,6 +137,7 @@ def reset_ingestion():
     st.session_state.pipeline_result = {}
     st.session_state.deferred_writer = None
     st.session_state._batch_committed = False
+    st.session_state._consistency_checked = False
     st.session_state._has_pending_ingestion = False
     st.session_state._ops_confirmed_claims = []
     st.session_state._ops_committed = False

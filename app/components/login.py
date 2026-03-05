@@ -90,7 +90,7 @@ def _verify_token(token: str) -> bool:
 
 
 def is_authenticated() -> bool:
-    """Check if the current user is authenticated. Returns True only if auth is explicitly disabled."""
+    """Check if the current user is authenticated via cookie, session state, or auth bypass."""
     username, password = _get_credentials()
     if not username or not password:
         # Auth not configured — only allow if explicitly opted out via DISABLE_AUTH=true

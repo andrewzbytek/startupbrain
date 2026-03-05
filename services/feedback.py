@@ -8,6 +8,14 @@ from datetime import datetime, timezone
 from typing import Optional
 
 
+def _safe_int(s: str) -> int:
+    """Parse string to int, returning 0 for non-integer values."""
+    try:
+        return int(s) if s else 0
+    except (ValueError, TypeError):
+        return 0
+
+
 def _extract_tag(text: str, tag: str) -> str:
     """Extract content of first XML tag from text."""
     match = re.search(rf"<{tag}>(.*?)</{tag}>", text, re.DOTALL)
@@ -98,7 +106,7 @@ def detect_patterns(feedback_tracker_section: str, new_feedback: dict, brain: st
         ab = m.group(1)
         alerts.append({
             "theme": _extract_tag(ab, "theme"),
-            "source_count": int(_extract_tag(ab, "source_count") or "0"),
+            "source_count": _safe_int(_extract_tag(ab, "source_count")),
             "sources": _extract_tag(ab, "sources"),
             "severity": _extract_tag(ab, "severity"),
             "description": _extract_tag(ab, "description"),
@@ -111,7 +119,7 @@ def detect_patterns(feedback_tracker_section: str, new_feedback: dict, brain: st
         tb = m.group(1)
         updated_themes.append({
             "name": _extract_tag(tb, "name"),
-            "count": int(_extract_tag(tb, "count") or "0"),
+            "count": _safe_int(_extract_tag(tb, "count")),
             "sources": _extract_tag(tb, "sources"),
             "status": _extract_tag(tb, "status"),
             "notes": _extract_tag(tb, "notes"),
@@ -362,9 +370,9 @@ def generate_pitch_materials(request: str, book_frameworks: Optional[list] = Non
     prompt = f"""{prompt_template}
 
 <pitch_input>
-  <startup_brain>{startup_brain}</startup_brain>
+  <startup_brain>{escape_xml(startup_brain)}</startup_brain>
   {frameworks_xml}
-  <specific_request>{request}</specific_request>
+  <specific_request>{escape_xml(request)}</specific_request>
   <audience_context>As specified in the request.</audience_context>
 </pitch_input>"""
 
