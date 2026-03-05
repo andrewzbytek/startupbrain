@@ -635,7 +635,21 @@ class TestGetLatestSession:
         with patch.object(mc, "get_db", return_value=mock_db):
             result = mc.get_latest_session()
             assert result["_id"] == "s1"
-            mock_sessions.find_one.assert_called_once_with(sort=[("created_at", -1)])
+            mock_sessions.find_one.assert_called_once_with({}, sort=[("created_at", -1)])
+
+    def test_returns_session_with_brain_filter(self):
+        mock_db = MagicMock()
+        mock_sessions = MagicMock()
+        mock_sessions.find_one.return_value = {"_id": "s2", "brain": "ops"}
+        mock_db.__getitem__ = MagicMock(return_value=mock_sessions)
+
+        with patch.object(mc, "get_db", return_value=mock_db):
+            result = mc.get_latest_session(brain="ops")
+            assert result["_id"] == "s2"
+            call_args = mock_sessions.find_one.call_args
+            query = call_args[0][0]
+            assert "$or" in query
+            assert {"brain": "ops"} in query["$or"]
 
     def test_returns_none_when_db_none(self):
         with patch.object(mc, "get_db", return_value=None):

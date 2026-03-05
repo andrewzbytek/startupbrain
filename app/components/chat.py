@@ -238,7 +238,7 @@ def _format_recall_context(sessions, claims=None, feedback=None) -> str:
             stype = escape_xml(meta.get("session_type", "Unknown"))
             participants = escape_xml(meta.get("participants", ""))
             summary = escape_xml(s.get("summary", "")[:500])
-            tags = escape_xml(", ".join(s.get("topic_tags", meta.get("tags", []))))
+            tags = escape_xml(", ".join(s.get("topic_tags", [])))
             entry = f"- [{date}] {stype}"
             if participants:
                 entry += f" | Participants: {participants}"
@@ -269,7 +269,7 @@ def _format_recall_context(sessions, claims=None, feedback=None) -> str:
         parts.append("<feedback>")
         for f in feedback[:10]:
             source = escape_xml(f.get("source_type", ""))
-            summary = escape_xml(f.get("summary", str(f.get("text", "")))[:200])
+            summary = escape_xml(f.get("feedback_text", f.get("summary", f.get("text", "")))[:200])
             parts.append(f"- [{source}] {summary}")
         parts.append("</feedback>")
 
@@ -335,7 +335,7 @@ def _build_recall_context(user_message: str) -> str:
             "Advisor": "advisor",
         }
         source_type = feedback_source_map.get(session_type)
-        feedback_list = get_feedback(source_type=source_type)
+        feedback_list = get_feedback(source_type=source_type, brain=brain_filter)
 
     return _format_recall_context(sessions, claims, feedback_list)
 
@@ -507,10 +507,8 @@ def _apply_direct_correction(user_message: str) -> str:
         from services.document_updater import update_document
         from services.consistency import run_consistency_check
 
-        # Determine target brain before consistency check
-        brain = st.session_state.get("chat_brain_context", "pitch")
-        if brain == "both":
-            brain = "pitch"  # fallback for "both" context
+        # Determine target brain — use active_brain (write target), not chat_brain_context (read context)
+        brain = st.session_state.get("active_brain", "pitch")
 
         # Build synthetic claim for consistency check
         claim = {
@@ -569,6 +567,7 @@ def _apply_quick_note(note_text: str) -> str:
         from services.mongo_client import insert_claim
         from datetime import datetime, timezone
 
+        # Notes always stored to ops brain — surfaced cross-brain in system prompt (by design)
         insert_claim({
             "claim_text": note_text,
             "claim_type": "scratchpad",
@@ -576,7 +575,6 @@ def _apply_quick_note(note_text: str) -> str:
             "source_type": "quick_note",
             "who_said_it": "Founder",
             "confirmed": True,
-            "created_at": datetime.now(timezone.utc),
         }, brain="ops")
 
         return "Noted — saved to scratchpad. I can reference this in our conversation, but it won't appear in the living document."
@@ -610,7 +608,6 @@ def _apply_contact(contact_text: str) -> str:
                 "source_type": "contact_note",
                 "who_said_it": "Founder",
                 "confirmed": True,
-                "created_at": datetime.now(timezone.utc),
             }, brain="ops")
         except Exception:
             pass
@@ -673,9 +670,7 @@ def _apply_hypothesis(user_message: str) -> str:
                 "confirmed": True,
                 "status": "unvalidated",
                 "test_plan": "",
-                "created_at": datetime.now(timezone.utc),
-                "brain": "ops",
-            })
+            }, brain="ops")
             db_synced = result is not None
         except Exception:
             db_synced = False
@@ -1303,7 +1298,7 @@ def _resolve_contradiction(contradiction: dict, action: str, new_claim: str, exp
                     f"**Context:** Contradiction resolution during ingestion.\n"
                     f"**Participants:** {participants}"
                 )
-                doc = _add_decision(doc, decision_entry)
+                doc = _add_decision(doc, decision_entry, brain=brain)
                 write_living_document(doc, brain=brain)
                 upsert_living_document(doc, metadata={"last_updated": date_str, "update_reason": reason}, brain=brain)
                 _git_commit(f"Decision log: {reason}", brain=brain)
@@ -1317,7 +1312,7 @@ def _resolve_contradiction(contradiction: dict, action: str, new_claim: str, exp
                     f"  Kept: {contradiction.get('existing_position', '')}\n"
                     f"  Section: {section}"
                 )
-                doc = _add_dismissed(doc, dismissed_entry)
+                doc = _add_dismissed(doc, dismissed_entry, brain=brain)
                 write_living_document(doc, brain=brain)
                 upsert_living_document(doc, metadata={"last_updated": date_str}, brain=brain)
                 _git_commit(f"Dismissed contradiction in {section} ({date_str})", brain=brain)
@@ -1342,7 +1337,7 @@ def _resolve_contradiction(contradiction: dict, action: str, new_claim: str, exp
                     f"**Context:** Contradiction resolution during ingestion.\n"
                     f"**Participants:** {participants}"
                 )
-                doc = _add_decision(doc, decision_entry)
+                doc = _add_decision(doc, decision_entry, brain=brain)
                 write_living_document(doc, brain=brain)
                 upsert_living_document(doc, metadata={"last_updated": date_str, "update_reason": reason}, brain=brain)
                 _git_commit(f"Decision log: {reason}", brain=brain)

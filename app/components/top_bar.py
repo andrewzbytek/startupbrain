@@ -53,6 +53,8 @@ def render_top_bar():
             st.session_state.chat_brain_context = new_brain
             st.session_state.sidebar_data = {}
             st.session_state.pop("_active_quick_cmd", None)
+            st.session_state.pop("_top_bar_cache", None)
+            st.session_state.pop("_top_bar_cache_ts", None)
             st.rerun()
 
     # col_spacer intentionally left empty
@@ -102,7 +104,7 @@ def render_top_bar():
                     from services.consistency import run_audit
 
                     with st.spinner("Running audit..."):
-                        result = run_audit()
+                        result = run_audit(brain=st.session_state.get("active_brain", "pitch"))
                     discrepancies = result.get("discrepancies", [])
                     if discrepancies:
                         st.warning(

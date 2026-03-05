@@ -196,11 +196,11 @@ def apply_diff(document: str, diff_blocks: list, brain: str = "pitch") -> str:
         elif action == "ADD_CHANGELOG":
             updated = _add_changelog(updated, section, content)
         elif action == "ADD_DECISION":
-            updated = _add_decision(updated, content)
+            updated = _add_decision(updated, content, brain=brain)
         elif action == "ADD_FEEDBACK":
             updated = _add_feedback(updated, content)
         elif action == "ADD_DISMISSED":
-            updated = _add_dismissed(updated, content)
+            updated = _add_dismissed(updated, content, brain=brain)
         elif action == "ADD_HYPOTHESIS":
             updated = _add_hypothesis(updated, content)
         elif action == "ADD_CONTACT":
@@ -210,7 +210,7 @@ def apply_diff(document: str, diff_blocks: list, brain: str = "pitch") -> str:
             if name_match:
                 updated = _update_contact(updated, name_match.group(1), content)
         elif action == "ADD_SECTION":
-            updated = _add_section(updated, section, content)
+            updated = _add_section(updated, section, content, brain=brain)
 
     return updated
 
@@ -278,8 +278,12 @@ def _add_changelog(doc: str, section: str, new_entry: str) -> str:
     return doc
 
 
-def _add_decision(doc: str, decision_content: str) -> str:
-    """Add a new entry to the Decision Log section."""
+def _add_decision(doc: str, decision_content: str, brain: str = "pitch") -> str:
+    """Add a new entry to the Decision Log section (pitch brain only)."""
+    if brain != "pitch":
+        # Ops brain has no Decision Log — skip silently
+        logging.warning("_add_decision called for non-pitch brain '%s' — skipping", brain)
+        return doc
     # Find "## Decision Log" and append after the last entry
     pattern = re.compile(r"(## Decision Log\n)(.*?)(\n## |\Z)", re.DOTALL)
 
@@ -308,8 +312,12 @@ def _add_feedback(doc: str, feedback_content: str) -> str:
     return doc + "\n\n## Feedback Tracker\n\n" + feedback_content + "\n"
 
 
-def _add_dismissed(doc: str, dismissed_content: str) -> str:
-    """Add a new entry to the Dismissed Contradictions section."""
+def _add_dismissed(doc: str, dismissed_content: str, brain: str = "pitch") -> str:
+    """Add a new entry to the Dismissed Contradictions section (pitch brain only)."""
+    if brain != "pitch":
+        # Ops brain has no Dismissed Contradictions — skip silently
+        logging.warning("_add_dismissed called for non-pitch brain '%s' — skipping", brain)
+        return doc
     pattern = re.compile(r"(## Dismissed Contradictions\n)(.*?)(\n## |\Z)", re.DOTALL)
 
     def replacer(m):
@@ -431,7 +439,7 @@ def _update_hypothesis_status(doc: str, hypothesis_fragment: str, new_status: st
     return pattern.sub(replacer, doc)
 
 
-def _add_section(doc: str, section: str, section_content: str) -> str:
+def _add_section(doc: str, section: str, section_content: str, brain: str = "pitch") -> str:
     """Add an entirely new section to Current State.
 
     If the section already exists (even with placeholder content like
@@ -468,8 +476,14 @@ def _add_section(doc: str, section: str, section_content: str) -> str:
                 doc,
             )
 
-    # Section doesn't exist — insert at end of ## Current State
-    # Find ## Current State first, then the next ## heading after it
+    # Section doesn't exist — insert at appropriate location based on brain
+    if brain == "ops":
+        # Ops brain: insert before ## Scratchpad Notes (last section)
+        if "## Scratchpad Notes" in doc:
+            return doc.replace("## Scratchpad Notes", section_content + "\n\n## Scratchpad Notes")
+        return doc + "\n\n" + section_content + "\n"
+
+    # Pitch brain: insert at end of ## Current State
     cs_start = doc.find("\n## Current State")
     if cs_start != -1:
         cs_match = re.search(r"\n(## (?!Current State))", doc[cs_start + 1:])

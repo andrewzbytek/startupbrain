@@ -37,7 +37,7 @@ def render_dashboard():
 
     # --- Load living document (cached in sidebar_data) ---
     if not st.session_state.get("sidebar_data"):
-        doc = _read_living_document()
+        doc = _read_living_document(brain="pitch")
         st.session_state.sidebar_data = {"doc": doc}
     else:
         doc = st.session_state.sidebar_data.get("doc", "")
@@ -46,7 +46,7 @@ def render_dashboard():
     _, refresh_col = st.columns([0.88, 0.12])
     with refresh_col:
         if st.button("Refresh", key="dashboard_refresh"):
-            doc = _read_living_document()
+            doc = _read_living_document(brain="pitch")
             st.session_state.sidebar_data = {"doc": doc}
             st.rerun()
 
@@ -131,7 +131,7 @@ def render_dashboard():
                 fallback_shown = False
                 try:
                     from services.feedback import get_recurring_themes
-                    themes = get_recurring_themes()
+                    themes = get_recurring_themes(brain="pitch")
                     if themes:
                         for theme in themes[:5]:
                             count = theme.get("count", 0)

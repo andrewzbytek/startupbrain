@@ -82,7 +82,7 @@ class DeferredWriter:
                 retry_info = f"{new_info}\n\nPrevious verification failed with issues:\n{verification_feedback}"
                 diff_output = generate_diff(self.in_memory_doc, retry_info, update_reason, brain=self.brain)
 
-            verification = verify_diff(self.in_memory_doc, diff_output, new_info)
+            verification = verify_diff(self.in_memory_doc, diff_output, new_info, brain=self.brain)
 
             if verification["verified"]:
                 break
@@ -99,7 +99,7 @@ class DeferredWriter:
         if not diff_blocks:
             return {"success": True, "message": "No changes needed — information already present.", "changes_applied": 0}
 
-        self.in_memory_doc = apply_diff(self.in_memory_doc, diff_blocks)
+        self.in_memory_doc = apply_diff(self.in_memory_doc, diff_blocks, brain=self.brain)
         self._changes_applied = len(diff_blocks)
 
         return {
@@ -111,12 +111,12 @@ class DeferredWriter:
     def apply_decision_log_deferred(self, entry: str):
         """Add a Decision Log entry to the in-memory document."""
         from services.document_updater import _add_decision
-        self.in_memory_doc = _add_decision(self.in_memory_doc, entry)
+        self.in_memory_doc = _add_decision(self.in_memory_doc, entry, brain=self.brain)
 
     def apply_dismissed_deferred(self, entry: str):
         """Add a Dismissed Contradictions entry to the in-memory document."""
         from services.document_updater import _add_dismissed
-        self.in_memory_doc = _add_dismissed(self.in_memory_doc, entry)
+        self.in_memory_doc = _add_dismissed(self.in_memory_doc, entry, brain=self.brain)
 
     def record_contradiction_resolution(self, idx: int, action: str, new_claim: str, explanation: str):
         """Record a contradiction resolution for the checkpoint."""

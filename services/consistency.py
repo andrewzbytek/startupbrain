@@ -315,7 +315,7 @@ def _get_rag_evidence(claims: list, brain: str = "pitch") -> list:
         evidence.append({
             "source_date": _ca[:10] if isinstance(_ca, str) else (_ca.strftime("%Y-%m-%d") if hasattr(_ca, 'strftime') else ""),
             "source_type": session.get("metadata", {}).get("session_type", "session"),
-            "relevant_excerpt": session.get("summary", session.get("transcript", ""))[:500],
+            "relevant_excerpt": (session.get("summary") or session.get("transcript") or "")[:500],
         })
 
     # Log warning if over threshold and using fallback

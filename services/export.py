@@ -84,7 +84,7 @@ def generate_context_export(brain: str = "pitch") -> str:
             # Claims for this session
             session_id = str(session["_id"])
             claims = get_claims(session_id=session_id, limit=500)
-            claims.sort(key=lambda c: c.get("created_at") or datetime.min.replace(tzinfo=timezone.utc))  # chronological
+            claims.sort(key=_safe_sort_dt)  # chronological
 
             if claims:
                 lines.append(f"**Claims extracted ({len(claims)}):**")

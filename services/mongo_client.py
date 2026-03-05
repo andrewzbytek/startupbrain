@@ -203,13 +203,18 @@ def delete_many(collection_name: str, query: dict) -> int:
         return 0
 
 
-def get_latest_session() -> Optional[dict]:
-    """Get the most recently created session (sort by created_at desc)."""
+def get_latest_session(brain: str = "") -> Optional[dict]:
+    """Get the most recently created session (sort by created_at desc).
+    If brain is specified, only considers sessions for that brain.
+    """
     db = get_db()
     if db is None:
         return None
     try:
-        return db["sessions"].find_one(sort=[("created_at", -1)])
+        query = {}
+        if brain:
+            query["$or"] = [{"brain": brain}, {"brain": {"$exists": False}}]
+        return db["sessions"].find_one(query, sort=[("created_at", -1)])
     except Exception as e:
         logging.error("MongoDB get_latest_session failed: %s", e)
         logging.warning("Database operation failed. Please try again.")

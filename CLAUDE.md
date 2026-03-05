@@ -18,6 +18,8 @@ AI-powered knowledge management for a 2-person startup. See `docs/SPEC.md` for f
 - LLM prompts in `prompts/` as markdown files — loaded at runtime, never hardcoded
 - Two-brain architecture: **Pitch Brain** (`documents/pitch_brain.md`) for investor narrative, **Ops Brain** (`documents/ops_brain.md`) for operational knowledge — both git-tracked, mirrored to MongoDB, auto-recovered from MongoDB on ephemeral filesystems (Render)
 - Brain-aware services: all document/storage functions accept `brain="pitch"|"ops"` parameter (default "pitch" for backward compat). MongoDB queries use `$or` pattern with `{"$exists": False}` to include pre-migration docs that lack the `brain` field.
+- Two brain variables with different semantics: `active_brain` is the **write target** (set by top bar toggle, always `"pitch"` or `"ops"`, never `"both"`); `chat_brain_context` is the **read scope** (set by chat context selector, can be `"pitch"`, `"ops"`, or `"both"`). Write operations must use `active_brain`; read/display operations use `chat_brain_context`.
+- Pitch-only document helpers (`_add_decision`, `_add_dismissed`) accept `brain=` and skip for non-pitch — ops brain has no Decision Log or Dismissed Contradictions sections.
 - All state management via `st.session_state` — Streamlit re-runs on every interaction
 - Pitch state machine: `chat → ingesting → confirming_claims → checking_consistency → resolving_contradiction → done`
 - Ops state machine: `chat → ops_ingesting → ops_confirming → ops_done` (no consistency check)
@@ -28,7 +30,7 @@ AI-powered knowledge management for a 2-person startup. See `docs/SPEC.md` for f
 
 ## Session Rollback
 - `from services.deferred_writer import rollback_last_session; rollback_last_session()` — rolls back the most recent session (deletes session + claims from MongoDB, reverts the correct brain document to previous git version based on session's `brain` field, mirrors to MongoDB, git commits the revert)
-- `services/mongo_client.py` also exposes `delete_many(collection, query)` and `get_latest_session()` for manual cleanup
+- `services/mongo_client.py` also exposes `delete_many(collection, query)` and `get_latest_session(brain="")` for manual cleanup
 
 ## Key Conventions
 - Use `@st.cache_resource` for MongoDB connections and the Anthropic client
@@ -59,7 +61,7 @@ When splitting tasks across agents, avoid overlapping file edits:
 - Test transcripts in `tests/test_transcripts/`
 - Run unit tests: `python -m pytest tests/ -m "not integration"`
 - Run integration tests: `python -m pytest tests/ -m integration` (requires API key + MongoDB)
-- 1010 unit tests + 45 integration tests across 29 test files, all unit tests run fully offline with mocks
+- 1012 unit tests + 45 integration tests across 29 test files, all unit tests run fully offline with mocks
 
 ## Deployment
 - **Render** (primary): `render.yaml` Blueprint — free tier, auto-deploy from GitHub
@@ -91,11 +93,13 @@ All 24 sections of `docs/SPEC.md` are implemented plus brain split architecture.
 
 **Multi-user safety:** Two-tier locking — long-lived ingestion lock (30-min timeout) for full pipeline, short-lived document write lock (2-min timeout) for individual writes (including dashboard hypothesis forms, chat hypothesis status updates, and contradiction resolution fallback path). Atomic lock operations via `find_one_and_update` with `ReturnDocument.AFTER`. DeferredWriter checkpoints track lock ownership to prevent cross-user recovery hijacking. Dismissed contradictions properly filtered in consistency engine Pass 2. Doc lock acquisition resilient to transient MongoDB errors (try/except with retry). Ops dashboard hypothesis form shows persistent warning on lock failure (prevents silent text loss). DeferredWriter deletes checkpoint on doc-lock failure to prevent duplicate claims on resume.
 
-**LLM integration hardening:** Anthropic client cached via `@st.cache_resource` (not recreated per call). Consistency engine detects API errors and surfaces "check failed" instead of silently producing "no contradictions". All 3 consistency passes, evolution narratives, and pitch material generation are brain-aware. Pass 2 input properly wrapped in `<pass1_output>` tags. Book framework content excluded from recall/historical query types to avoid inflating system prompts. Ops brain uses dedicated `ops_diff_verify.md` prompt for diff verification (pitch uses `diff_verify.md`). RAG health monitor is brain-aware — shows claim count for the active brain.
+**LLM integration hardening:** Anthropic client cached via `@st.cache_resource` (not recreated per call). Consistency engine detects API errors and surfaces "check failed" instead of silently producing "no contradictions". All 3 consistency passes, evolution narratives, and pitch material generation are brain-aware. Pass 2 input properly wrapped in `<pass1_output>` tags. Book framework content excluded from recall/historical query types to avoid inflating system prompts. Ops brain uses dedicated `ops_diff_verify.md` prompt for diff verification (pitch uses `diff_verify.md`). RAG health monitor is brain-aware — shows claim count for the active brain. Top bar cache invalidated on brain switch (prevents stale RAG pill).
+
+**Brain isolation integrity (2026-03-04 review — 26 bugs fixed):** DeferredWriter threads `self.brain` to all callees (`verify_diff`, `apply_diff`, `_add_decision`, `_add_dismissed`). Direct corrections use `active_brain` (write target), not `chat_brain_context` (read scope). Recall context filters feedback by brain. Feedback field reads use correct MongoDB field name (`feedback_text`). `get_recurring_themes()`/`should_alert()` accept `brain=` parameter. Crash recovery syncs both `active_brain` and `chat_brain_context`. `_add_section` has brain-aware fallback insertion (ops: before Scratchpad Notes; pitch: inside Current State). `_add_decision`/`_add_dismissed` guard against non-pitch brain (ops has no Decision Log/Dismissed Contradictions). `get_latest_session()` accepts `brain=` filter. Feedback themes written back to MongoDB after pattern detection. Dashboard hypothesis form inserts claim into MongoDB for query parity. `run_ops_ingestion()` parameterized with `brain=` (default "ops").
 
 **Infrastructure:** Vector search code ready (`vector_search_text()`, upgraded `_get_rag_evidence()`), time-based fallback on free tier, RAG health monitor (warns at 200 claims). Render deployment live at `https://startupbrain.onrender.com` (free tier), ephemeral filesystem handled by MongoDB document recovery, git no-op when not in a repo.
 
-**Tests:** 1010 unit tests, 45 integration tests across 29 test files. All unit tests run fully offline with mocks.
+**Tests:** 1012 unit tests, 45 integration tests across 29 test files. All unit tests run fully offline with mocks.
 
 ### Decided Against
 

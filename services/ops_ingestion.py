@@ -14,11 +14,12 @@ def run_ops_ingestion(
     session_summary: str = "",
     topic_tags: Optional[list] = None,
     session_type: str = "",
+    brain: str = "ops",
 ) -> dict:
     """
     Simplified Ops Brain ingestion pipeline:
     1. Update ops living document with confirmed claims
-    2. Store session and claims in MongoDB (tagged brain="ops")
+    2. Store session and claims in MongoDB (tagged brain=brain)
     3. No consistency check, no deferred writes
 
     Returns:
@@ -49,7 +50,7 @@ def run_ops_ingestion(
     new_info = "\n".join(claims_text_parts)
 
     # Update ops document
-    doc_result = update_document(new_info, update_reason=update_reason, brain="ops")
+    doc_result = update_document(new_info, update_reason=update_reason, brain=brain)
 
     # Store session
     session_id = store_session(
@@ -57,14 +58,14 @@ def run_ops_ingestion(
         metadata=metadata,
         session_summary=session_summary,
         topic_tags=topic_tags,
-        brain="ops",
+        brain=brain,
     )
 
     # Store claims
     claims_stored = 0
     if session_id:
         inserted = store_confirmed_claims(
-            confirmed_claims, session_id, metadata=metadata, brain="ops",
+            confirmed_claims, session_id, metadata=metadata, brain=brain,
         )
         claims_stored = len(inserted)
 

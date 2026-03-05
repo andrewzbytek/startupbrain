@@ -96,6 +96,18 @@ def render_ops_dashboard():
                                 write_living_document(updated, brain="ops")
                                 upsert_living_document(updated, metadata={"last_updated": datetime.now(timezone.utc).strftime("%Y-%m-%d"), "update_reason": "New hypothesis"}, brain="ops")
                                 _git_commit(f"Add ops hypothesis: {hyp_text[:50]}", brain="ops")
+                                # Also insert into claims collection for query parity with chat path
+                                from services.mongo_client import insert_claim
+                                insert_claim({
+                                    "claim_text": hyp_text,
+                                    "claim_type": "hypothesis",
+                                    "confidence": "low",
+                                    "source_type": "hypothesis",
+                                    "who_said_it": "Founder",
+                                    "confirmed": True,
+                                    "status": "unvalidated",
+                                    "test_plan": hyp_test or "",
+                                }, brain="ops")
                                 st.rerun()
                             except Exception as e:
                                 import logging

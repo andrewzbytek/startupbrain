@@ -761,6 +761,7 @@ else:
                     st.session_state.ingestion_topic_tags = writer.topic_tags
                     st.session_state.consistency_results = writer.consistency_results
                     st.session_state.active_brain = writer.brain
+                    st.session_state.chat_brain_context = writer.brain
                     st.session_state._has_pending_ingestion = False
 
                     if writer.stage == "ready_to_commit":

@@ -692,7 +692,7 @@ class TestResolveContradictionDecisionFormat:
 
         captured = {}
 
-        def capture_add_decision(doc, entry):
+        def capture_add_decision(doc, entry, brain="pitch"):
             captured["entry"] = entry
             return doc  # pass-through
 

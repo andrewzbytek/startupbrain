@@ -3,6 +3,7 @@ Feedback pattern detection for Startup Brain.
 Section 8 of the SPEC — detects recurring themes across investor/customer feedback.
 """
 
+import logging
 import re
 from datetime import datetime, timezone
 from typing import Optional
@@ -22,14 +23,26 @@ def _get_feedback_tracker_section(brain: str = "pitch") -> str:
     """Read the Feedback Tracker section from the living document."""
     from services.document_updater import read_living_document
     doc = read_living_document(brain=brain)
+    # Ops brain has ## Feedback Tracker; pitch brain does not — try both patterns
     match = re.search(r"## Feedback Tracker\n(.*?)(\n## |\Z)", doc, re.DOTALL)
+    if not match and brain == "pitch":
+        # Pitch brain stores feedback inline; return empty gracefully
+        return ""
     return match.group(1).strip() if match else ""
 
 
 def _get_current_strategy_summary(brain: str = "pitch") -> str:
-    """Extract Current State section from living document for pattern analysis."""
+    """Extract strategy context from living document for pattern analysis."""
     from services.document_updater import read_living_document
     doc = read_living_document(brain=brain)
+    if brain == "ops":
+        # Ops brain has no ## Current State; use Active Hypotheses + Key Risks
+        parts = []
+        for section_name in ("## Active Hypotheses", "## Key Risks"):
+            match = re.search(rf"{re.escape(section_name)}\n(.*?)(\n## |\Z)", doc, re.DOTALL)
+            if match:
+                parts.append(match.group(1).strip())
+        return "\n\n".join(parts)[:3000] if parts else ""
     match = re.search(r"## Current State\n(.*?)(\n## |\Z)", doc, re.DOTALL)
     if not match:
         return ""
@@ -133,14 +146,14 @@ def detect_patterns(feedback_tracker_section: str, new_feedback: dict, brain: st
     }
 
 
-def get_recurring_themes() -> list:
+def get_recurring_themes(brain: str = "") -> list:
     """
     Query MongoDB feedback collection for theme counts.
     Returns list of dicts: {theme, count, sources}
     """
     from services.mongo_client import get_feedback
 
-    feedback_entries = get_feedback(limit=200)
+    feedback_entries = get_feedback(limit=200, brain=brain)
 
     theme_map = {}
     for entry in feedback_entries:
@@ -155,9 +168,9 @@ def get_recurring_themes() -> list:
     return sorted(theme_map.values(), key=lambda x: x["count"], reverse=True)
 
 
-def should_alert(theme: str) -> bool:
+def should_alert(theme: str, brain: str = "") -> bool:
     """Returns True if the given theme has 3 or more distinct sources."""
-    themes = get_recurring_themes()
+    themes = get_recurring_themes(brain=brain)
     for t in themes:
         if t["theme"] == theme:
             return len(t["sources"]) >= 3
@@ -217,6 +230,16 @@ def ingest_feedback(
 
     # Run pattern detection
     pattern_results = detect_patterns(feedback_tracker, new_feedback, brain=brain)
+
+    # Write detected themes back to the stored feedback document
+    detected_themes = pattern_results.get("new_feedback_entry", {}).get("themes", [])
+    if feedback_id and detected_themes:
+        from services.mongo_client import update_one
+        from bson import ObjectId
+        try:
+            update_one("feedback", {"_id": ObjectId(feedback_id)}, {"$set": {"themes": detected_themes}})
+        except Exception as e:
+            logging.error("Could not update feedback themes: %s", e)
 
     # Update living document with feedback entry
     # Build new_info from pattern results
@@ -284,6 +307,7 @@ def generate_evolution_narrative(topic: str, brain: str = "pitch") -> dict:
         changelog = cl_match.group(1).strip()
 
     # Extract relevant decision log entries (simple keyword match)
+    # Ops brain has no Decision Log — leave empty (acceptable for ops evolution narratives)
     decision_log_match = re.search(r"## Decision Log\n(.*?)(?=\n## |\Z)", doc, re.DOTALL)
     decision_log = decision_log_match.group(1).strip() if decision_log_match else ""
 
