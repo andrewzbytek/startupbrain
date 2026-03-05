@@ -748,7 +748,6 @@ else:
                     if not lock_result["acquired"]:
                         st.error("Cannot resume — another ingestion is in progress.")
                         st.rerun()
-                        return  # st.rerun() doesn't stop execution immediately
                     else:
                         st.session_state._lock_acquired = True
 
