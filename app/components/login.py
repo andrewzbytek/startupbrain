@@ -29,9 +29,9 @@ def _get_credentials():
     except Exception:
         pass
     if not username:
-        username = os.environ.get("APP_USERNAME")
+        username = os.environ.get("APP_USERNAME") or None
     if not password:
-        password = os.environ.get("APP_PASSWORD")
+        password = os.environ.get("APP_PASSWORD") or None
     return username, password
 
 

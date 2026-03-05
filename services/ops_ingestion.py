@@ -3,7 +3,6 @@ Simplified ingestion pipeline for Ops Brain.
 No consistency check, no DeferredWriter — direct document update.
 """
 
-import logging
 from datetime import datetime, timezone
 from typing import Optional
 

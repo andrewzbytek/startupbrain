@@ -3,7 +3,7 @@ Pure parsing functions for the Startup Brain living document.
 Extracted from sidebar.py for reuse across dashboard and other components.
 """
 
-import html
+import logging
 import re
 from datetime import date, timedelta
 
@@ -152,8 +152,8 @@ def _parse_feedback_by_source(doc: str) -> dict:
                         bucket = "vc"  # Default fallback
                 result[bucket].append(summary)
 
-    except Exception:
-        pass
+    except Exception as e:
+        logging.debug("Feedback parse error: %s", e)
 
     return result
 

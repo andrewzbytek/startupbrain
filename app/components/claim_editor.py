@@ -56,11 +56,12 @@ def render_claim_editor(ops_mode: bool = False):
                 )
 
             with col_text:
-                edited_text = st.text_input(
+                edited_text = st.text_area(
                     label="Claim text",
                     value=claim.get("claim_text", ""),
                     key=f"claim_text_{claim['_uid']}",
                     label_visibility="collapsed",
+                    height=68,
                 )
 
             with col_meta:

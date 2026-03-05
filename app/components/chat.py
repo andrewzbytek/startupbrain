@@ -10,7 +10,7 @@ from datetime import datetime, timedelta, timezone
 
 import streamlit as st
 
-from app.state import add_message, set_mode, reset_ingestion, invalidate_sidebar
+from app.state import add_message, set_mode, invalidate_sidebar
 
 
 from app.components._parsers import _escape_latex
@@ -233,10 +233,10 @@ def _format_recall_context(sessions, claims=None, feedback=None) -> str:
             date = s.get("session_date", s.get("created_at", ""))
             if hasattr(date, "strftime"):
                 date = date.strftime("%Y-%m-%d")
-            stype = meta.get("session_type", "Unknown")
-            participants = meta.get("participants", "")
-            summary = s.get("summary", "")[:500]
-            tags = ", ".join(meta.get("tags", []))
+            stype = escape_xml(meta.get("session_type", "Unknown"))
+            participants = escape_xml(meta.get("participants", ""))
+            summary = escape_xml(s.get("summary", "")[:500])
+            tags = escape_xml(", ".join(meta.get("tags", [])))
             entry = f"- [{date}] {stype}"
             if participants:
                 entry += f" | Participants: {participants}"
@@ -250,10 +250,10 @@ def _format_recall_context(sessions, claims=None, feedback=None) -> str:
     if claims:
         parts.append("<claims>")
         for c in claims[:30]:
-            ctype = c.get("claim_type", "claim")
-            text = c.get("claim_text", "")
-            who = c.get("who_said_it", "")
-            confidence = c.get("confidence", "")
+            ctype = escape_xml(c.get("claim_type", "claim"))
+            text = escape_xml(c.get("claim_text", ""))
+            who = escape_xml(c.get("who_said_it", ""))
+            confidence = escape_xml(c.get("confidence", ""))
             entry = f"- [{ctype}] {text}"
             if who:
                 entry += f" (by {who}"
@@ -266,8 +266,8 @@ def _format_recall_context(sessions, claims=None, feedback=None) -> str:
     if feedback:
         parts.append("<feedback>")
         for f in feedback[:10]:
-            source = f.get("source_type", "")
-            summary = f.get("summary", str(f.get("text", "")))[:200]
+            source = escape_xml(f.get("source_type", ""))
+            summary = escape_xml(f.get("summary", str(f.get("text", "")))[:200])
             parts.append(f"- [{source}] {summary}")
         parts.append("</feedback>")
 
@@ -436,7 +436,7 @@ def _build_claude_prompt(user_message: str, query_type: str):
         history_text += f"{role_label}: {escape_xml(msg['content'])}\n\n"
 
     if history_text:
-        full_prompt = f"<conversation_history>\n{history_text}</conversation_history>\n\nFounder: {user_message}"
+        full_prompt = f"<conversation_history>\n{history_text}</conversation_history>\n\nFounder: {escape_xml(user_message)}"
     else:
         full_prompt = user_message
 
@@ -468,7 +468,8 @@ def _call_claude(user_message: str, query_type: str) -> str:
         result = call_with_routing(full_prompt, task_type=task_type, system=system, stream=False)
         return result.get("text", "Sorry, I could not generate a response.")
     except Exception as e:
-        return f"Error: {e}"
+        logging.error("Chat routing error: %s", e)
+        return "I had trouble responding. Please try again."
 
 
 def _call_claude_stream(user_message: str, query_type: str):
@@ -482,7 +483,8 @@ def _call_claude_stream(user_message: str, query_type: str):
         generator = call_with_routing(full_prompt, task_type=task_type, system=system, stream=True)
         yield from generator
     except Exception as e:
-        yield f"Error: {e}"
+        logging.error("Chat stream error: %s", e)
+        yield "I had trouble responding. Please try again."
 
 
 def _apply_direct_correction(user_message: str) -> str:
@@ -825,7 +827,7 @@ def _handle_quick_action(text: str, query_type: str):
     add_message("user", text)
     with st.chat_message("assistant"):
         response = st.write_stream(_call_claude_stream(text, query_type))
-    add_message("assistant", response)
+    add_message("assistant", response if isinstance(response, str) else "".join(response) if response else "")
     st.rerun()
 
 
@@ -935,10 +937,9 @@ def render_chat():
         with st.chat_message("user"):
             st.markdown(user_input)
 
-        add_message("user", user_input)
-
         # Check if user pasted a transcript
         if _is_likely_transcript(user_input):
+            add_message("user", user_input[:200] + "... [transcript detected, use Ingest button]")
             response = (
                 "That looks like a session transcript or summary. "
                 "Would you like to run it through the ingestion pipeline to extract and store the key claims? "
@@ -949,6 +950,8 @@ def render_chat():
             add_message("assistant", response)
             st.rerun()
             return
+
+        add_message("user", user_input)
 
         # Handle quick notes — lightweight doc update, no full pipeline
         if _is_quick_note(user_input):

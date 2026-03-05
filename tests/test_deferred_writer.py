@@ -354,6 +354,21 @@ class TestBatchCommit:
         assert result["success"] is False
         mock_delete.assert_not_called()
 
+    def test_batch_commit_doc_lock_failure(self):
+        """batch_commit should handle doc lock failure gracefully."""
+        writer = _make_writer()
+        writer.in_memory_doc = "changed content"
+
+        with patch("services.ingestion_lock.acquire_doc_lock", return_value=False), \
+             patch("services.document_updater.write_living_document") as mock_write, \
+             patch("services.mongo_client.delete_pending_ingestion") as mock_delete:
+            result = writer.batch_commit()
+
+        assert result["success"] is False
+        assert "lock" in result["message"].lower()
+        mock_write.assert_not_called()
+        mock_delete.assert_not_called()
+
 
 # ---------------------------------------------------------------------------
 # load_pending_ingestion tests
@@ -555,3 +570,27 @@ class TestRollbackLastSession:
             result = rollback_last_session()
 
         assert result["session_id"] == str(sid)
+
+    def test_rollback_ops_brain(self):
+        """rollback_last_session should use ops brain when session has brain='ops'."""
+        from bson import ObjectId
+        sid = ObjectId()
+        session = {"_id": sid, "created_at": "2026-03-01", "brain": "ops"}
+
+        with patch("services.mongo_client.get_latest_session", return_value=session), \
+             patch("services.mongo_client.delete_many", return_value=1), \
+             patch("services.mongo_client.delete_one"), \
+             patch("subprocess.run", side_effect=self._mock_subprocess_run(show_stdout="ops reverted content")), \
+             patch("services.document_updater.write_living_document") as mock_write, \
+             patch("services.mongo_client.upsert_living_document") as mock_upsert, \
+             patch("services.document_updater._git_commit", return_value=True), \
+             patch("services.ingestion_lock.acquire_doc_lock", return_value=True), \
+             patch("services.ingestion_lock.release_doc_lock"):
+            from services.deferred_writer import rollback_last_session
+            result = rollback_last_session()
+
+        assert result["success"] is True
+        mock_write.assert_called_once_with("ops reverted content", brain="ops")
+        mock_upsert.assert_called_once()
+        # Verify upsert was called with brain="ops"
+        assert mock_upsert.call_args[1].get("brain") == "ops"

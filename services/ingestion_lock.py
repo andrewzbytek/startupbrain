@@ -4,6 +4,7 @@ Ensures only one user can run ingestion at a time.
 Stale locks auto-expire after 30 minutes.
 """
 
+import logging
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 import uuid
@@ -111,7 +112,6 @@ def acquire_lock(session_id: Optional[str] = None) -> dict:
 
     except Exception as e:
         # MongoDB error — fail closed to protect concurrent safety
-        import logging
         logging.error("Ingestion lock acquisition failed: %s", e)
         return {"acquired": False, "locked_by": None, "message": f"Lock check failed ({e}) — denying ingestion for safety"}
 
@@ -267,5 +267,6 @@ def release_doc_lock() -> None:
             {"_id": "doc_write_lock"},
             {"$set": {"locked": False}},
         )
-    except Exception:
-        pass
+    except Exception as e:
+        logging.error("release_doc_lock failed — lock may remain held for up to %ds: %s",
+                      DOC_LOCK_TIMEOUT_SECONDS, e)

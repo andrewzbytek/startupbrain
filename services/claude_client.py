@@ -7,7 +7,7 @@ Every call logs via cost_tracker.
 import logging
 import os
 from pathlib import Path
-from typing import Generator, Optional
+from typing import Generator, Optional, Union
 
 import streamlit as st
 
@@ -16,6 +16,20 @@ try:
     ANTHROPIC_AVAILABLE = True
 except ImportError:
     ANTHROPIC_AVAILABLE = False
+
+def _retry_on_rate_limit(func, max_retries=3):
+    """Retry an API call with exponential backoff on rate limit errors."""
+    import time as _time
+    for attempt in range(max_retries):
+        try:
+            return func()
+        except Exception as e:
+            if "rate" in str(e).lower() or "429" in str(e) or (hasattr(e, 'status_code') and e.status_code == 429):
+                if attempt < max_retries - 1:
+                    _time.sleep(2 ** attempt)
+                    continue
+            raise
+
 
 # Model IDs
 SONNET_MODEL = "claude-sonnet-4-20250514"
@@ -83,7 +97,7 @@ def call_sonnet(
     images: Optional[list] = None,
     stream: bool = False,
     task_type: str = "general",
-) -> dict:
+) -> Union[dict, Generator]:
     """
     Call Claude Sonnet with the given prompt.
 
@@ -120,7 +134,7 @@ def call_sonnet(
         return _stream_response(client, kwargs, SONNET_MODEL, task_type, cost_tracker)
 
     try:
-        response = client.messages.create(**kwargs)
+        response = _retry_on_rate_limit(lambda: client.messages.create(**kwargs))
         if not response.content:
             return {"text": "Error: Empty response from API.", "tokens_in": 0, "tokens_out": 0, "model": SONNET_MODEL}
         text = response.content[0].text
@@ -138,7 +152,7 @@ def call_opus(
     system: Optional[str] = None,
     stream: bool = False,
     task_type: str = "deep_analysis",
-) -> dict:
+) -> Union[dict, Generator]:
     """
     Call Claude Opus with the given prompt.
 
@@ -170,7 +184,7 @@ def call_opus(
         return _stream_response(client, kwargs, OPUS_MODEL, task_type, cost_tracker)
 
     try:
-        response = client.messages.create(**kwargs)
+        response = _retry_on_rate_limit(lambda: client.messages.create(**kwargs))
         if not response.content:
             return {"text": "Error: Empty response from API.", "tokens_in": 0, "tokens_out": 0, "model": OPUS_MODEL}
         text = response.content[0].text

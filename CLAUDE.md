@@ -59,7 +59,7 @@ When splitting tasks across agents, avoid overlapping file edits:
 - Test transcripts in `tests/test_transcripts/`
 - Run unit tests: `python -m pytest tests/ -m "not integration"`
 - Run integration tests: `python -m pytest tests/ -m integration` (requires API key + MongoDB)
-- 915 unit tests + 45 integration tests across 29 test files, all unit tests run fully offline with mocks
+- 935 unit tests + 45 integration tests across 29 test files, all unit tests run fully offline with mocks
 
 ## Deployment
 - **Render** (primary): `render.yaml` Blueprint — free tier, auto-deploy from GitHub
@@ -74,7 +74,7 @@ When splitting tasks across agents, avoid overlapping file edits:
 - Required secrets/env vars: `ANTHROPIC_API_KEY`, `MONGODB_URI`
 - Optional secrets/env vars: `APP_USERNAME`, `APP_PASSWORD` (enables login gate), `DISABLE_AUTH` (set to `true` to skip auth in production)
 
-## Current Status (as of 2026-03-05)
+## Current Status (as of 2026-03-04)
 
 ### Implementation: Complete
 All 24 sections of `docs/SPEC.md` are implemented plus brain split architecture. The system is production-ready for daily use.
@@ -95,13 +95,13 @@ All 24 sections of `docs/SPEC.md` are implemented plus brain split architecture.
 
 **Infrastructure:** Vector search code ready (`vector_search_text()`, upgraded `_get_rag_evidence()`), time-based fallback on free tier, RAG health monitor (warns at 200 claims). Render deployment live at `https://startupbrain.onrender.com` (free tier), ephemeral filesystem handled by MongoDB document recovery, git no-op when not in a repo.
 
-**Tests:** 915 unit tests, 45 integration tests across 29 test files. All unit tests run fully offline with mocks.
+**Tests:** 935 unit tests, 45 integration tests across 29 test files. All unit tests run fully offline with mocks.
 
 ### Decided Against
 
 - **Dedicated feedback ingestion UI** — feedback enters via chat (paste email + commentary) or ingestion flow (select "Investor meeting" session type). No extra UI needed.
 - **Persistent book framework storage** — temporary .md upload in chat is the permanent solution. No MongoDB persistence for book content.
-- **Atlas M10+ upgrade (for now)** — autoEmbed requires paid tier ($57/mo). Time-based retrieval works fine until ~200 claims. Sidebar monitors this automatically.
+- **Atlas M10+ upgrade (for now)** — autoEmbed requires paid tier ($57/mo). Time-based retrieval works fine until ~200 claims. The top bar status pill monitors this automatically.
 - **MongoDB backup script** — optional extra for the future. Atlas has its own backup and data volume is tiny.
 - **Delete claim chat command** — edge case; if a bad claim slips through, delete directly in MongoDB.
 

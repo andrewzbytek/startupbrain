@@ -86,8 +86,9 @@ def render_dashboard():
 
     # --- LEFT COLUMN ---
     with left_col:
-        # Hypotheses panel
-        hypotheses = _parse_hypotheses(doc)
+        # Hypotheses panel — always read from ops brain (Active Hypotheses lives there)
+        ops_doc = _read_living_document(brain="ops")
+        hypotheses = _parse_hypotheses(ops_doc)
         active = [h for h in hypotheses if h["status"] in ("unvalidated", "testing")] if hypotheses else []
         resolved = [h for h in hypotheses if h["status"] in ("validated", "invalidated")] if hypotheses else []
 
@@ -129,13 +130,13 @@ def render_dashboard():
                                     st.warning("Document is being updated by another process. Try again shortly.")
                                 else:
                                     try:
-                                        fresh_doc = read_living_document()
+                                        fresh_doc = read_living_document(brain="ops")
                                         updated = _update_hypothesis_status(fresh_doc, h["text"], new_status)
                                         if updated != fresh_doc:
-                                            write_living_document(updated)
+                                            write_living_document(updated, brain="ops")
                                             date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-                                            upsert_living_document(updated, metadata={"last_updated": date_str})
-                                            _git_commit(f"Hypothesis {new_status}: {h['text'][:50]}")
+                                            upsert_living_document(updated, metadata={"last_updated": date_str}, brain="ops")
+                                            _git_commit(f"Hypothesis {new_status}: {h['text'][:50]}", brain="ops")
                                             try:
                                                 update_hypothesis_status(h["text"], new_status)
                                             except Exception:
@@ -192,11 +193,11 @@ def render_dashboard():
                                     f"  Evidence: ---"
                                 )
 
-                                fresh_doc = read_living_document()
+                                fresh_doc = read_living_document(brain="ops")
                                 updated = _add_hypothesis(fresh_doc, entry)
-                                write_living_document(updated)
-                                upsert_living_document(updated, metadata={"last_updated": date_str, "update_reason": "New hypothesis"})
-                                _git_commit(f"Add hypothesis: {hyp_text.strip()[:50]}")
+                                write_living_document(updated, brain="ops")
+                                upsert_living_document(updated, metadata={"last_updated": date_str, "update_reason": "New hypothesis"}, brain="ops")
+                                _git_commit(f"Add hypothesis: {hyp_text.strip()[:50]}", brain="ops")
 
                                 try:
                                     insert_claim({
@@ -386,7 +387,9 @@ def render_dashboard():
                         st.session_state.evolution_result = evo_result
                         st.rerun()
                     except Exception as e:
-                        st.error(f"Evolution narrative failed: {e}")
+                        import logging
+                        logging.error("Evolution narrative failed: %s", e)
+                        st.error("Evolution narrative failed. Please try again.")
 
             evo = st.session_state.get("evolution_result")
             if evo:

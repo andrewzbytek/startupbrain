@@ -228,6 +228,10 @@ def run_ingestion_pipeline(
     brain: str = "pitch",
 ) -> dict:
     """
+    Legacy/test ingestion pipeline — NOT used in production UI.
+    Production uses DeferredWriter (services/deferred_writer.py) instead.
+    Kept for backward compatibility and integration tests.
+
     Orchestrate post-confirmation ingestion:
     1. Run consistency check
     2. Update living document
@@ -253,7 +257,7 @@ def run_ingestion_pipeline(
 
     # Step 1: Consistency check
     session_type = (metadata or {}).get("session_type", "")
-    consistency_results = consistency.run_consistency_check(confirmed_claims, session_type=session_type)
+    consistency_results = consistency.run_consistency_check(confirmed_claims, session_type=session_type, brain=brain)
 
     # Step 2: Update living document
     # Build new_info string from confirmed claims

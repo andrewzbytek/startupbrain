@@ -772,5 +772,10 @@ div[role="alert"].st-emotion-cache-error,
         font-size: 0.62rem;
         padding: 2px 6px;
     }
+
+    .stButton > button {
+        min-height: 40px !important;
+        padding: 0.5rem 0.8rem !important;
+    }
 }
 </style>""", unsafe_allow_html=True)

@@ -5,6 +5,7 @@ All tests run without API keys, MongoDB, or network access.
 
 import sys
 import subprocess
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -624,3 +625,49 @@ class TestParseDiffOutputCodeFences:
         assert len(blocks) == 1
         assert blocks[0]["action"] == "UPDATE_POSITION"
         assert "New price." in blocks[0]["content"]
+
+
+# ---------------------------------------------------------------------------
+# read_living_document MongoDB recovery tests
+# ---------------------------------------------------------------------------
+
+class TestReadLivingDocumentRecovery:
+    """Tests for read_living_document cold-start MongoDB recovery path."""
+
+    def test_read_living_document_recovers_from_mongodb(self, tmp_path):
+        """File doesn't exist, MongoDB has content -> should return MongoDB content."""
+        from services.document_updater import read_living_document
+        fake_path = tmp_path / "documents" / "pitch_brain.md"
+        # Do NOT create the file — simulates ephemeral filesystem after restart
+
+        mongo_doc = {"content": "# Recovered from MongoDB\nSome content here"}
+
+        with patch("services.document_updater._doc_path", return_value=fake_path), \
+             patch("services.mongo_client.get_living_document", return_value=mongo_doc):
+            result = read_living_document(brain="pitch")
+
+        assert result == "# Recovered from MongoDB\nSome content here"
+
+    def test_read_living_document_mongodb_empty(self, tmp_path):
+        """File doesn't exist, MongoDB returns None -> should return empty string."""
+        from services.document_updater import read_living_document
+        fake_path = tmp_path / "documents" / "pitch_brain.md"
+        # Do NOT create the file
+
+        with patch("services.document_updater._doc_path", return_value=fake_path), \
+             patch("services.mongo_client.get_living_document", return_value=None):
+            result = read_living_document(brain="pitch")
+
+        assert result == ""
+
+    def test_read_living_document_mongodb_exception(self, tmp_path):
+        """File doesn't exist, MongoDB raises -> should log warning and return empty string."""
+        from services.document_updater import read_living_document
+        fake_path = tmp_path / "documents" / "pitch_brain.md"
+        # Do NOT create the file
+
+        with patch("services.document_updater._doc_path", return_value=fake_path), \
+             patch("services.mongo_client.get_living_document", side_effect=Exception("connection refused")):
+            result = read_living_document(brain="pitch")
+
+        assert result == ""

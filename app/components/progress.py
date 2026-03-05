@@ -8,18 +8,6 @@ from typing import Optional
 
 import streamlit as st
 
-# Pre-defined steps for the ingestion pipeline (in order)
-INGESTION_STEPS = [
-    "Transcript received",
-    "Extracting claims...",
-    "Claims extracted",
-    "Awaiting confirmation...",
-    "Checking consistency (Pass 1 of 2)...",
-    "Checking consistency (Pass 2 of 2)...",
-    "Consistency check complete",
-    "Updating living document...",
-    "All done. Session ingested.",
-]
 
 
 class IngestionProgress:

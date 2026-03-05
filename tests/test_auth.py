@@ -196,3 +196,25 @@ class TestIsAuthenticated:
         mock_controller.get.return_value = "admin|0|fakesig"
         mock_cookies_module.CookieController.return_value = mock_controller
         assert is_authenticated() is False
+
+    def test_render_env_without_credentials_blocks(self, monkeypatch):
+        """Set RENDER=true env var with no credentials, is_authenticated() should return False."""
+        monkeypatch.setenv("RENDER", "true")
+        assert is_authenticated() is False
+
+    def test_port_env_without_credentials_blocks(self, monkeypatch):
+        """Set PORT=8501 env var with no credentials, should return False."""
+        monkeypatch.setenv("PORT", "8501")
+        assert is_authenticated() is False
+
+    def test_disable_auth_bypasses(self, monkeypatch):
+        """Set DISABLE_AUTH=true, should return True even without credentials."""
+        monkeypatch.setenv("RENDER", "true")
+        monkeypatch.setenv("DISABLE_AUTH", "true")
+        assert is_authenticated() is True
+
+    def test_disable_auth_case_insensitive(self, monkeypatch):
+        """Set DISABLE_AUTH=TRUE (uppercase), should return True."""
+        monkeypatch.setenv("RENDER", "true")
+        monkeypatch.setenv("DISABLE_AUTH", "TRUE")
+        assert is_authenticated() is True

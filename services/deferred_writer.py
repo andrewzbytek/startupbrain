@@ -155,10 +155,32 @@ class DeferredWriter:
             # 1. Write file (only if changed) — acquire doc lock to prevent clobbering
             if doc_changed:
                 if not acquire_doc_lock(timeout_seconds=60):
+                    # Still store session + claims even if doc can't be updated
+                    session_id_result = None
+                    claims_stored_count = 0
+                    try:
+                        session_id_result = store_session(
+                            self.transcript,
+                            metadata=self.metadata,
+                            session_summary=self.session_summary,
+                            topic_tags=self.topic_tags,
+                            brain=self.brain,
+                        )
+                        if session_id_result:
+                            inserted = store_confirmed_claims(
+                                self.confirmed_claims, session_id_result,
+                                metadata=self.metadata, brain=self.brain,
+                            )
+                            claims_stored_count = len(inserted) if inserted else 0
+                    except Exception as store_err:
+                        logging.error("Failed to store session/claims on doc-lock failure: %s", store_err)
                     return {
                         "success": False,
-                        "message": "Could not acquire document lock — another update is in progress.",
-                        "claims_stored": 0, "session_id": "", "document_updated": False, "changes_applied": 0,
+                        "message": "Document lock unavailable — session and claims stored but document not updated. Try again later.",
+                        "claims_stored": claims_stored_count,
+                        "session_id": session_id_result or "",
+                        "document_updated": False,
+                        "changes_applied": 0,
                     }
                 try:
                     write_living_document(self.in_memory_doc, brain=self.brain)
@@ -331,7 +353,7 @@ def rollback_last_session() -> dict:
         upsert_living_document,
     )
     from services.document_updater import (
-        write_living_document, _git_commit, LIVING_DOC_PATH, _doc_path,
+        write_living_document, _git_commit, _doc_path,
     )
 
     # 1. Find latest session
@@ -371,24 +393,29 @@ def rollback_last_session() -> dict:
     except subprocess.CalledProcessError as e:
         git_error = e  # Git unavailable — will still delete MongoDB data
 
-    # 3. Delete claims for this session
-    claims_deleted = delete_many("claims", {"session_id": session_id})
-
-    # 4. Delete the session document
-    delete_one("sessions", {"_id": session["_id"]})
-
-    # 5. Revert living document if git content was found
+    # 3. Acquire doc lock BEFORE MongoDB deletes to ensure atomicity
+    #    (prevents window where MongoDB data is deleted but doc revert fails due to lock)
+    from services.ingestion_lock import acquire_doc_lock, release_doc_lock
+    doc_lock_acquired = False
     if prev_content is not None:
-        from services.ingestion_lock import acquire_doc_lock, release_doc_lock
-        if not acquire_doc_lock(timeout_seconds=30):
+        doc_lock_acquired = acquire_doc_lock(timeout_seconds=30)
+        if not doc_lock_acquired:
             return {
-                "success": True,
-                "message": f"Session {session_id} deleted from MongoDB ({claims_deleted} claims). "
-                           "Could not acquire document lock for git revert.",
+                "success": False,
+                "message": "Could not acquire document lock for rollback — no changes made.",
                 "session_id": session_id,
-                "claims_deleted": claims_deleted,
+                "claims_deleted": 0,
             }
-        try:
+
+    try:
+        # 4. Delete claims for this session
+        claims_deleted = delete_many("claims", {"session_id": session_id})
+
+        # 5. Delete the session document
+        delete_one("sessions", {"_id": session["_id"]})
+
+        # 6. Revert living document if git content was found
+        if prev_content is not None:
             write_living_document(prev_content, brain=brain)
             date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
             upsert_living_document(
@@ -397,9 +424,11 @@ def rollback_last_session() -> dict:
                 brain=brain,
             )
             _git_commit(f"Rollback session: {session_id}", brain=brain)
-        finally:
+    finally:
+        if doc_lock_acquired:
             release_doc_lock()
 
+    if prev_content is not None:
         return {
             "success": True,
             "message": f"Rolled back session {session_id}: {claims_deleted} claims deleted, "
@@ -407,7 +436,6 @@ def rollback_last_session() -> dict:
             "session_id": session_id,
             "claims_deleted": claims_deleted,
         }
-
     elif git_error is not None:
         return {
             "success": True,

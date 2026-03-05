@@ -376,6 +376,28 @@ class TestSystemPromptSocratic:
             prompt = _get_system_prompt()
             assert "<book_framework>" not in prompt
 
+    def test_system_prompt_both_brains(self):
+        """When chat_brain_context is 'both', system prompt should include both documents."""
+        from unittest.mock import patch
+        import streamlit as _st
+        _st.session_state["chat_brain_context"] = "both"
+        _st.session_state["book_crosscheck_content"] = ""
+
+        def mock_read(brain="pitch"):
+            if brain == "pitch":
+                return "PITCH DOCUMENT CONTENT"
+            elif brain == "ops":
+                return "OPS DOCUMENT CONTENT"
+            return ""
+
+        with patch("services.document_updater.read_living_document", side_effect=mock_read):
+            prompt = _get_system_prompt()
+            assert "PITCH DOCUMENT CONTENT" in prompt
+            assert "OPS DOCUMENT CONTENT" in prompt
+
+        # Restore default
+        _st.session_state["chat_brain_context"] = "pitch"
+
 
 # ---------------------------------------------------------------------------
 # _is_hypothesis / _is_hypothesis_status_update in chat.py

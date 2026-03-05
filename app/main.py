@@ -87,6 +87,9 @@ def render_ingesting():
         placeholder="Paste your session summary here...",
         key="transcript_input",
     )
+    if transcript:
+        word_count = len(transcript.split())
+        st.caption(f"{word_count} words — aim for 200-2000 for best results")
 
     col1, col2 = st.columns(2)
     with col1:
@@ -217,7 +220,7 @@ def render_ingesting():
                         st.session_state.ingestion_topic_tags = topic_tags
 
                         if claims:
-                            st.success(f"Extracted {len(claims)} claim(s). Review and confirm below.")
+                            st.toast(f"Extracted {len(claims)} claim(s). Review below.")
                         else:
                             st.warning("No claims were extracted. You can add claims manually.")
 
@@ -251,6 +254,14 @@ def render_checking_consistency():
 
     st.header("Checking Consistency")
     render_step_indicator(3)
+
+    # Stuck-state escape — always render cancel before pipeline code that may throw
+    col_cancel, _ = st.columns([1, 3])
+    with col_cancel:
+        if st.button("Cancel", key="consistency_cancel_escape"):
+            reset_ingestion()
+            st.rerun()
+            return
 
     confirmed_claims = st.session_state.get("pending_claims", [])
     transcript = st.session_state.get("current_transcript", "")
@@ -290,7 +301,7 @@ def render_checking_consistency():
             # Step 2: Run consistency check (read-only — no writes)
             progress.update_step("Checking consistency (Pass 1 of 2)...", status="running")
             from services.consistency import run_consistency_check
-            consistency_results = run_consistency_check(confirmed_claims, session_type=session_type)
+            consistency_results = run_consistency_check(confirmed_claims, session_type=session_type, brain=st.session_state.get("active_brain", "pitch"))
             st.session_state.consistency_results = consistency_results
             writer.consistency_results = consistency_results
 
@@ -402,8 +413,6 @@ def render_checking_consistency():
             st.rerun()
         return
 
-    st.rerun()
-
 
 def render_done():
     """Success summary screen after ingestion completes. Runs batch commit on first render."""
@@ -418,7 +427,7 @@ def render_done():
     writer = st.session_state.get("deferred_writer")
     batch_committed = st.session_state.get("_batch_committed", False)
 
-    if writer is not None and not batch_committed:
+    if writer is not None and not batch_committed and not st.session_state.get("_batch_commit_failed"):
         with st.spinner("Committing all changes..."):
             commit_result = writer.batch_commit()
 
@@ -431,8 +440,14 @@ def render_done():
             st.session_state.pipeline_result = pipeline_result
             st.session_state.current_session_id = commit_result.get("session_id", "")
         else:
-            logging.error("Batch commit failed: %s", commit_result.get('message', ''))
-            st.error("Saving your session failed. Your checkpoint is preserved and will be offered for recovery on next load.")
+            logging.error("Batch commit failed: %s", commit_result.get("message", ""))
+            st.session_state._batch_commit_failed = True
+            st.error("Saving your session failed. Click below to retry.")
+
+    if st.session_state.get("_batch_commit_failed") and not st.session_state.get("_batch_committed"):
+        if st.button("Retry Save", type="primary", key="retry_batch_commit"):
+            st.session_state._batch_commit_failed = False
+            st.rerun()
 
     doc_updated = pipeline_result.get("document_updated", False)
     changes_applied = pipeline_result.get("changes_applied", 0)
@@ -506,6 +521,9 @@ def render_ops_ingesting():
             height=200,
             placeholder="Meeting notes, email thread, call notes...",
         )
+        if transcript:
+            word_count = len(transcript.split())
+            st.caption(f"{word_count} words — aim for 200-2000 for best results")
         col1, col2 = st.columns(2)
         with col1:
             session_type = st.selectbox(
@@ -559,6 +577,8 @@ def render_ops_ingesting():
             import logging
             logging.error(f"Ops extraction failed: {e}")
             st.error("Extraction failed. Please try again.")
+    elif submitted:
+        st.error("Please paste session notes before extracting.")
 
 
 def render_claim_editor_for_ops():
@@ -783,6 +803,11 @@ else:
         st.session_state.active_view = "dashboard" if active_view == "Dashboard" else "chat"
 
         if st.session_state.active_view == "dashboard":
+            # Show pending ingestion warning on dashboard too
+            if st.session_state.get("_has_pending_ingestion"):
+                writer = st.session_state.get("deferred_writer")
+                if writer is not None:
+                    st.warning("A previous ingestion was interrupted. Switch to Chat to resume or discard it.")
             render_dashboard()
         else:
             render_chat()

@@ -44,7 +44,10 @@ from services.ingestion_lock import (
     release_lock,
     check_lock,
     ensure_lock_document,
+    acquire_doc_lock,
+    release_doc_lock,
     LOCK_TIMEOUT_MINUTES,
+    DOC_LOCK_TIMEOUT_SECONDS,
 )
 
 
@@ -223,3 +226,100 @@ class TestEnsureLockDocument:
     def test_no_mongo_no_error(self, no_mongo):
         """ensure_lock_document does nothing when MongoDB is unavailable."""
         ensure_lock_document()  # Should not raise
+
+
+# ---------------------------------------------------------------------------
+# Document write lock tests (acquire_doc_lock / release_doc_lock)
+# ---------------------------------------------------------------------------
+
+class TestDocLock:
+
+    def test_acquire_doc_lock_no_mongo(self, no_mongo):
+        """When _get_lock_collection returns None, should return True."""
+        assert acquire_doc_lock() is True
+
+    def test_acquire_doc_lock_success(self, mock_collection):
+        """When find_one_and_update returns a doc, should return True."""
+        mock_collection.find_one_and_update.return_value = {
+            "_id": "doc_write_lock",
+            "locked": True,
+            "locked_at": datetime.now(timezone.utc),
+        }
+        assert acquire_doc_lock() is True
+
+    def test_acquire_doc_lock_timeout(self, mock_collection):
+        """When lock is held and never released, should return False after timeout."""
+        mock_collection.find_one_and_update.return_value = None
+        mock_collection.find_one.return_value = {
+            "_id": "doc_write_lock",
+            "locked": True,
+            "locked_at": datetime.now(timezone.utc),
+        }
+        # Use a very short timeout to avoid slow test
+        result = acquire_doc_lock(timeout_seconds=1)
+        assert result is False
+
+    def test_acquire_doc_lock_creates_when_missing(self, mock_collection):
+        """When lock doc doesn't exist, insert_one creates it and returns True."""
+        mock_collection.find_one_and_update.return_value = None
+        mock_collection.find_one.return_value = None
+        mock_collection.insert_one.return_value = MagicMock()
+        result = acquire_doc_lock()
+        assert result is True
+        mock_collection.insert_one.assert_called_once()
+
+    def test_acquire_doc_lock_stale_takeover(self, mock_collection):
+        """A stale doc lock (older than DOC_LOCK_TIMEOUT_SECONDS) can be taken over."""
+        stale_time = datetime.now(timezone.utc) - timedelta(seconds=DOC_LOCK_TIMEOUT_SECONDS + 60)
+        # find_one_and_update succeeds because $or includes stale check
+        mock_collection.find_one_and_update.return_value = {
+            "_id": "doc_write_lock",
+            "locked": True,
+            "locked_at": stale_time,
+        }
+        assert acquire_doc_lock() is True
+
+    def test_release_doc_lock_success(self, mock_collection):
+        """release_doc_lock calls update_one and should not raise."""
+        mock_collection.update_one.return_value = MagicMock(modified_count=1)
+        release_doc_lock()  # Should not raise
+        mock_collection.update_one.assert_called_once()
+
+    def test_release_doc_lock_no_mongo(self, no_mongo):
+        """When collection is None, release_doc_lock should not raise."""
+        release_doc_lock()  # Should not raise
+
+    def test_release_doc_lock_exception_swallowed(self, mock_collection):
+        """When update_one raises, release_doc_lock should swallow the exception."""
+        mock_collection.update_one.side_effect = Exception("MongoDB connection lost")
+        release_doc_lock()  # Should not raise
+
+
+# ---------------------------------------------------------------------------
+# Lock contention tests
+# ---------------------------------------------------------------------------
+
+class TestLockContention:
+
+    def test_insert_race_condition(self, mock_collection):
+        """When find_one_and_update returns None and find_one also returns None,
+        but insert_one raises (another process beat us), should return contention message."""
+        mock_collection.find_one_and_update.return_value = None
+        mock_collection.find_one.return_value = None
+        mock_collection.insert_one.side_effect = Exception("duplicate key")
+        result = acquire_lock(session_id="my-session")
+        assert result["acquired"] is False
+        assert "contention" in result["message"].lower()
+
+    def test_lock_held_by_other_session(self, mock_collection):
+        """When lock is held by another session, should return acquired=False with that session's ID."""
+        mock_collection.find_one_and_update.return_value = None
+        mock_collection.find_one.return_value = {
+            "_id": "ingestion_lock",
+            "locked": True,
+            "session_id": "other-session",
+            "locked_at": datetime.now(timezone.utc),
+        }
+        result = acquire_lock(session_id="my-session")
+        assert result["acquired"] is False
+        assert result["locked_by"] == "other-session"

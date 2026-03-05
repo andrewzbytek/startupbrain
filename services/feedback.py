@@ -7,6 +7,8 @@ import re
 from datetime import datetime, timezone
 from typing import Optional
 
+from services.claude_client import extract_xml_tag as _extract_tag
+
 
 def _safe_int(s: str) -> int:
     """Parse string to int, returning 0 for non-integer values."""
@@ -14,12 +16,6 @@ def _safe_int(s: str) -> int:
         return int(s) if s else 0
     except (ValueError, TypeError):
         return 0
-
-
-def _extract_tag(text: str, tag: str) -> str:
-    """Extract content of first XML tag from text."""
-    match = re.search(rf"<{tag}>(.*?)</{tag}>", text, re.DOTALL)
-    return match.group(1).strip() if match else ""
 
 
 def _get_feedback_tracker_section(brain: str = "pitch") -> str:

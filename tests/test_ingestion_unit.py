@@ -386,7 +386,7 @@ class TestRunIngestionPipeline:
             from services.ingestion import run_ingestion_pipeline
             result = run_ingestion_pipeline("transcript", claims, "session_123")
 
-            mock_consist.assert_called_once_with(claims, session_type="")
+            mock_consist.assert_called_once_with(claims, session_type="", brain="pitch")
             mock_update.assert_called_once()
             assert result["document_updated"] is True
             assert result["claims_stored"] == 1

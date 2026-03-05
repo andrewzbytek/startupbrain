@@ -12,7 +12,7 @@ from typing import Optional
 import streamlit as st
 
 try:
-    from pymongo import MongoClient, ASCENDING
+    from pymongo import MongoClient
     from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError
     PYMONGO_AVAILABLE = True
 except ImportError:
@@ -38,7 +38,7 @@ def get_mongo_client() -> Optional[object]:
     Tries st.secrets first, then os.environ fallback.
     """
     if not PYMONGO_AVAILABLE:
-        st.warning("pymongo not installed — MongoDB features disabled.")
+        logging.warning("pymongo not installed — MongoDB features disabled.")
         return None
 
     uri = None
@@ -48,7 +48,7 @@ def get_mongo_client() -> Optional[object]:
         uri = os.environ.get("MONGODB_URI")
 
     if not uri:
-        st.warning("MONGODB_URI not configured — MongoDB features disabled.")
+        logging.warning("MONGODB_URI not configured — MongoDB features disabled.")
         return None
 
     try:
@@ -57,14 +57,12 @@ def get_mongo_client() -> Optional[object]:
         client.admin.command("ping")
         return client
     except (ConnectionFailure, ServerSelectionTimeoutError) as e:
-        import logging
         logging.error("MongoDB connection failed: %s", e)
-        st.warning("MongoDB connection failed — MongoDB features disabled.")
+        logging.warning("MongoDB connection failed — MongoDB features disabled.")
         return None
     except Exception as e:
-        import logging
         logging.error("Unexpected MongoDB error: %s", e)
-        st.warning("MongoDB connection error — MongoDB features disabled.")
+        logging.warning("MongoDB connection error — MongoDB features disabled.")
         return None
 
 
@@ -100,13 +98,13 @@ def insert_one(collection_name: str, document: dict) -> Optional[str]:
         return str(result.inserted_id)
     except Exception as e:
         logging.error("MongoDB insert failed (%s): %s", collection_name, e)
-        st.warning("Database operation failed. Please try again.")
+        logging.warning("Database operation failed. Please try again.")
         return None
 
 
 def find_many(
     collection_name: str,
-    query: dict = None,
+    query: dict | None = None,
     sort_by: str = "created_at",
     sort_order: int = -1,
     limit: int = 100,
@@ -128,7 +126,7 @@ def find_many(
         return list(cursor)
     except Exception as e:
         logging.error("MongoDB find failed (%s): %s", collection_name, e)
-        st.warning("Database operation failed. Please try again.")
+        logging.warning("Database operation failed. Please try again.")
         return []
 
 
@@ -144,7 +142,7 @@ def find_one(collection_name: str, query: dict) -> Optional[dict]:
         return db[collection_name].find_one(query)
     except Exception as e:
         logging.error("MongoDB find_one failed (%s): %s", collection_name, e)
-        st.warning("Database operation failed. Please try again.")
+        logging.warning("Database operation failed. Please try again.")
         return None
 
 
@@ -173,7 +171,7 @@ def update_one(
         return True
     except Exception as e:
         logging.error("MongoDB update failed (%s): %s", collection_name, e)
-        st.warning("Database operation failed. Please try again.")
+        logging.warning("Database operation failed. Please try again.")
         return False
 
 
@@ -187,7 +185,7 @@ def delete_one(collection_name: str, query: dict) -> bool:
         return True
     except Exception as e:
         logging.error("MongoDB delete failed (%s): %s", collection_name, e)
-        st.warning("Database operation failed. Please try again.")
+        logging.warning("Database operation failed. Please try again.")
         return False
 
 
@@ -201,7 +199,7 @@ def delete_many(collection_name: str, query: dict) -> int:
         return result.deleted_count
     except Exception as e:
         logging.error("MongoDB delete_many failed (%s): %s", collection_name, e)
-        st.warning("Database operation failed. Please try again.")
+        logging.warning("Database operation failed. Please try again.")
         return 0
 
 
@@ -214,7 +212,7 @@ def get_latest_session() -> Optional[dict]:
         return db["sessions"].find_one(sort=[("created_at", -1)])
     except Exception as e:
         logging.error("MongoDB get_latest_session failed: %s", e)
-        st.warning("Database operation failed. Please try again.")
+        logging.warning("Database operation failed. Please try again.")
         return None
 
 
@@ -237,7 +235,7 @@ def insert_claim(claim_doc: dict, brain: str = "pitch") -> Optional[str]:
     return insert_one("claims", {**claim_doc, "brain": brain})
 
 
-def get_claims(session_id: str = None, limit: int = 200, brain: str = "") -> list:
+def get_claims(session_id: str | None = None, limit: int = 200, brain: str = "") -> list:
     """Retrieve claims, optionally filtered by session_id and/or brain."""
     query = {}
     if session_id:
@@ -257,7 +255,7 @@ def insert_feedback(feedback_doc: dict) -> Optional[str]:
     return insert_one("feedback", feedback_doc)
 
 
-def get_feedback(source_type: str = None, limit: int = 100) -> list:
+def get_feedback(source_type: str | None = None, limit: int = 100) -> list:
     """Retrieve feedback entries, optionally filtered by source_type."""
     query = {"source_type": source_type} if source_type else {}
     return find_many("feedback", query=query, sort_by="created_at", sort_order=-1, limit=limit)
@@ -273,7 +271,7 @@ def get_book_frameworks() -> list:
     return find_many("book_frameworks", sort_by="created_at", sort_order=1, limit=20)
 
 
-def upsert_living_document(content: str, metadata: dict = None, brain: str = "pitch") -> bool:
+def upsert_living_document(content: str, metadata: dict | None = None, brain: str = "pitch") -> bool:
     """
     Upsert the living document mirror in MongoDB.
     There is only ever one living document per brain.
@@ -325,15 +323,16 @@ def update_hypothesis_status(claim_text_fragment, new_status):
             {"$set": {"status": new_status, "updated_at": datetime.now(timezone.utc)}},
         )
         return result.modified_count > 0
-    except Exception:
+    except Exception as e:
+        logging.error("update_hypothesis_status failed: %s", e)
         return False
 
 
 def search_sessions(
-    session_type: str = None,
-    participant: str = None,
-    date_from: str = None,
-    date_to: str = None,
+    session_type: str | None = None,
+    participant: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
     limit: int = 20,
 ) -> list:
     """
@@ -387,7 +386,7 @@ def delete_pending_ingestion() -> bool:
     return delete_one("pending_ingestion", {"_id": "pending"})
 
 
-def count_documents(collection_name: str, query: dict = None) -> int:
+def count_documents(collection_name: str, query: dict | None = None) -> int:
     """Count documents in a collection. Returns 0 on failure."""
     db = get_db()
     if db is None:
@@ -409,7 +408,7 @@ def vector_search(
     path: str = "embedding",
     num_candidates: int = 50,
     limit: int = 5,
-    filter_query: dict = None,
+    filter_query: dict | None = None,
 ) -> list:
     """
     Run a MongoDB Atlas Vector Search query.
@@ -452,7 +451,7 @@ def vector_search(
         return list(db[collection_name].aggregate(pipeline))
     except Exception as e:
         logging.error("Vector search failed (%s): %s", collection_name, e)
-        st.warning("Database operation failed. Please try again.")
+        logging.warning("Database operation failed. Please try again.")
         return []
 
 
@@ -462,7 +461,7 @@ def vector_search_text(
     index_name: str,
     path: str = "claim_text_embedding",
     limit: int = 5,
-    filter_query: dict = None,
+    filter_query: dict | None = None,
 ) -> list:
     """
     Run MongoDB Atlas Vector Search with automated embedding (queryString).

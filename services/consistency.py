@@ -8,8 +8,6 @@ Pass 3 (Opus): Deep analysis — ONLY if Pass 2 found Critical contradictions
 """
 
 import re
-from typing import Optional
-
 import logging
 
 from services.claude_client import extract_xml_tag as _extract_tag
@@ -393,24 +391,48 @@ def pass3_deep_analysis(critical_items: list, living_doc: str, rag_evidence: lis
 def check_dismissed(contradictions: list, living_doc: str) -> list:
     """
     Filter contradictions that match entries in the Dismissed Contradictions section.
+    Splits the section into individual entries (by ### headers) and checks each one
+    separately, so a contradiction is only dismissed if 40%+ word overlap with a
+    single entry (not the combined vocabulary of all entries).
     Returns the filtered list (dismissed entries removed).
     """
     dismissed_section = ""
     match = re.search(r"## Dismissed Contradictions\n(.*?)(\n## |\Z)", living_doc, re.DOTALL)
     if match:
-        dismissed_section = match.group(1).lower()
+        dismissed_section = match.group(1).strip()
 
-    if not dismissed_section or dismissed_section.strip() in ("", "[no dismissed contradictions]"):
+    if not dismissed_section or dismissed_section.lower() in ("", "[no dismissed contradictions]"):
+        return contradictions
+
+    # Split dismissed section into individual entries by ### headers
+    entries = re.split(r'\n(?=### )', dismissed_section)
+    # Build word sets for each individual entry
+    entry_word_sets = []
+    for entry in entries:
+        entry = entry.strip()
+        if entry:
+            entry_words = set(re.findall(r'\b\w+\b', entry.lower()))
+            if entry_words:
+                entry_word_sets.append(entry_words)
+
+    if not entry_word_sets:
         return contradictions
 
     filtered = []
     for c in contradictions:
         claim_text = c.get("new_claim", "").lower()
-        # Simple heuristic: if key words from the claim appear in dismissed section
         words = [w for w in claim_text.split() if len(w) > 4]
-        dismissed_words = set(re.findall(r'\b\w+\b', dismissed_section))
-        match_count = sum(1 for w in words if w in dismissed_words)
-        if len(words) == 0 or match_count / len(words) < 0.4:
+        if len(words) == 0:
+            filtered.append(c)
+            continue
+        # Check against each individual entry — dismissed only if 40%+ overlap with ANY single entry
+        is_dismissed = False
+        for entry_words in entry_word_sets:
+            match_count = sum(1 for w in words if w in entry_words)
+            if match_count / len(words) >= 0.4:
+                is_dismissed = True
+                break
+        if not is_dismissed:
             filtered.append(c)
 
     return filtered
@@ -492,6 +514,16 @@ def run_consistency_check(claims: list, session_type: str = "", brain: str = "pi
 
     # Pass 2
     pass2 = pass2_severity_filter(pass1, living_doc, session_type=session_type)
+
+    if pass2.get("api_error"):
+        return {
+            "pass1": pass1,
+            "pass2": pass2,
+            "pass3": None,
+            "has_contradictions": False,
+            "has_critical": False,
+            "summary": "Consistency check failed — API error during severity filtering.",
+        }
 
     if pass2["total_retained"] == 0:
         return {

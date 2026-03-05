@@ -182,6 +182,7 @@ Sessions are categorized to calibrate how the system processes them:
 |------|-------------------|
 | Co-founder discussion | Claims may be exploratory; uncertain statements marked speculative |
 | Investor meeting | Feedback attributed to external source; higher contradiction weight |
+| Investor email/feedback | Feedback from investor correspondence |
 | Customer interview | Market claims are high-value; exact language preserved |
 | Advisor session | Strategic advice flagged as preference unless explicitly adopted |
 | Internal notes | Lighter pushback; may represent thinking-out-loud |
@@ -243,7 +244,7 @@ Two-tier MongoDB-based locking ensures multi-user safety:
 - Daily queries: ~$3-5/month (Sonnet)
 - Occasional Opus (deep analysis, pitch): ~$15-30/month
 - **Estimated total: $25-40/month**
-- Hard cap: $400/month, alert at $300
+- Budget alert at $300/month (forces Sonnet for all requests)
 
 ## Project Status
 
