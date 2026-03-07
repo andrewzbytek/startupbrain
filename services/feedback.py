@@ -279,7 +279,7 @@ def ingest_feedback(
 def generate_evolution_narrative(topic: str, brain: str = "pitch") -> dict:
     """
     Generate a narrative of how thinking on a topic has evolved.
-    Uses Sonnet with evolution.md prompt.
+    Uses Sonnet with evolution.md prompt. Pitch brain only.
 
     Args:
         topic: Topic name (e.g., "Pricing", "Target Market").
@@ -287,6 +287,14 @@ def generate_evolution_narrative(topic: str, brain: str = "pitch") -> dict:
     Returns:
         dict with: narrative, key_inflection_points, current_position_summary, raw
     """
+    if brain != "pitch":
+        return {
+            "narrative": "Topic evolution is only available for Pitch Brain.",
+            "key_inflection_points": [],
+            "current_position_summary": "",
+            "raw": "",
+        }
+
     from services.claude_client import call_sonnet, escape_xml, load_prompt
     from services.document_updater import read_living_document
 

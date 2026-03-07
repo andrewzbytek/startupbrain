@@ -353,7 +353,8 @@ def _get_system_prompt(query_type: str = "") -> str:
             doc = read_living_document(brain="ops")
         else:
             doc = read_living_document(brain="pitch")
-    except Exception:
+    except Exception as _doc_err:
+        logging.warning("Failed to read living document for system prompt: %s", _doc_err)
         doc = ""
 
     base = (
@@ -420,8 +421,8 @@ def _get_system_prompt(query_type: str = "") -> str:
                 for n in scratchpad
             )
             base += f"\n\n<scratchpad_notes>\nRecent scratchpad notes from the founder (not in the living document):\n{escape_xml(notes_text)}\n</scratchpad_notes>"
-    except Exception:
-        pass  # MongoDB unavailable — skip scratchpad
+    except Exception as _pad_err:
+        logging.warning("Scratchpad fetch failed: %s", _pad_err)
 
     # Append book framework if loaded for cross-check (skip for recall/historical to avoid inflating prompts)
     if query_type not in ("recall", "historical"):
@@ -517,26 +518,27 @@ def _apply_direct_correction(user_message: str) -> str:
             "confidence": "definite",
         }
 
-        # Run lightweight consistency check (informational only)
+        # Run lightweight consistency check (informational only) — pitch brain only
         info_note = ""
-        try:
-            results = run_consistency_check([claim], session_type="Direct correction", brain=brain)
-            if results.get("has_contradictions"):
-                contradictions = results.get("pass2", {}).get("retained", [])
-                if contradictions:
-                    notes = []
-                    for c in contradictions:
-                        notes.append(
-                            f"- **{c.get('severity', 'Notable')}**: "
-                            f"{c.get('evidence_summary', c.get('tension_description', ''))}"
+        if brain == "pitch":
+            try:
+                results = run_consistency_check([claim], session_type="Direct correction", brain=brain)
+                if results.get("has_contradictions"):
+                    contradictions = results.get("pass2", {}).get("retained", [])
+                    if contradictions:
+                        notes = []
+                        for c in contradictions:
+                            notes.append(
+                                f"- **{c.get('severity', 'Notable')}**: "
+                                f"{c.get('evidence_summary', c.get('tension_description', ''))}"
+                            )
+                        info_note = (
+                            "\n\nHeads up — this touches on some existing positions:\n"
+                            + "\n".join(notes)
+                            + "\n\nThe update has been applied as requested."
                         )
-                    info_note = (
-                        "\n\nHeads up — this touches on some existing positions:\n"
-                        + "\n".join(notes)
-                        + "\n\nThe update has been applied as requested."
-                    )
-        except Exception:
-            pass  # Consistency check failure should never block corrections
+            except Exception as _cc_err:
+                logging.warning("Informational consistency check skipped: %s", _cc_err)
 
         # Always apply the correction — route to the active brain
         result = update_document(
@@ -659,8 +661,11 @@ def _apply_hypothesis(user_message: str) -> str:
             doc = _add_hypothesis(doc, entry)
             # Mirror to MongoDB first (source of truth on Render's ephemeral FS)
             upsert_living_document(doc, metadata={"last_updated": date_str, "update_reason": "New hypothesis"}, brain="ops")
-            write_living_document(doc, brain="ops")
-            _git_commit(f"Add hypothesis: {hypothesis_text[:50]}", brain="ops")
+            try:
+                write_living_document(doc, brain="ops")
+                _git_commit(f"Add hypothesis: {hypothesis_text[:50]}", brain="ops")
+            except Exception as file_err:
+                logging.warning("Hypothesis file write failed (MongoDB succeeded): %s", file_err)
         finally:
             release_doc_lock(lock_id)
 
@@ -678,7 +683,8 @@ def _apply_hypothesis(user_message: str) -> str:
                 "test_plan": "",
             }, brain="ops")
             db_synced = result is not None
-        except Exception:
+        except Exception as _hyp_db_err:
+            logging.error("Hypothesis claim insert failed: %s", _hyp_db_err)
             db_synced = False
 
         confirmation = (
@@ -687,7 +693,7 @@ def _apply_hypothesis(user_message: str) -> str:
             f"or `invalidated: {hypothesis_text[:30]}...` in chat, or use the sidebar."
         )
         if not db_synced:
-            confirmation += " (note: database sync pending)"
+            confirmation += " (note: database sync failed — hypothesis is in the document but not searchable via chat history)"
         return confirmation
     except Exception as e:
         logging.error("Could not track hypothesis: %s", e)
@@ -726,8 +732,11 @@ def _apply_hypothesis_status_update(user_message: str) -> str:
 
             # Mirror to MongoDB first (source of truth on Render's ephemeral FS)
             upsert_living_document(updated_doc, metadata={"last_updated": date_str}, brain="ops")
-            write_living_document(updated_doc, brain="ops")
-            _git_commit(f"Hypothesis {new_status}: {fragment[:50]}", brain="ops")
+            try:
+                write_living_document(updated_doc, brain="ops")
+                _git_commit(f"Hypothesis {new_status}: {fragment[:50]}", brain="ops")
+            except Exception as file_err:
+                logging.warning("Hypothesis status file write failed (MongoDB succeeded): %s", file_err)
         finally:
             release_doc_lock(lock_id)
 
@@ -850,7 +859,7 @@ def render_chat():
     """Main chat UI. Called when mode='chat'."""
     from services.mongo_client import is_mongo_available
     if not is_mongo_available():
-        st.warning("MongoDB is unavailable. Running in degraded mode — chat works but ingestion and history are disabled.")
+        st.warning("Memory storage is currently unavailable. Chat still works, but session history and ingestion are disabled.")
 
     # Brain context selector
     brain_ctx = st.session_state.get("chat_brain_context", "pitch")
@@ -933,6 +942,8 @@ def render_chat():
         # Quick command chips — only when top-level brain is Ops (notes/hypotheses/contacts are Ops features)
         if st.session_state.get("active_brain", "pitch") == "ops":
             _render_quick_command_panel()
+        else:
+            st.caption("Switch to Ops Brain to log notes, hypotheses, and contacts.")
 
     # Book framework upload — outside frame, near the bottom
     with st.expander("Upload .md for cross-check", expanded=False):
@@ -1039,10 +1050,14 @@ def render_chat():
             st.rerun()
             return
 
-        # If user typed an ops prefix in pitch mode, show a helpful toast
+        # If user typed an ops prefix in pitch mode, block it early (don't waste API cost)
         if active_brain != "ops":
             if _is_quick_note(user_input) or _is_contact(user_input) or _is_hypothesis(user_input) or _is_hypothesis_status_update(user_input):
-                st.toast("Switch to Ops Brain to use note:/hypothesis:/contact: commands.")
+                with st.chat_message("assistant"):
+                    st.info("Quick commands like note: and hypothesis: work in Ops Brain. Switch the brain toggle at the top and try again.")
+                add_message("assistant", "Quick commands like note: and hypothesis: work in Ops Brain. Switch the brain toggle at the top and try again.")
+                st.rerun()
+                return
 
         # Handle direct corrections — apply immediately, zero pushback
         if _is_direct_correction(user_input):
@@ -1087,33 +1102,33 @@ def render_contradiction_resolution():
     contradiction = contradictions[idx]
     total = len(contradictions)
 
+    from app.components.progress import render_step_indicator
+    render_step_indicator(3)
+
     st.header(f"Contradiction {idx + 1} of {total}")
     st.progress((idx + 1) / total)
 
     severity = contradiction.get("severity", "Notable")
     severity_cls = "critical" if severity == "Critical" else "notable"
-    st.markdown(
-        f'<div class="severity-{severity_cls}">'
-        f'<strong>Severity: {html.escape(severity)}</strong></div>',
-        unsafe_allow_html=True,
-    )
-
-    # Show the tension
-    col1, col2 = st.columns(2)
-    with col1:
-        st.subheader("Current position")
-        section = contradiction.get("existing_section", "")
-        if section:
-            st.caption(f"Section: {section}")
-        st.write(_escape_latex(contradiction.get("existing_position", "_Not found_")))
-
-    with col2:
-        st.subheader("New claim")
-        st.write(_escape_latex(contradiction.get("new_claim", "_Not found_")))
-
+    existing_position = html.escape(contradiction.get("existing_position", "Not found"))
+    new_claim_display = html.escape(contradiction.get("new_claim", "Not found"))
     tension = contradiction.get("tension_description", "") or contradiction.get("evidence_summary", "")
+    section = contradiction.get("existing_section", "")
+
+    severity_html = (
+        f'<div class="severity-{severity_cls}">'
+        f'<strong>Severity: {html.escape(severity)}</strong>'
+    )
+    if section:
+        severity_html += f'<br><em>Section: {html.escape(section)}</em>'
+    severity_html += (
+        f'<br><br><strong>What the document says:</strong> {existing_position}'
+        f'<br><br><strong>What you just said:</strong> {new_claim_display}'
+    )
     if tension:
-        st.info(_escape_latex(f"**Why this matters:** {tension}"))
+        severity_html += f'<br><br><strong>Tension:</strong> {html.escape(tension)}'
+    severity_html += '</div>'
+    st.markdown(severity_html, unsafe_allow_html=True)
 
     # Check if this is a revisited rejection
     if contradiction.get("is_revisited_rejection"):
@@ -1129,7 +1144,7 @@ def render_contradiction_resolution():
             c_id = contradiction.get("id", "")
             for analysis in pass3["analyses"]:
                 if analysis.get("contradiction_id") == c_id:
-                    with st.expander("Deep Analysis (Opus)", expanded=True):
+                    with st.expander("Deep Analysis", expanded=True):
                         headline = analysis.get("headline", "")
                         if headline:
                             st.markdown(f"> {_escape_latex(headline)}")
@@ -1146,24 +1161,26 @@ def render_contradiction_resolution():
     col_update, col_keep, col_explain = st.columns(3)
 
     with col_update:
-        if st.button("Update to new", type="primary", use_container_width=True, key=f"resolve_update_{idx}"):
+        if st.button("Update to new", type="primary", use_container_width=True, key=f"resolve_update_{idx}",
+                      help="Overwrite the document with the new claim"):
             with st.spinner("Updating document..."):
-                _resolve_contradiction_deferred(contradiction, "update", new_claim_text, "")
-            _advance_contradiction()
-        st.caption("Replace the current position with the new claim")
+                success = _resolve_contradiction_deferred(contradiction, "update", new_claim_text, "")
+            if success:
+                _advance_contradiction()
 
     with col_keep:
-        if st.button("Keep current", use_container_width=True, key=f"resolve_keep_{idx}"):
+        if st.button("Keep current", use_container_width=True, key=f"resolve_keep_{idx}",
+                      help="Keep the document as-is, ignore the new claim"):
             with st.spinner("Logging decision..."):
-                _resolve_contradiction_deferred(contradiction, "keep", "", "")
-            _advance_contradiction()
-        st.caption("Dismiss the new claim and keep what we have")
+                success = _resolve_contradiction_deferred(contradiction, "keep", "", "")
+            if success:
+                _advance_contradiction()
 
     with col_explain:
-        if st.button("Let me explain", use_container_width=True, key=f"resolve_explain_{idx}"):
+        if st.button("Let me explain", use_container_width=True, key=f"resolve_explain_{idx}",
+                      help="Provide context before updating"):
             st.session_state[f"show_explain_{idx}"] = True
             st.rerun()
-        st.caption("Provide context before updating")
 
     # Explanation text input
     if st.session_state.get(f"show_explain_{idx}", False):
@@ -1176,23 +1193,37 @@ def render_contradiction_resolution():
         if st.button("Submit explanation", key=f"submit_explain_{idx}", type="primary"):
             if explanation.strip():
                 with st.spinner("Updating document with your explanation..."):
-                    _resolve_contradiction_deferred(contradiction, "explain", new_claim_text, explanation.strip())
-                _advance_contradiction()
+                    success = _resolve_contradiction_deferred(contradiction, "explain", new_claim_text, explanation.strip())
+                if success:
+                    _advance_contradiction()
             else:
                 st.error("Please enter an explanation before submitting.")
 
-    # Cancel button — escape hatch to abandon ingestion mid-resolution
+    # Cancel button — escape hatch to abandon ingestion mid-resolution (two-click confirmation)
     st.markdown("---")
-    if st.button("Cancel Ingestion", key=f"cancel_resolution_{idx}"):
-        writer = st.session_state.get("deferred_writer")
-        if writer is not None:
-            try:
-                writer.rollback()
-            except Exception as e:
-                logging.error("Rollback during cancel failed: %s", e)
-        from app.state import reset_ingestion
-        reset_ingestion()
-        st.rerun()
+    if st.session_state.get("_confirm_cancel_ingestion", False):
+        st.warning("This will discard all progress. Are you sure?")
+        confirm_col1, confirm_col2 = st.columns(2)
+        with confirm_col1:
+            if st.button("Yes, cancel everything", key=f"confirm_cancel_{idx}", type="primary"):
+                st.session_state._confirm_cancel_ingestion = False
+                writer = st.session_state.get("deferred_writer")
+                if writer is not None:
+                    try:
+                        writer.rollback()
+                    except Exception as e:
+                        logging.error("Rollback during cancel failed: %s", e)
+                from app.state import reset_ingestion
+                reset_ingestion()
+                st.rerun()
+        with confirm_col2:
+            if st.button("No, continue", key=f"cancel_cancel_{idx}"):
+                st.session_state._confirm_cancel_ingestion = False
+                st.rerun()
+    else:
+        if st.button("Cancel Ingestion", key=f"cancel_resolution_{idx}"):
+            st.session_state._confirm_cancel_ingestion = True
+            st.rerun()
 
 
 def _resolve_contradiction_deferred(contradiction: dict, action: str, new_claim: str, explanation: str):
@@ -1204,7 +1235,7 @@ def _resolve_contradiction_deferred(contradiction: dict, action: str, new_claim:
     if writer is None:
         logging.warning("No deferred_writer in session state — falling back to immediate contradiction resolution.")
         _resolve_contradiction(contradiction, action, new_claim, explanation)
-        return
+        return True
 
     try:
         from datetime import datetime, timezone
@@ -1222,7 +1253,11 @@ def _resolve_contradiction_deferred(contradiction: dict, action: str, new_claim:
                 f"Tension was: {tension}"
             )
             reason = f"Contradiction resolved — updated {section} ({date_str})"
-            writer.apply_document_update_deferred(new_info, update_reason=reason)
+            doc_result = writer.apply_document_update_deferred(new_info, update_reason=reason)
+            if not doc_result.get("success"):
+                logging.error("Deferred resolution update failed: %s", doc_result.get("message"))
+                st.warning(f"Could not apply resolution: {doc_result.get('message', 'unknown error')}. Please try again.")
+                return False
 
             decision_entry = (
                 f"### {date_str} — Resolved: {section}\n"
@@ -1250,7 +1285,11 @@ def _resolve_contradiction_deferred(contradiction: dict, action: str, new_claim:
                 f"Tension was: {tension}"
             )
             reason = f"Contradiction resolved with explanation — {section} ({date_str})"
-            writer.apply_document_update_deferred(new_info, update_reason=reason)
+            doc_result = writer.apply_document_update_deferred(new_info, update_reason=reason)
+            if not doc_result.get("success"):
+                logging.error("Deferred resolution explain failed: %s", doc_result.get("message"))
+                st.warning(f"Could not apply resolution: {doc_result.get('message', 'unknown error')}. Please try again.")
+                return False
 
             decision_entry = (
                 f"### {date_str} — Resolved: {section}\n"
@@ -1264,10 +1303,12 @@ def _resolve_contradiction_deferred(contradiction: dict, action: str, new_claim:
 
         writer.record_contradiction_resolution(idx, action, new_claim, explanation)
         writer.save_checkpoint()
+        return True
 
     except Exception as e:
         logging.error("Deferred resolution failed: %s", e)
         st.warning("Could not apply resolution. Please try again.")
+        return False
 
 
 def _resolve_contradiction(contradiction: dict, action: str, new_claim: str, explanation: str):

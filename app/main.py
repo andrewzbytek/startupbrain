@@ -43,15 +43,15 @@ init_session_state()
 try:
     from services.ingestion_lock import ensure_lock_document
     ensure_lock_document()
-except Exception:
-    pass  # MongoDB unavailable — locks degrade to single-user mode
+except Exception as _lock_err:
+    logging.warning("Lock document init failed: %s", _lock_err)
 
 # --- Ensure doc_write_lock document exists ---
 try:
     from services.ingestion_lock import ensure_doc_write_lock
     ensure_doc_write_lock()
-except Exception:
-    pass
+except Exception as _doc_lock_err:
+    logging.warning("Doc write lock init failed: %s", _doc_lock_err)
 
 # --- Crash recovery: check for pending ingestion checkpoint ---
 if not st.session_state.get("_has_pending_ingestion") and st.session_state.get("deferred_writer") is None:
@@ -271,10 +271,13 @@ def render_checking_consistency():
         st.header("Checking Consistency")
         render_step_indicator(3)
         st.error("Ingestion pipeline failed. You can retry or cancel.")
+        if st.session_state.get("_consistency_fail_msg"):
+            st.caption("If the issue persists, contact your developer.")
         col_retry, col_cancel_err = st.columns(2)
         with col_retry:
             if st.button("Retry", type="primary", key="retry_after_error"):
                 st.session_state._consistency_failed = False
+                st.session_state._consistency_fail_msg = None
                 st.rerun()
         with col_cancel_err:
             if st.button("Cancel", key="cancel_after_error"):
@@ -330,6 +333,7 @@ def render_checking_consistency():
 
             # Step 2: Run consistency check (read-only — no writes)
             progress.update_step("Checking consistency (Pass 1 of 2)...", status="running")
+            st.info("Running 2-3 consistency passes. This may take 30-60 seconds — please leave the tab open.")
             from services.consistency import run_consistency_check
             consistency_results = run_consistency_check(confirmed_claims, session_type=session_type, brain=st.session_state.get("active_brain", "pitch"))
             st.session_state.consistency_results = consistency_results
@@ -379,7 +383,9 @@ def render_checking_consistency():
                     status="complete",
                 )
             else:
-                progress.update_step(f"Document update failed: {doc_result.get('message', '')}", status="error")
+                logging.error("Document update failed: %s", doc_result.get('message', ''))
+                progress.update_step("Document update failed — check server logs.", status="error")
+                raise RuntimeError(f"Document update failed: {doc_result.get('message', 'unknown error')}")
 
             # Step 4: Checkpoint to MongoDB
             writer.stage = "awaiting_resolution" if has_contradictions else "ready_to_commit"
@@ -416,8 +422,8 @@ def render_checking_consistency():
                     if relevant_hyps:
                         hyp_list = "\n".join(f"- {h[:80]}" for h in relevant_hyps[:3])
                         st.info(f"These claims may relate to active hypotheses:\n{hyp_list}")
-            except Exception:
-                pass  # Hypothesis check is a nudge, never blocking
+            except Exception as _hyp_err:
+                logging.warning("Hypothesis relevance check failed: %s", _hyp_err)
 
             # Mark as checked BEFORE setting mode — prevents re-run on rerun
             st.session_state._consistency_checked = True
@@ -438,6 +444,7 @@ def render_checking_consistency():
     except Exception as e:
         logging.error("Ingestion pipeline failed: %s", e)
         st.session_state._consistency_failed = True
+        st.session_state._consistency_fail_msg = str(e)
         st.rerun()
         return
 
@@ -471,6 +478,8 @@ def render_done():
             logging.error("Batch commit failed: %s", commit_result.get("message", ""))
             st.session_state._batch_commit_failed = True
             st.error("Saving your session failed. Click below to retry.")
+            if st.session_state.get("pipeline_result", {}).get("document_updated"):
+                st.info("Your living document was already updated successfully. Only the session record failed to save.")
 
     if st.session_state.get("_batch_commit_failed") and not st.session_state.get("_batch_committed"):
         if st.button("Retry Save", type="primary", key="retry_batch_commit"):
@@ -505,8 +514,16 @@ def render_done():
         has_contradictions = consistency_results.get("has_contradictions", False) if consistency_results else False
         st.metric("Contradictions", "Resolved" if has_contradictions else "None")
 
+    # Show which sections were changed, if available
+    doc_result_sections = pipeline_result.get("sections_changed") or pipeline_result.get("updated_sections")
+    if doc_result_sections:
+        st.caption(f"Sections changed: {', '.join(doc_result_sections)}")
+    elif doc_updated:
+        st.caption("Check the Dashboard to see what changed.")
+
     if session_id:
-        st.caption(f"Session ID: {session_id}")
+        with st.expander("Debug info", expanded=False):
+            st.caption(f"Session reference: {session_id}")
 
     summary = consistency_results.get("summary", "") if consistency_results else ""
     if summary:
@@ -549,9 +566,6 @@ def render_ops_ingesting():
             height=200,
             placeholder="Meeting notes, email thread, call notes...",
         )
-        if transcript:
-            word_count = len(transcript.split())
-            st.caption(f"{word_count} words — aim for 200-2000 for best results")
         col1, col2 = st.columns(2)
         with col1:
             session_type = st.selectbox(
@@ -590,7 +604,8 @@ def render_ops_ingesting():
                     prompt_name="ops_extraction",
                 )
 
-            st.session_state.pending_claims = result.get("claims", [])
+            claims = result.get("claims", [])
+            st.session_state.pending_claims = claims
             st.session_state.current_transcript = transcript
             st.session_state.ingestion_session_summary = result.get("session_summary", "")
             st.session_state.ingestion_topic_tags = result.get("topic_tags", [])
@@ -598,9 +613,12 @@ def render_ops_ingesting():
             st.session_state.ingestion_session_date = str(session_date)
             st.session_state.ingestion_participants = participants
 
-            from app.state import set_mode
-            set_mode("ops_confirming")
-            st.rerun()
+            if claims:
+                from app.state import set_mode
+                set_mode("ops_confirming")
+                st.rerun()
+            else:
+                st.warning("No items were extracted. Try rephrasing your notes or adding more detail.")
         except Exception as e:
             import logging
             logging.error(f"Ops extraction failed: {e}")
@@ -687,28 +705,35 @@ def render_ops_done():
             st.session_state._ops_committed = True
             st.session_state._ops_result = result
         except Exception as e:
-            import logging
-            logging.error(f"Ops ingestion failed: {e}")
+            logging.error("Ops ingestion failed: %s", e)
             st.session_state._ops_commit_failed = True
+            st.session_state._ops_commit_fail_msg = str(e)
             st.session_state._ops_result = {"success": False, "message": "Storage failed. Please try again."}
 
     if st.session_state.get("_ops_commit_failed") and not st.session_state.get("_ops_committed"):
         st.error("Saving ops items failed. Click below to retry.")
+        if st.session_state.get("_ops_commit_fail_msg"):
+            st.caption("If the issue persists, contact your developer.")
         if st.button("Retry Save", type="primary", key="retry_ops_commit"):
             st.session_state._ops_commit_failed = False
+            st.session_state._ops_commit_fail_msg = None
             st.rerun()
 
     result = st.session_state.get("_ops_result", {})
 
-    if result.get("success"):
-        st.success(f"Ops Brain updated: {result.get('claims_stored', 0)} items stored.")
-    else:
-        logging.warning("Ops partial result: %s", result.get('message'))
-        st.warning("Ops Brain update partially completed. Some items may not have been stored.")
+    if not st.session_state.get("_ops_commit_failed"):
+        if result.get("success"):
+            st.success(f"Ops Brain updated: {result.get('claims_stored', 0)} items stored.")
+        elif result.get("claims_stored", 0) > 0:
+            logging.warning("Ops partial result: %s", result.get('message'))
+            st.warning("Some items may not have saved to Ops Brain. Check your dashboard to see what was stored.")
+        else:
+            logging.warning("Ops failed result: %s", result.get('message'))
+            st.error("Ops Brain update failed. Please try ingesting again.")
 
-    st.markdown(f"**Items stored:** {result.get('claims_stored', 0)}")
-    if result.get("document_updated"):
-        st.markdown(f"**Document changes:** {result.get('changes_applied', 0)}")
+        st.markdown(f"**Items stored:** {result.get('claims_stored', 0)}")
+        if result.get("document_updated"):
+            st.markdown(f"**Document changes:** {result.get('changes_applied', 0)}")
 
     if st.button("Done — Back to Chat", type="primary"):
         from app.state import reset_ingestion
@@ -763,8 +788,8 @@ else:
                 _current_doc = read_living_document(brain=writer.brain)
                 if _current_doc and writer.original_doc and _current_doc != writer.original_doc:
                     _doc_drifted = True
-            except Exception:
-                pass
+            except Exception as _drift_err:
+                logging.warning("Doc drift check failed: %s", _drift_err)
 
             if is_own_checkpoint:
                 st.warning("A previous ingestion was interrupted before completing.")
@@ -776,9 +801,15 @@ else:
                     "Resuming may overwrite recent changes. Consider discarding instead."
                 )
 
+            _STAGE_LABELS = {
+                "consistency_check": "Running consistency check",
+                "awaiting_resolution": "Resolving contradictions",
+                "ready_to_commit": "Ready to save",
+                "committed": "Saved",
+            }
             col_info1, col_info2, col_info3 = st.columns(3)
             with col_info1:
-                st.metric("Stage", writer.stage)
+                st.metric("Stage", _STAGE_LABELS.get(writer.stage, "In progress"))
             with col_info2:
                 st.metric("Claims", len(writer.confirmed_claims))
             with col_info3:

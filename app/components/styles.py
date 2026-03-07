@@ -360,11 +360,6 @@ div[data-testid="stHorizontalBlock"] .stRadio > div > label > div:first-child {
     font-family: var(--font-display);
 }
 
-.pill-badge-red {
-    background-color: rgba(248, 81, 73, 0.12);
-    color: var(--accent-red);
-}
-
 .pill-badge-yellow {
     background-color: rgba(210, 153, 34, 0.12);
     color: var(--accent-yellow);
@@ -389,11 +384,6 @@ div[data-testid="stHorizontalBlock"] .stRadio > div > label > div:first-child {
 .hypothesis-unvalidated {
     background-color: rgba(210, 153, 34, 0.12);
     color: var(--accent-yellow);
-}
-
-.hypothesis-testing {
-    background-color: rgba(88, 166, 255, 0.12);
-    color: var(--accent-blue);
 }
 
 .hypothesis-validated {

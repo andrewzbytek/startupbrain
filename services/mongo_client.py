@@ -410,7 +410,8 @@ def count_documents(collection_name: str, query: dict | None = None) -> int:
         return 0
     try:
         return db[collection_name].count_documents(query or {})
-    except Exception:
+    except Exception as e:
+        logging.error("MongoDB count failed (%s): %s", collection_name, e)
         return 0
 
 

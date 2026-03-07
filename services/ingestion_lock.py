@@ -275,8 +275,8 @@ def acquire_doc_lock(timeout_seconds: int = 30) -> Optional[str]:
                     return lock_id
                 except Exception:
                     pass  # Another process just created it — retry
-        except Exception:
-            pass  # Transient MongoDB error — retry
+        except Exception as _e:
+            logging.debug("acquire_doc_lock transient error (will retry): %s", _e)
 
         time.sleep(1)
 

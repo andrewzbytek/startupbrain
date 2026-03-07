@@ -3,6 +3,7 @@ Persistent top bar for Startup Brain.
 Renders app title, action buttons, and status pills across all views.
 """
 
+import datetime
 import streamlit as st
 
 from app.state import set_mode
@@ -45,6 +46,7 @@ def render_top_bar():
             label_visibility="collapsed",
             key="brain_toggle",
             disabled=in_pipeline,
+            help="Brain cannot be switched during ingestion. Cancel first." if in_pipeline else None,
         )
         new_brain = selected.lower()
         # Only process brain switch if not in pipeline
@@ -58,6 +60,8 @@ def render_top_bar():
             st.session_state.evolution_result = None
             st.session_state.pop("_context_export_data", None)
             st.session_state.pop("_ops_context_export_data", None)
+            st.session_state.conversation_history = []
+            st.toast(f"Switched to {new_brain.capitalize()} Brain. Chat history cleared.")
             st.rerun()
 
     # col_spacer intentionally left empty
@@ -83,12 +87,18 @@ def render_top_bar():
             ingest_disabled = mode != "chat" or ingestion_locked
             brain_label = st.session_state.get("active_brain", "pitch").capitalize()
             ingest_label = "Ingestion in progress..." if ingestion_locked else f"Ingest → {brain_label}"
+            _ingest_help = None
+            if mode != "chat":
+                _ingest_help = "Ingestion is already in progress. Complete or cancel the current session first."
+            elif ingestion_locked:
+                _ingest_help = "Another ingestion is in progress. Please wait for it to complete."
             if st.button(
                 ingest_label,
                 type="primary",
                 disabled=ingest_disabled,
                 use_container_width=True,
                 key="top_bar_ingest",
+                help=_ingest_help,
             ):
                 if st.session_state.get("active_brain", "pitch") == "ops":
                     set_mode("ops_ingesting")
@@ -97,11 +107,13 @@ def render_top_bar():
                 st.rerun()
 
         with btn_col2:
+            audit_disabled = mode != "chat" or st.session_state.get("active_brain", "pitch") == "ops"
             if st.button(
                 "Run Audit",
-                disabled=mode != "chat" or st.session_state.get("active_brain", "pitch") == "ops",
+                disabled=audit_disabled,
                 use_container_width=True,
                 key="top_bar_audit",
+                help="Audit is available for Pitch Brain only. Switch to Pitch to run an audit." if audit_disabled else None,
             ):
                 try:
                     from services.consistency import run_audit
@@ -142,9 +154,10 @@ def render_top_bar():
                 pill_color = "#D29922"
             else:
                 pill_color = "#F85149"
+            month_abbr = datetime.datetime.now().strftime('%b')
             cost_html = (
                 f'<span class="status-pill" style="background:rgba({_hex_to_rgb(pill_color)},0.12);'
-                f'color:{pill_color};">${cost:.0f} / ${budget}</span>'
+                f'color:{pill_color};">${cost:.0f} / ${budget} ({month_abbr})</span>'
             )
         else:
             cost_html = (
@@ -169,16 +182,17 @@ def render_top_bar():
             threshold = health.get("threshold", 200)
             needs_upgrade = health.get("needs_upgrade", False)
             rag_color = "#F85149" if needs_upgrade else "#3FB950"
+            rag_title = ' title="Approaching memory limit. Contact your developer to upgrade storage."' if needs_upgrade else ''
             rag_html = (
                 f'<span class="status-pill" style="background:rgba({_hex_to_rgb(rag_color)},0.12);'
-                f'color:{rag_color};margin-left:0.4rem;">'
-                f'RAG: {claim_count}/{threshold}</span>'
+                f'color:{rag_color};margin-left:0.4rem;"{rag_title}>'
+                f'Memory: {claim_count}/{threshold}</span>'
             )
         else:
             rag_html = (
                 '<span class="status-pill" style="background:rgba(139,148,158,0.12);'
                 'color:#8B949E;margin-left:0.4rem;">'
-                'RAG: N/A</span>'
+                'Memory: N/A</span>'
             )
 
         # Store cache if we just fetched fresh data

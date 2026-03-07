@@ -49,10 +49,10 @@ class IngestionProgress:
             label = f"Claims extracted (found {n_claims} claims)"
 
         icon = {
-            "running": "...",
-            "complete": "✓",
-            "error": "✗",
-        }.get(status, "...")
+            "running": "\u231b",
+            "complete": "\u2713",
+            "error": "\u2717",
+        }.get(status, "\u231b")
 
         self._completed_steps.append(f"{icon} {label}")
         # Rewrite all steps so far
@@ -112,9 +112,9 @@ def show_simple_progress(steps: list, current_step: int) -> None:
     lines = []
     for i, step in enumerate(steps):
         if i < current_step:
-            lines.append(f"✓ {step}")
+            lines.append(f"\u2713 {step}")
         elif i == current_step:
-            lines.append(f"... {step}")
+            lines.append(f"\u231b {step}")
         else:
             lines.append(f"  {step}")
     st.code("\n".join(lines), language=None)

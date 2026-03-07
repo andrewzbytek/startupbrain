@@ -76,7 +76,7 @@ startupbrain/
 │   ├── bootstrap.py            # Vector search index bootstrap
 │   └── migrate_brain_split.py  # One-time MongoDB migration for brain split
 ├── render.yaml                 # Render Blueprint deployment config
-├── tests/                      # 1011 unit tests, 45 integration tests
+├── tests/                      # 1014 unit tests, 45 integration tests
 │   ├── conftest.py             # Shared fixtures and sample data
 │   ├── test_transcripts/       # Sample transcripts for testing
 │   └── test_*.py               # 29 test modules (one per service/component)
@@ -201,7 +201,7 @@ python -m pytest tests/ -m integration
 python -m pytest tests/ -v --tb=short -m "not integration"
 ```
 
-1011 unit tests + 45 integration tests across 29 test files. All service and component tests run fully offline with mocks.
+1014 unit tests + 45 integration tests across 29 test files. All service and component tests run fully offline with mocks.
 
 ## Deployment
 
@@ -270,6 +270,8 @@ All 24 sections of the spec are implemented plus the two-brain architecture exte
 - Consistency engine properly filters dismissed contradictions (including short-word claims)
 - Consistency engine detects API errors and surfaces "check failed" instead of silently producing "no contradictions"
 - Brain isolation hardened: `active_brain` (write target) vs `chat_brain_context` (read scope) correctly separated across all write/read paths; 26 cross-brain data integrity bugs fixed via targeted review
+- UX hardened (Pass 4b — 42 findings fixed): contradiction resolution guards against silent skip on write failure; brain switch clears chat history to prevent cross-brain context contamination; quick command prefixes intercepted before LLM in wrong brain; cancel button requires two-click confirmation; empty dashboard states show guidance; error messages sanitized and actionable; status pills human-readable (RAG→Memory, cost shows month); crash recovery shows readable stage names; dead CSS removed; login centering fixed; service-layer logging gaps filled
+- Pipeline robustness (Pass 5 — 28 findings fixed): pipeline flow gating (doc update failure stops pipeline, contradiction resolution checks write success, ops warns on zero claims); retry idempotency (`batch_commit` tracks committed session ID, skips re-insert on retry); developer jargon removed from all user-facing strings (raw enums, model names, exception text, MongoDB tier names); disabled widgets get help tooltips; direct correction consistency check skipped for Ops Brain (saves 2 Sonnet calls); evolution narrative pitch-only guarded; 8 silent `except: pass` blocks now log errors
 
 **Deliberate deviations from spec:**
 - **Vector search**: Code is in place but Atlas free tier (M0) doesn't support Voyage AI autoEmbed. System uses time-based retrieval with a health monitor that alerts at 200 claims when upgrading to M10+ becomes worthwhile.

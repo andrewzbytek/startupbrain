@@ -4,6 +4,7 @@ Renders operational sections: Contacts, Hypotheses, Assumptions, Risks,
 Open Questions, Feedback, Hiring Plans, Scratchpad Notes.
 """
 
+import html as _html
 import re
 import streamlit as st
 
@@ -36,13 +37,21 @@ def render_ops_dashboard():
         st.markdown("### Contacts / Prospects")
         contacts = _parse_contacts(doc)
         if contacts:
+            # NOTE: Colors must stay in sync with CSS variables in styles.py
+            _STATUS_COLORS = {
+                "identified": ("rgba(210,153,34,0.12)", "#D29922"),
+                "in-conversation": ("rgba(88,166,255,0.12)", "#58A6FF"),
+                "engaged": ("rgba(63,185,80,0.12)", "#3FB950"),
+            }
             for c in contacts:
-                status_color = {"identified": "#D29922", "in-conversation": "#58A6FF", "engaged": "#3FB950"}.get(
-                    c.get("status", ""), "#8B949E"
+                bg, fg = _STATUS_COLORS.get(c.get("status", ""), ("rgba(139,148,158,0.12)", "#8B949E"))
+                status_badge = (
+                    f'<span style="background:{bg};color:{fg};padding:2px 8px;'
+                    f'border-radius:999px;font-size:0.8em;">{_html.escape(c.get("status", ""))}</span>'
                 )
                 st.markdown(
-                    f'<span style="color:{status_color};font-weight:600;">{_escape_latex(c["name"])}</span> '
-                    f'({_escape_latex(c.get("org", ""))}) — {c.get("status", "")}',
+                    f'**{_escape_latex(c["name"])}** ({_escape_latex(c.get("org", ""))}) '
+                    f'{status_badge}',
                     unsafe_allow_html=True,
                 )
                 st.caption(f'{c.get("role", "")} | {c.get("context", "")[:80]}')
@@ -122,6 +131,7 @@ def render_ops_dashboard():
                                 release_doc_lock(lock_id)
 
     # --- Middle row: Assumptions, Risks, Open Questions ---
+    # TODO: 3-column layout breaks on mobile — consider single-column with expanders
     col3, col4, col5 = st.columns(3)
 
     with col3:
@@ -163,6 +173,7 @@ def render_ops_dashboard():
         st.markdown("### Hiring Plans")
         _render_section_content(sections.get("Hiring Plans", ""))
 
+        st.divider()
         st.markdown("### Scratchpad Notes")
         _render_section_content(sections.get("Scratchpad Notes", ""))
 

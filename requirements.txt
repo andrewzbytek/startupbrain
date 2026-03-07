@@ -1,3 +1,5 @@
+# IMPORTANT: Range-pinned for flexibility. Pin to exact versions (==) for reproducible deploys.
+# Run `pip freeze` on a working environment and pin critical deps before production.
 streamlit>=1.31.0,<2.0.0
 pymongo[srv]>=4.6.0,<5.0.0
 anthropic>=0.40.0,<1.0.0

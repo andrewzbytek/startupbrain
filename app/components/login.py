@@ -123,38 +123,34 @@ def is_authenticated() -> bool:
 
 def render_login_page():
     """Render the login form. Call only when is_authenticated() returns False."""
-    st.markdown(
-        "<div style='max-width:400px;margin:4rem auto;'>",
-        unsafe_allow_html=True,
-    )
-    st.markdown("## Startup Brain")
-    st.markdown("Sign in to continue.")
+    _, center_col, _ = st.columns([1, 2, 1])
+    with center_col:
+        st.markdown("## Startup Brain")
+        st.markdown("Sign in to continue.")
 
-    with st.form("login_form"):
-        username = st.text_input("Username")
-        password = st.text_input("Password", type="password")
-        submitted = st.form_submit_button("Sign in", type="primary", use_container_width=True)
+        with st.form("login_form"):
+            username = st.text_input("Username")
+            password = st.text_input("Password", type="password")
+            submitted = st.form_submit_button("Sign in", type="primary", use_container_width=True)
 
-    if submitted:
-        expected_user, expected_pass = _get_credentials()
-        if (
-            expected_user
-            and expected_pass
-            and hmac.compare_digest(username, expected_user)
-            and hmac.compare_digest(password, expected_pass)
-        ):
-            # Set session state
-            st.session_state._authenticated = True
-            # Set cookie
-            try:
-                from streamlit_cookies_controller import CookieController
-                cookies = CookieController()
-                token = _create_token(username)
-                cookies.set(_COOKIE_NAME, token, max_age=_COOKIE_MAX_AGE_SECONDS)
-            except Exception:
-                pass  # Cookie storage failed — session-only auth
-            st.rerun()
-        else:
-            st.error("Invalid username or password.")
-
-    st.markdown("</div>", unsafe_allow_html=True)
+        if submitted:
+            expected_user, expected_pass = _get_credentials()
+            if (
+                expected_user
+                and expected_pass
+                and hmac.compare_digest(username, expected_user)
+                and hmac.compare_digest(password, expected_pass)
+            ):
+                # Set session state
+                st.session_state._authenticated = True
+                # Set cookie
+                try:
+                    from streamlit_cookies_controller import CookieController
+                    cookies = CookieController()
+                    token = _create_token(username)
+                    cookies.set(_COOKIE_NAME, token, max_age=_COOKIE_MAX_AGE_SECONDS)
+                except Exception:
+                    pass  # Cookie storage failed — session-only auth
+                st.rerun()
+            else:
+                st.error("Invalid username or password.")

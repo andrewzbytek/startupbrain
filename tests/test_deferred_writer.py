@@ -341,12 +341,28 @@ class TestBatchCommit:
 
         mock_delete.assert_called_once()
 
-    def test_deletes_checkpoint_on_failure(self):
-        """Checkpoint is always deleted on failure to prevent stuck recovery prompts."""
+    def test_preserves_checkpoint_on_failure_when_doc_changed(self):
+        """Checkpoint is preserved on failure when doc was changed, enabling retry."""
         writer = _make_writer()
         writer.in_memory_doc = "changed"
 
         with patch("services.document_updater.write_living_document", side_effect=IOError("disk full")), \
+             patch("services.mongo_client.delete_pending_ingestion") as mock_delete, \
+             patch("services.mongo_client.upsert_pending_ingestion") as mock_save_cp, \
+             patch("services.ingestion_lock.acquire_doc_lock", return_value="lock-123"), \
+             patch("services.ingestion_lock.release_doc_lock"):
+            result = writer.batch_commit()
+
+        assert result["success"] is False
+        mock_delete.assert_not_called()
+        mock_save_cp.assert_called_once()  # checkpoint saved for retry
+
+    def test_deletes_checkpoint_on_failure_when_doc_unchanged(self):
+        """Checkpoint is deleted on failure when doc was NOT changed (no retry needed)."""
+        writer = _make_writer()
+        # in_memory_doc == original_doc, so doc_changed is False
+
+        with patch("services.ingestion.store_session", side_effect=IOError("db error")), \
              patch("services.mongo_client.delete_pending_ingestion") as mock_delete, \
              patch("services.ingestion_lock.acquire_doc_lock", return_value="lock-123"), \
              patch("services.ingestion_lock.release_doc_lock"):

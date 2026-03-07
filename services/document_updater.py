@@ -582,9 +582,11 @@ def _git_commit(message: str, brain: str = "pitch") -> bool:
             capture_output=True,
         )
         return True
-    except subprocess.CalledProcessError:
+    except subprocess.CalledProcessError as e:
+        logging.warning("_git_commit CalledProcessError (%s): %s", brain, e)
         return False
-    except Exception:
+    except Exception as e:
+        logging.warning("_git_commit failed (%s): %s", brain, e)
         return False
 
 

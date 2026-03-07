@@ -4,6 +4,7 @@ Replaces the sidebar with a dedicated dashboard tab.
 """
 
 import html
+import logging
 
 import streamlit as st
 
@@ -18,6 +19,8 @@ from app.components._parsers import (
     _read_living_document,
 )
 
+# NOTE: Colors must stay in sync with CSS variables in styles.py
+# --accent-red: #F85149, --accent-blue: #58A6FF, --accent-yellow: #D29922, --accent-green: #3FB950, --text-tertiary: #8B949E
 _CONTACT_STATUS_COLORS = {
     "identified": ("rgba(88,166,255,0.12)", "#58A6FF"),
     "in-conversation": ("rgba(210,153,34,0.12)", "#D29922"),
@@ -42,6 +45,10 @@ def render_dashboard():
     else:
         doc = st.session_state.sidebar_data.get("doc", "")
 
+    if not doc:
+        st.info("Your Pitch Brain is empty. Ingest a session from the top bar to get started.")
+        return
+
     # --- Refresh button ---
     _, refresh_col = st.columns([0.88, 0.12])
     with refresh_col:
@@ -64,7 +71,7 @@ def render_dashboard():
                     pos = section["current_position"]
                     has_content = pos and pos != "[Not yet defined]"
                     dot = "\U0001f7e2" if has_content else "\u26aa"
-                    with st.expander(f"{dot} {section['name']}", expanded=False):
+                    with st.expander(f"{dot} {section['name']}", expanded=not has_content):
                         st.markdown(_escape_latex(pos) if has_content else "_Not yet defined_")
     else:
         st.caption("No current state defined yet.")
@@ -103,7 +110,7 @@ def render_dashboard():
                         bg, fg = _CONTACT_STATUS_COLORS.get(c["status"], ("rgba(139,148,158,0.12)", "#8B949E"))
                         status_badge = (
                             f'<span style="background:{bg};color:{fg};padding:2px 8px;'
-                            f'border-radius:4px;font-size:0.8em;">{html.escape(c["status"])}</span>'
+                            f'border-radius:999px;font-size:0.8em;">{html.escape(c["status"])}</span>'
                         )
                         st.markdown(f"**{html.escape(c['name'])}** ({html.escape(c['org'])})", unsafe_allow_html=True)
                         st.markdown(status_badge + f" &nbsp; {html.escape(c['role'])}", unsafe_allow_html=True)
@@ -147,8 +154,8 @@ def render_dashboard():
                                 unsafe_allow_html=True,
                             )
                         fallback_shown = True
-                except Exception:
-                    pass
+                except Exception as _theme_err:
+                    logging.warning("Feedback theme fetch failed: %s", _theme_err)
 
                 if not fallback_shown:
                     doc_themes = _parse_feedback_themes(doc)
@@ -210,6 +217,9 @@ def render_dashboard():
                         import logging
                         logging.error(f"Export failed: {e}")
                         st.error("Export failed. Please try again.")
+
+            if st.session_state.get("_context_export_data"):
+                st.text_area("Copy export", value=st.session_state["_context_export_data"], height=200, disabled=False, label_visibility="collapsed")
 
             export_data = st.session_state.get("_context_export_data")
             if export_data:

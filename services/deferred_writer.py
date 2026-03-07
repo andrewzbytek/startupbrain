@@ -151,6 +151,9 @@ class DeferredWriter:
         date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         doc_changed = self.in_memory_doc != self.original_doc
 
+        session_id = getattr(self, '_committed_session_id', None)
+        claims_stored = 0
+
         try:
             # 1. Write file (only if changed) — acquire doc lock to prevent clobbering
             if doc_changed:
@@ -208,17 +211,19 @@ class DeferredWriter:
                 finally:
                     release_doc_lock(lock_id)
 
-            # 4. Store session
-            session_id = store_session(
-                self.transcript,
-                metadata=self.metadata,
-                session_summary=self.session_summary,
-                topic_tags=self.topic_tags,
-                brain=self.brain,
-            )
-
+            # 4. Store session (skip if already stored from a previous attempt)
             if not session_id:
-                logging.error("batch_commit: store_session returned None — session not persisted")
+                session_id = store_session(
+                    self.transcript,
+                    metadata=self.metadata,
+                    session_summary=self.session_summary,
+                    topic_tags=self.topic_tags,
+                    brain=self.brain,
+                )
+                if session_id:
+                    self._committed_session_id = session_id
+                else:
+                    logging.error("batch_commit: store_session returned None — session not persisted")
 
             # 5. Store claims
             claims_stored = 0
@@ -246,18 +251,28 @@ class DeferredWriter:
         except Exception as e:
             logging.error("batch_commit failed: %s", e)
             # Clean up orphaned session if claims storage failed
-            if 'session_id' in dir() and session_id and ('claims_stored' not in dir() or claims_stored == 0):
+            if session_id and claims_stored == 0:
                 try:
                     from services.mongo_client import delete_one
                     delete_one("sessions", {"_id": session_id})
+                    self._committed_session_id = None
                     logging.info("Cleaned up orphaned session %s after batch_commit failure", session_id)
                 except Exception as cleanup_err:
                     logging.warning("Could not clean up orphaned session %s: %s", session_id, cleanup_err)
-            # Always delete checkpoint to prevent stuck recovery prompts
-            try:
-                delete_pending_ingestion()
-            except Exception as cp_err:
-                logging.warning("Could not delete checkpoint in batch_commit failure path: %s", cp_err)
+            # Preserve checkpoint for retry — only delete if doc was already committed
+            if doc_changed:
+                # Doc write succeeded, only session/claims failed — save checkpoint
+                # so retry can skip the doc write and just re-store session/claims
+                try:
+                    self.stage = "ready_to_commit"
+                    self.save_checkpoint()
+                except Exception as cp_err:
+                    logging.warning("Could not save checkpoint for retry: %s", cp_err)
+            else:
+                try:
+                    delete_pending_ingestion()
+                except Exception as cp_err:
+                    logging.warning("Could not delete checkpoint in batch_commit failure path: %s", cp_err)
             return {
                 "success": False,
                 "message": f"Batch commit failed: {e}",
@@ -416,7 +431,7 @@ def rollback_last_session() -> dict:
                 check=True,
             )
             prev_content = show_result.stdout
-    except subprocess.CalledProcessError as e:
+    except (subprocess.CalledProcessError, FileNotFoundError, OSError) as e:
         git_error = e  # Git unavailable — will still delete MongoDB data
 
     # 3. Acquire doc lock BEFORE MongoDB deletes to ensure atomicity

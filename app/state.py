@@ -77,6 +77,7 @@ def init_session_state():
         "_ops_committed": False,
         "_ops_commit_failed": False,
         "_ops_result": {},
+        "_confirm_cancel_ingestion": False,
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -161,3 +162,4 @@ def reset_ingestion():
 
     # Clear pending quick command to prevent stale fire after cancel
     st.session_state.pop("_quick_cmd_pending", None)
+    st.session_state._confirm_cancel_ingestion = False
