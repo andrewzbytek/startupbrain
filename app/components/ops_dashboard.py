@@ -81,7 +81,8 @@ def render_ops_dashboard():
                         from services.mongo_client import upsert_living_document
                         from services.ingestion_lock import acquire_doc_lock, release_doc_lock
 
-                        if not acquire_doc_lock():
+                        lock_id = acquire_doc_lock()
+                        if not lock_id:
                             st.session_state[lock_failed_key] = True
                             st.rerun()
                         else:
@@ -93,12 +94,13 @@ def render_ops_dashboard():
                                 )
                                 current = read_living_document(brain="ops")
                                 updated = _add_hypothesis(current, entry)
-                                write_living_document(updated, brain="ops")
+                                # Mirror to MongoDB first (source of truth on Render's ephemeral FS)
                                 upsert_living_document(updated, metadata={"last_updated": datetime.now(timezone.utc).strftime("%Y-%m-%d"), "update_reason": "New hypothesis"}, brain="ops")
+                                write_living_document(updated, brain="ops")
                                 _git_commit(f"Add ops hypothesis: {hyp_text[:50]}", brain="ops")
                                 # Also insert into claims collection for query parity with chat path
                                 from services.mongo_client import insert_claim
-                                insert_claim({
+                                claim_result = insert_claim({
                                     "claim_text": hyp_text,
                                     "claim_type": "hypothesis",
                                     "confidence": "low",
@@ -108,13 +110,16 @@ def render_ops_dashboard():
                                     "status": "unvalidated",
                                     "test_plan": hyp_test or "",
                                 }, brain="ops")
+                                if not claim_result:
+                                    import logging as _log
+                                    _log.warning("Hypothesis claim insert returned None — document updated but claims not synced")
                                 st.rerun()
                             except Exception as e:
                                 import logging
                                 logging.error(f"Ops hypothesis add failed: {e}")
                                 st.error("Could not add hypothesis. Please try again.")
                             finally:
-                                release_doc_lock()
+                                release_doc_lock(lock_id)
 
     # --- Middle row: Assumptions, Risks, Open Questions ---
     col3, col4, col5 = st.columns(3)

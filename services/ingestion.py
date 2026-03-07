@@ -150,7 +150,9 @@ def process_whiteboard(image_bytes: bytes, transcript_context: str = "", session
         "confirmation_message": confirmation_message,
         "raw_output": raw,
     }
-    insert_whiteboard_extraction(doc)
+    wb_result = insert_whiteboard_extraction(doc)
+    if not wb_result:
+        logging.warning("insert_whiteboard_extraction returned None — whiteboard not persisted to MongoDB")
 
     return {
         "extraction_confidence": extraction_confidence,

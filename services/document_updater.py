@@ -575,7 +575,8 @@ def update_document(new_info: str, update_reason: str = "", max_retries: int = 2
     from services.mongo_client import upsert_living_document
     from services.ingestion_lock import acquire_doc_lock, release_doc_lock
 
-    if not acquire_doc_lock(timeout_seconds=60):
+    lock_id = acquire_doc_lock(timeout_seconds=60)
+    if not lock_id:
         return {"success": False, "message": "Could not acquire document lock — another update is in progress.", "changes_applied": 0}
 
     try:
@@ -637,4 +638,4 @@ def update_document(new_info: str, update_reason: str = "", max_retries: int = 2
             "changes_applied": len(diff_blocks),
         }
     finally:
-        release_doc_lock()
+        release_doc_lock(lock_id)

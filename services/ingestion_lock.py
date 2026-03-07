@@ -140,7 +140,9 @@ def release_lock(session_id: Optional[str] = None) -> bool:
             {"$set": {"locked": False, "session_id": None}},
         )
         return result.modified_count > 0
-    except Exception:
+    except Exception as e:
+        logging.error("release_lock failed — ingestion lock may remain held for up to %d min: %s",
+                      LOCK_TIMEOUT_MINUTES, e)
         return False
 
 
@@ -193,8 +195,23 @@ def ensure_lock_document():
             {"$setOnInsert": {"locked": False, "locked_at": None, "session_id": None}},
             upsert=True,
         )
-    except Exception:
-        pass
+    except Exception as e:
+        logging.warning("ensure_lock_document failed — first-use race condition possible: %s", e)
+
+
+def ensure_doc_write_lock():
+    """Create the doc_write_lock document if it doesn't exist. Called once at startup."""
+    collection = _get_lock_collection()
+    if collection is None:
+        return
+    try:
+        collection.update_one(
+            {"_id": "doc_write_lock"},
+            {"$setOnInsert": {"locked": False, "locked_at": None, "session_id": None}},
+            upsert=True,
+        )
+    except Exception as e:
+        logging.warning("ensure_doc_write_lock failed — first-use race condition possible: %s", e)
 
 
 # ---------------------------------------------------------------------------
@@ -205,16 +222,22 @@ def ensure_lock_document():
 DOC_LOCK_TIMEOUT_SECONDS = 120  # 2 minutes — LLM diff+verify can take ~60s
 
 
-def acquire_doc_lock(timeout_seconds: int = 30) -> bool:
+def acquire_doc_lock(timeout_seconds: int = 30) -> Optional[str]:
     """
     Acquire a short-lived lock on the living document.
-    Blocks (polls) up to timeout_seconds. Returns True if acquired.
+    Blocks (polls) up to timeout_seconds.
+
+    Returns:
+        A lock_id string (truthy) if acquired, None (falsy) if not.
+        Pass the returned lock_id to release_doc_lock() to release.
     """
     import time
 
+    lock_id = str(uuid.uuid4())
+
     collection = _get_lock_collection()
     if collection is None:
-        return True  # No MongoDB — allow write
+        return lock_id  # No MongoDB — allow write
 
     deadline = time.time() + timeout_seconds
 
@@ -231,13 +254,13 @@ def acquire_doc_lock(timeout_seconds: int = 30) -> bool:
                         {"locked_at": {"$lt": stale_threshold}},
                     ],
                 },
-                {"$set": {"locked": True, "locked_at": now}},
+                {"$set": {"locked": True, "locked_at": now, "session_id": lock_id}},
                 upsert=False,
                 return_document=ReturnDocument.AFTER,
             )
 
             if result is not None:
-                return True
+                return lock_id
 
             # Lock document may not exist yet
             existing = collection.find_one({"_id": "doc_write_lock"})
@@ -247,8 +270,9 @@ def acquire_doc_lock(timeout_seconds: int = 30) -> bool:
                         "_id": "doc_write_lock",
                         "locked": True,
                         "locked_at": now,
+                        "session_id": lock_id,
                     })
-                    return True
+                    return lock_id
                 except Exception:
                     pass  # Another process just created it — retry
         except Exception:
@@ -256,18 +280,21 @@ def acquire_doc_lock(timeout_seconds: int = 30) -> bool:
 
         time.sleep(1)
 
-    return False
+    return None
 
 
-def release_doc_lock() -> None:
-    """Release the document write lock."""
+def release_doc_lock(lock_id: Optional[str] = None) -> None:
+    """Release the document write lock, verifying ownership if lock_id provided."""
     collection = _get_lock_collection()
     if collection is None:
         return
     try:
+        query = {"_id": "doc_write_lock"}
+        if lock_id:
+            query["session_id"] = lock_id
         collection.update_one(
-            {"_id": "doc_write_lock"},
-            {"$set": {"locked": False}},
+            query,
+            {"$set": {"locked": False, "session_id": None}},
         )
     except Exception as e:
         logging.error("release_doc_lock failed — lock may remain held for up to %ds: %s",

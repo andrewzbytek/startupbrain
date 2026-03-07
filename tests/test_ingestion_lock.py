@@ -235,20 +235,23 @@ class TestEnsureLockDocument:
 class TestDocLock:
 
     def test_acquire_doc_lock_no_mongo(self, no_mongo):
-        """When _get_lock_collection returns None, should return True."""
-        assert acquire_doc_lock() is True
+        """When _get_lock_collection returns None, should return a truthy lock_id."""
+        result = acquire_doc_lock()
+        assert result  # truthy string
 
     def test_acquire_doc_lock_success(self, mock_collection):
-        """When find_one_and_update returns a doc, should return True."""
+        """When find_one_and_update returns a doc, should return a truthy lock_id."""
         mock_collection.find_one_and_update.return_value = {
             "_id": "doc_write_lock",
             "locked": True,
             "locked_at": datetime.now(timezone.utc),
         }
-        assert acquire_doc_lock() is True
+        result = acquire_doc_lock()
+        assert result  # truthy string
+        assert isinstance(result, str)
 
     def test_acquire_doc_lock_timeout(self, mock_collection):
-        """When lock is held and never released, should return False after timeout."""
+        """When lock is held and never released, should return None after timeout."""
         mock_collection.find_one_and_update.return_value = None
         mock_collection.find_one.return_value = {
             "_id": "doc_write_lock",
@@ -257,15 +260,15 @@ class TestDocLock:
         }
         # Use a very short timeout to avoid slow test
         result = acquire_doc_lock(timeout_seconds=1)
-        assert result is False
+        assert result is None
 
     def test_acquire_doc_lock_creates_when_missing(self, mock_collection):
-        """When lock doc doesn't exist, insert_one creates it and returns True."""
+        """When lock doc doesn't exist, insert_one creates it and returns lock_id."""
         mock_collection.find_one_and_update.return_value = None
         mock_collection.find_one.return_value = None
         mock_collection.insert_one.return_value = MagicMock()
         result = acquire_doc_lock()
-        assert result is True
+        assert result  # truthy string
         mock_collection.insert_one.assert_called_once()
 
     def test_acquire_doc_lock_stale_takeover(self, mock_collection):
@@ -277,13 +280,34 @@ class TestDocLock:
             "locked": True,
             "locked_at": stale_time,
         }
-        assert acquire_doc_lock() is True
+        result = acquire_doc_lock()
+        assert result  # truthy string
 
-    def test_release_doc_lock_success(self, mock_collection):
-        """release_doc_lock calls update_one and should not raise."""
+    def test_acquire_doc_lock_stores_session_id(self, mock_collection):
+        """acquire_doc_lock should store session_id in the lock document."""
+        mock_collection.find_one_and_update.return_value = {
+            "_id": "doc_write_lock",
+            "locked": True,
+        }
+        lock_id = acquire_doc_lock()
+        assert lock_id
+        # Verify session_id was included in the $set
+        call_args = mock_collection.find_one_and_update.call_args
+        assert call_args[0][1]["$set"]["session_id"] == lock_id
+
+    def test_release_doc_lock_with_ownership(self, mock_collection):
+        """release_doc_lock with lock_id should filter by session_id."""
         mock_collection.update_one.return_value = MagicMock(modified_count=1)
-        release_doc_lock()  # Should not raise
-        mock_collection.update_one.assert_called_once()
+        release_doc_lock(lock_id="my-lock-id")
+        call_args = mock_collection.update_one.call_args
+        assert call_args[0][0]["session_id"] == "my-lock-id"
+
+    def test_release_doc_lock_without_ownership(self, mock_collection):
+        """release_doc_lock without lock_id should not filter by session_id (backward compat)."""
+        mock_collection.update_one.return_value = MagicMock(modified_count=1)
+        release_doc_lock()
+        call_args = mock_collection.update_one.call_args
+        assert "session_id" not in call_args[0][0]
 
     def test_release_doc_lock_no_mongo(self, no_mongo):
         """When collection is None, release_doc_lock should not raise."""

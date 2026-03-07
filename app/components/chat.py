@@ -603,7 +603,7 @@ def _apply_contact(contact_text: str) -> str:
         )
 
         try:
-            insert_claim({
+            claim_result = insert_claim({
                 "claim_text": contact_text,
                 "claim_type": "claim",
                 "confidence": "definite",
@@ -611,8 +611,10 @@ def _apply_contact(contact_text: str) -> str:
                 "who_said_it": "Founder",
                 "confirmed": True,
             }, brain="ops")
-        except Exception:
-            pass
+            if not claim_result:
+                logging.warning("Contact claim insert returned None — document updated but claims not synced")
+        except Exception as e:
+            logging.error("Contact claim insert failed: %s", e)
 
         if result.get("success"):
             return f"Contact noted — {result.get('message', '')}"
@@ -641,7 +643,8 @@ def _apply_hypothesis(user_message: str) -> str:
         if not hypothesis_text:
             return "Please provide a hypothesis after the 'hypothesis:' prefix."
 
-        if not acquire_doc_lock(timeout_seconds=30):
+        lock_id = acquire_doc_lock(timeout_seconds=30)
+        if not lock_id:
             return "Could not update document — another update is in progress. Please try again."
 
         date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -654,11 +657,12 @@ def _apply_hypothesis(user_message: str) -> str:
         try:
             doc = read_living_document(brain="ops")
             doc = _add_hypothesis(doc, entry)
-            write_living_document(doc, brain="ops")
+            # Mirror to MongoDB first (source of truth on Render's ephemeral FS)
             upsert_living_document(doc, metadata={"last_updated": date_str, "update_reason": "New hypothesis"}, brain="ops")
+            write_living_document(doc, brain="ops")
             _git_commit(f"Add hypothesis: {hypothesis_text[:50]}", brain="ops")
         finally:
-            release_doc_lock()
+            release_doc_lock(lock_id)
 
         # Store in MongoDB as a hypothesis claim
         db_synced = False
@@ -711,7 +715,8 @@ def _apply_hypothesis_status_update(user_message: str) -> str:
 
         # Update living document (hypotheses live in ops brain)
         from services.ingestion_lock import acquire_doc_lock, release_doc_lock
-        if not acquire_doc_lock():
+        lock_id = acquire_doc_lock()
+        if not lock_id:
             return "Document is being updated by another process. Try again shortly."
         try:
             doc = read_living_document(brain="ops")
@@ -719,17 +724,18 @@ def _apply_hypothesis_status_update(user_message: str) -> str:
             if updated_doc == doc:
                 return f"Could not find a hypothesis matching: **{fragment}**. Check the sidebar for exact text."
 
-            write_living_document(updated_doc, brain="ops")
+            # Mirror to MongoDB first (source of truth on Render's ephemeral FS)
             upsert_living_document(updated_doc, metadata={"last_updated": date_str}, brain="ops")
+            write_living_document(updated_doc, brain="ops")
             _git_commit(f"Hypothesis {new_status}: {fragment[:50]}", brain="ops")
         finally:
-            release_doc_lock()
+            release_doc_lock(lock_id)
 
         # Update MongoDB
         try:
             update_hypothesis_status(fragment, new_status)
-        except Exception:
-            pass
+        except Exception as e:
+            logging.error("Failed to sync hypothesis status to MongoDB: %s", e)
 
         return f"Hypothesis updated to **{new_status}**: {fragment}"
     except Exception as e:
@@ -1300,7 +1306,8 @@ def _resolve_contradiction(contradiction: dict, action: str, new_claim: str, exp
             update_document(new_info, update_reason=reason, brain=brain)
 
             # Separate lock scope for the Decision Log entry
-            if not acquire_doc_lock(timeout_seconds=60):
+            lock_id = acquire_doc_lock(timeout_seconds=60)
+            if not lock_id:
                 st.warning("Document updated but could not add Decision Log entry — lock busy.")
                 return
             try:
@@ -1314,15 +1321,17 @@ def _resolve_contradiction(contradiction: dict, action: str, new_claim: str, exp
                     f"**Participants:** {participants}"
                 )
                 doc = _add_decision(doc, decision_entry, brain=brain)
-                write_living_document(doc, brain=brain)
+                # Mirror to MongoDB first (source of truth on Render's ephemeral FS)
                 upsert_living_document(doc, metadata={"last_updated": date_str, "update_reason": reason}, brain=brain)
+                write_living_document(doc, brain=brain)
                 _git_commit(f"Decision log: {reason}", brain=brain)
             finally:
-                release_doc_lock()
+                release_doc_lock(lock_id)
 
         elif action == "keep":
             # No content update — just add a Dismissed Contradiction entry
-            if not acquire_doc_lock(timeout_seconds=60):
+            lock_id = acquire_doc_lock(timeout_seconds=60)
+            if not lock_id:
                 st.warning("Document is being updated by another process. Try again shortly.")
                 return
             try:
@@ -1333,11 +1342,12 @@ def _resolve_contradiction(contradiction: dict, action: str, new_claim: str, exp
                     f"  Section: {section}"
                 )
                 doc = _add_dismissed(doc, dismissed_entry, brain=brain)
-                write_living_document(doc, brain=brain)
+                # Mirror to MongoDB first (source of truth on Render's ephemeral FS)
                 upsert_living_document(doc, metadata={"last_updated": date_str}, brain=brain)
+                write_living_document(doc, brain=brain)
                 _git_commit(f"Dismissed contradiction in {section} ({date_str})", brain=brain)
             finally:
-                release_doc_lock()
+                release_doc_lock(lock_id)
 
         else:  # explain
             new_info = (
@@ -1351,7 +1361,8 @@ def _resolve_contradiction(contradiction: dict, action: str, new_claim: str, exp
             update_document(new_info, update_reason=reason, brain=brain)
 
             # Separate lock scope for the Decision Log entry
-            if not acquire_doc_lock(timeout_seconds=60):
+            lock_id = acquire_doc_lock(timeout_seconds=60)
+            if not lock_id:
                 st.warning("Document updated but could not add Decision Log entry — lock busy.")
                 return
             try:
@@ -1365,11 +1376,12 @@ def _resolve_contradiction(contradiction: dict, action: str, new_claim: str, exp
                     f"**Participants:** {participants}"
                 )
                 doc = _add_decision(doc, decision_entry, brain=brain)
-                write_living_document(doc, brain=brain)
+                # Mirror to MongoDB first (source of truth on Render's ephemeral FS)
                 upsert_living_document(doc, metadata={"last_updated": date_str, "update_reason": reason}, brain=brain)
+                write_living_document(doc, brain=brain)
                 _git_commit(f"Decision log: {reason}", brain=brain)
             finally:
-                release_doc_lock()
+                release_doc_lock(lock_id)
 
     except Exception as e:
         logging.error("Contradiction resolution failed: %s", e)

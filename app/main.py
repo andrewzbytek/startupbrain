@@ -48,14 +48,8 @@ except Exception:
 
 # --- Ensure doc_write_lock document exists ---
 try:
-    from services.ingestion_lock import _get_lock_collection
-    _lock_coll = _get_lock_collection()
-    if _lock_coll is not None:
-        _lock_coll.update_one(
-            {"_id": "doc_write_lock"},
-            {"$setOnInsert": {"locked": False, "locked_at": None}},
-            upsert=True,
-        )
+    from services.ingestion_lock import ensure_doc_write_lock
+    ensure_doc_write_lock()
 except Exception:
     pass
 

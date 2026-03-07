@@ -251,7 +251,7 @@ class TestUpdateDocumentUnit:
         living_doc_path.write_text("", encoding="utf-8")
 
         with patch.dict("services.document_updater._BRAIN_DOC_PATHS", {"pitch": living_doc_path}), \
-             patch("services.ingestion_lock.acquire_doc_lock", return_value=True), \
+             patch("services.ingestion_lock.acquire_doc_lock", return_value="lock-123"), \
              patch("services.ingestion_lock.release_doc_lock"), \
              patch("services.mongo_client.get_living_document", return_value=None):
             from services.document_updater import update_document

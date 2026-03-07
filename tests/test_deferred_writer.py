@@ -268,7 +268,7 @@ class TestBatchCommit:
              patch("services.mongo_client.delete_pending_ingestion"), \
              patch("services.ingestion.store_session", return_value="sess123"), \
              patch("services.ingestion.store_confirmed_claims", return_value=["c1"]), \
-             patch("services.ingestion_lock.acquire_doc_lock", return_value=True), \
+             patch("services.ingestion_lock.acquire_doc_lock", return_value="lock-123"), \
              patch("services.ingestion_lock.release_doc_lock"):
             result = writer.batch_commit()
 
@@ -302,7 +302,7 @@ class TestBatchCommit:
              patch("services.mongo_client.delete_pending_ingestion"), \
              patch("services.ingestion.store_session", return_value="s1"), \
              patch("services.ingestion.store_confirmed_claims", return_value=[]), \
-             patch("services.ingestion_lock.acquire_doc_lock", return_value=True), \
+             patch("services.ingestion_lock.acquire_doc_lock", return_value="lock-123"), \
              patch("services.ingestion_lock.release_doc_lock"):
             writer.batch_commit()
 
@@ -318,7 +318,7 @@ class TestBatchCommit:
              patch("services.mongo_client.delete_pending_ingestion"), \
              patch("services.ingestion.store_session", return_value="sess1") as mock_store_session, \
              patch("services.ingestion.store_confirmed_claims", return_value=["c1", "c2"]) as mock_store_claims, \
-             patch("services.ingestion_lock.acquire_doc_lock", return_value=True), \
+             patch("services.ingestion_lock.acquire_doc_lock", return_value="lock-123"), \
              patch("services.ingestion_lock.release_doc_lock"):
             result = writer.batch_commit()
 
@@ -335,31 +335,32 @@ class TestBatchCommit:
              patch("services.mongo_client.delete_pending_ingestion") as mock_delete, \
              patch("services.ingestion.store_session", return_value="s1"), \
              patch("services.ingestion.store_confirmed_claims", return_value=[]), \
-             patch("services.ingestion_lock.acquire_doc_lock", return_value=True), \
+             patch("services.ingestion_lock.acquire_doc_lock", return_value="lock-123"), \
              patch("services.ingestion_lock.release_doc_lock"):
             writer.batch_commit()
 
         mock_delete.assert_called_once()
 
-    def test_preserves_checkpoint_on_failure(self):
+    def test_deletes_checkpoint_on_failure(self):
+        """Checkpoint is always deleted on failure to prevent stuck recovery prompts."""
         writer = _make_writer()
         writer.in_memory_doc = "changed"
 
         with patch("services.document_updater.write_living_document", side_effect=IOError("disk full")), \
              patch("services.mongo_client.delete_pending_ingestion") as mock_delete, \
-             patch("services.ingestion_lock.acquire_doc_lock", return_value=True), \
+             patch("services.ingestion_lock.acquire_doc_lock", return_value="lock-123"), \
              patch("services.ingestion_lock.release_doc_lock"):
             result = writer.batch_commit()
 
         assert result["success"] is False
-        mock_delete.assert_not_called()
+        mock_delete.assert_called_once()
 
     def test_batch_commit_doc_lock_failure(self):
         """batch_commit should handle doc lock failure gracefully."""
         writer = _make_writer()
         writer.in_memory_doc = "changed content"
 
-        with patch("services.ingestion_lock.acquire_doc_lock", return_value=False), \
+        with patch("services.ingestion_lock.acquire_doc_lock", return_value=None), \
              patch("services.document_updater.write_living_document") as mock_write, \
              patch("services.mongo_client.delete_pending_ingestion") as mock_delete:
             result = writer.batch_commit()
@@ -584,7 +585,7 @@ class TestRollbackLastSession:
              patch("services.document_updater.write_living_document") as mock_write, \
              patch("services.mongo_client.upsert_living_document") as mock_upsert, \
              patch("services.document_updater._git_commit", return_value=True), \
-             patch("services.ingestion_lock.acquire_doc_lock", return_value=True), \
+             patch("services.ingestion_lock.acquire_doc_lock", return_value="lock-123"), \
              patch("services.ingestion_lock.release_doc_lock"):
             from services.deferred_writer import rollback_last_session
             result = rollback_last_session()

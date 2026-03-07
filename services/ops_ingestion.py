@@ -3,6 +3,7 @@ Simplified ingestion pipeline for Ops Brain.
 No consistency check, no DeferredWriter — direct document update.
 """
 
+import logging
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -60,6 +61,9 @@ def run_ops_ingestion(
         topic_tags=topic_tags,
         brain=brain,
     )
+
+    if not session_id:
+        logging.error("run_ops_ingestion: store_session returned None — session not persisted")
 
     # Store claims
     claims_stored = 0

@@ -154,7 +154,8 @@ class DeferredWriter:
         try:
             # 1. Write file (only if changed) — acquire doc lock to prevent clobbering
             if doc_changed:
-                if not acquire_doc_lock(timeout_seconds=60):
+                lock_id = acquire_doc_lock(timeout_seconds=60)
+                if not lock_id:
                     # Still store session + claims even if doc can't be updated
                     session_id_result = None
                     claims_stored_count = 0
@@ -205,7 +206,7 @@ class DeferredWriter:
                     commit_msg = f"Update {brain_label}: {self._build_update_reason()} ({date_str})"
                     _git_commit(commit_msg, brain=self.brain)
                 finally:
-                    release_doc_lock()
+                    release_doc_lock(lock_id)
 
             # 4. Store session
             session_id = store_session(
@@ -216,6 +217,9 @@ class DeferredWriter:
                 brain=self.brain,
             )
 
+            if not session_id:
+                logging.error("batch_commit: store_session returned None — session not persisted")
+
             # 5. Store claims
             claims_stored = 0
             if session_id:
@@ -224,13 +228,15 @@ class DeferredWriter:
                     brain=self.brain,
                 )
                 claims_stored = len(inserted)
+                if self.confirmed_claims and claims_stored == 0:
+                    logging.error("batch_commit: all claim inserts failed — session stored but no RAG evidence")
 
             # 6. Delete checkpoint
             delete_pending_ingestion()
 
             return {
-                "success": True,
-                "message": "Batch commit complete.",
+                "success": bool(session_id),
+                "message": "Batch commit complete." if session_id else "Document updated but session could not be saved to database.",
                 "claims_stored": claims_stored,
                 "session_id": session_id or "",
                 "document_updated": doc_changed,
@@ -245,8 +251,13 @@ class DeferredWriter:
                     from services.mongo_client import delete_one
                     delete_one("sessions", {"_id": session_id})
                     logging.info("Cleaned up orphaned session %s after batch_commit failure", session_id)
-                except Exception:
-                    pass
+                except Exception as cleanup_err:
+                    logging.warning("Could not clean up orphaned session %s: %s", session_id, cleanup_err)
+            # Always delete checkpoint to prevent stuck recovery prompts
+            try:
+                delete_pending_ingestion()
+            except Exception as cp_err:
+                logging.warning("Could not delete checkpoint in batch_commit failure path: %s", cp_err)
             return {
                 "success": False,
                 "message": f"Batch commit failed: {e}",
@@ -411,10 +422,10 @@ def rollback_last_session() -> dict:
     # 3. Acquire doc lock BEFORE MongoDB deletes to ensure atomicity
     #    (prevents window where MongoDB data is deleted but doc revert fails due to lock)
     from services.ingestion_lock import acquire_doc_lock, release_doc_lock
-    doc_lock_acquired = False
+    doc_lock_id = None
     if prev_content is not None:
-        doc_lock_acquired = acquire_doc_lock(timeout_seconds=30)
-        if not doc_lock_acquired:
+        doc_lock_id = acquire_doc_lock(timeout_seconds=30)
+        if not doc_lock_id:
             return {
                 "success": False,
                 "message": "Could not acquire document lock for rollback — no changes made.",
@@ -441,8 +452,8 @@ def rollback_last_session() -> dict:
         # 6. Delete claims for this session
         claims_deleted = delete_many("claims", {"session_id": session_id})
     finally:
-        if doc_lock_acquired:
-            release_doc_lock()
+        if doc_lock_id:
+            release_doc_lock(doc_lock_id)
 
     if prev_content is not None:
         return {
