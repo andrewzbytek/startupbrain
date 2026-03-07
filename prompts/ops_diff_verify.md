@@ -58,7 +58,7 @@ If there are blocking issues:
 - [ ] If ADD_CONTACT is present, is the contact name genuinely new (not already in the Contacts / Prospects section)? Should be UPDATE_CONTACT instead. (BLOCKING)
 - [ ] Does each ADD_HYPOTHESIS include a hypothesis statement (bold), Status, and Test? (BLOCKING if missing required fields)
 - [ ] Does each ADD_FEEDBACK include a date, source name, and feedback content? (BLOCKING if missing required fields)
-- [ ] If ADD_RISK, ADD_ASSUMPTION, or ADD_QUESTION actions are present, does each include meaningful text content? (BLOCKING if empty or placeholder)
+- [ ] Are all actions in the proposed diff one of the valid ops actions: UPDATE_POSITION, ADD_CHANGELOG, ADD_CONTACT, UPDATE_CONTACT, ADD_HYPOTHESIS, ADD_FEEDBACK, ADD_SECTION? (BLOCKING if an unrecognized action is present)
 - [ ] Does any change accidentally delete existing entries in any section? (BLOCKING)
 - [ ] Does any change rephrase existing content that should be unchanged? (BLOCKING)
 - [ ] Are all section headers in the changes exact matches to headers in the original document? (BLOCKING)

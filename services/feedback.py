@@ -367,6 +367,13 @@ def generate_pitch_materials(request: str, book_frameworks: Optional[list] = Non
     Returns:
         dict with: pitch_content, framework_notes, gaps_and_suggestions, format_type, audience, raw
     """
+    if brain != "pitch":
+        return {
+            "pitch_content": "Pitch generation is only available for Pitch Brain.",
+            "format_type": "", "audience": "",
+            "framework_notes": [], "gaps_and_suggestions": [], "raw": "",
+        }
+
     from services.claude_client import call_opus, escape_xml, load_prompt
     from services.document_updater import read_living_document
     from services.mongo_client import get_book_frameworks

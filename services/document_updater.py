@@ -206,11 +206,11 @@ def apply_diff(document: str, diff_blocks: list, brain: str = "pitch") -> str:
         if action == "UPDATE_POSITION":
             updated = _update_position(updated, section, content)
         elif action == "ADD_CHANGELOG":
-            updated = _add_changelog(updated, section, content)
+            updated = _add_changelog(updated, section, content, brain=brain)
         elif action == "ADD_DECISION":
             updated = _add_decision(updated, content, brain=brain)
         elif action == "ADD_FEEDBACK":
-            updated = _add_feedback(updated, content)
+            updated = _add_feedback(updated, content, brain=brain)
         elif action == "ADD_DISMISSED":
             updated = _add_dismissed(updated, content, brain=brain)
         elif action == "ADD_HYPOTHESIS":
@@ -268,11 +268,28 @@ def _update_position(doc: str, section: str, new_position_content: str) -> str:
     return doc
 
 
-def _add_changelog(doc: str, section: str, new_entry: str) -> str:
+def _add_changelog(doc: str, section: str, new_entry: str, brain: str = "pitch") -> str:
     """Append a changelog entry to the given section."""
+    if brain == "ops":
+        # Ops sections are top-level ## headers with no **Changelog:** label
+        section_name = section.split(" → ", 1)[-1] if " → " in section else section
+        pattern = re.compile(
+            rf"(## {re.escape(section_name)}\n)(.*?)(\n## |\Z)",
+            re.DOTALL,
+        )
+
+        def ops_replacer(m):
+            return m.group(1) + m.group(2) + new_entry + "\n" + m.group(3)
+
+        updated = pattern.sub(ops_replacer, doc)
+        if updated != doc:
+            return updated
+        logging.warning("_add_changelog (ops): section '%s' not found in document, returning unmodified", section)
+        return doc
+
+    # Pitch brain: find **Changelog:** under ### subsection
     if " → " in section:
         _, subsection = section.split(" → ", 1)
-        # Find "**Changelog:**" under this subsection and append the entry
         pattern = re.compile(
             rf"(### {re.escape(subsection)}.*?\*\*Changelog:\*\*\n)(.*?)(\n###|\n## |\Z)",
             re.DOTALL,
@@ -310,8 +327,27 @@ def _add_decision(doc: str, decision_content: str, brain: str = "pitch") -> str:
     return doc + "\n\n## Decision Log\n\n" + decision_content + "\n"
 
 
-def _add_feedback(doc: str, feedback_content: str) -> str:
+def _add_feedback(doc: str, feedback_content: str, brain: str = "pitch") -> str:
     """Add a new entry to the Feedback Tracker section."""
+    if brain == "ops":
+        # Ops brain: insert under ### Individual Feedback subsection
+        pattern = re.compile(r"(### Individual Feedback\n)(.*?)(\n###|\n## |\Z)", re.DOTALL)
+
+        def ops_replacer(m):
+            existing = m.group(2).strip()
+            if existing.lower().startswith("[no feedback"):
+                existing = ""
+            if existing:
+                return m.group(1) + existing + "\n" + feedback_content + "\n" + m.group(3)
+            return m.group(1) + feedback_content + "\n" + m.group(3)
+
+        updated = pattern.sub(ops_replacer, doc)
+        if updated != doc:
+            return updated
+        # Fallback: try the top-level section
+        logging.warning("_add_feedback (ops): ### Individual Feedback not found, trying ## Feedback Tracker")
+
+    # Pitch brain (or ops fallback): append to ## Feedback Tracker
     pattern = re.compile(r"(## Feedback Tracker\n)(.*?)(\n## |\Z)", re.DOTALL)
 
     def replacer(m):

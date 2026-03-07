@@ -572,6 +572,14 @@ def run_audit(num_sessions: int = 10, brain: str = "pitch") -> dict:
     Returns:
         dict with: discrepancies (list), overall_assessment (str), summary_message (str), raw (str)
     """
+    if brain != "pitch":
+        return {
+            "discrepancies": [],
+            "overall_assessment": "healthy",
+            "summary_message": "Audit is only available for Pitch Brain.",
+            "raw": "",
+        }
+
     from services.claude_client import call_sonnet, escape_xml, load_prompt
     from services.mongo_client import get_sessions
 
@@ -624,6 +632,16 @@ def run_audit(num_sessions: int = 10, brain: str = "pitch") -> dict:
     discrepancies = []
     for m in re.finditer(r"<discrepancy>(.*?)</discrepancy>", raw, re.DOTALL):
         block = m.group(1)
+        # Parse evidence citations if present
+        citations = []
+        evidence_block = re.search(r"<evidence>(.*?)</evidence>", block, re.DOTALL)
+        if evidence_block:
+            for cit in re.finditer(r"<citation>(.*?)</citation>", evidence_block.group(1), re.DOTALL):
+                cb = cit.group(1)
+                citations.append({
+                    "date": _extract_tag(cb, "date"),
+                    "excerpt": _extract_tag(cb, "excerpt"),
+                })
         discrepancies.append({
             "type": _extract_tag(block, "type"),
             "section": _extract_tag(block, "section"),
@@ -631,6 +649,7 @@ def run_audit(num_sessions: int = 10, brain: str = "pitch") -> dict:
             "sessions_suggest": _extract_tag(block, "sessions_suggest"),
             "severity": _extract_tag(block, "severity"),
             "suggestion": _extract_tag(block, "suggestion"),
+            "evidence": citations,
         })
 
     return {
