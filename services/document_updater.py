@@ -461,14 +461,18 @@ def _update_contact(doc: str, contact_name: str, updated_fields: str) -> str:
     )
     _replacement = updated_fields.strip()
     updated = pattern.sub(lambda _m: _replacement, doc)
+    if updated == doc:
+        logging.warning("_update_contact: no match found for contact '%s' — document unchanged", contact_name)
     return updated
 
 
 def _update_hypothesis_status(doc: str, hypothesis_fragment: str, new_status: str, evidence_update: str = "") -> str:
-    """Update the status of an existing hypothesis. Finds by bold text fragment."""
+    """Update the status of an existing hypothesis. Finds by bold text prefix match
+    (fragment can be a prefix of the full hypothesis text, e.g. 'SMBs will pay $49'
+    matches '**SMBs will pay $49/mo for analytics**')."""
     escaped = re.escape(hypothesis_fragment)
     pattern = re.compile(
-        rf"(- \[\d{{4}}-\d{{2}}-\d{{2}}\] \*\*{escaped}\*\*\n\s+Status: )\w+( \| .*?\n\s+Evidence: )(.*?)(?=\n- \[|\n## |\Z)",
+        rf"(- \[\d{{4}}-\d{{2}}-\d{{2}}\] \*\*{escaped}[^*]*\*\*\n\s+Status: )\w+( \| .*?\n\s+Evidence: )(.*?)(?=\n- \[|\n## |\Z)",
         re.DOTALL,
     )
 

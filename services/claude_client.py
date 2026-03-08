@@ -74,10 +74,16 @@ def escape_xml(text: str) -> str:
 
 
 def extract_xml_tag(text: str, tag: str) -> str:
-    """Extract content of first XML tag from text. Shared utility for LLM response parsing."""
+    """Extract content of first XML tag from text. Shared utility for LLM response parsing.
+
+    Applies html.unescape() to the result so that XML entities the LLM may echo
+    back (e.g. &lt;50 inside <claim_text>) are decoded to their literal characters
+    before any downstream consumer stores or re-escapes them.
+    """
+    import html as _html
     import re
     match = re.search(rf"<{tag}>(.*?)</{tag}>", text, re.DOTALL)
-    return match.group(1).strip() if match else ""
+    return _html.unescape(match.group(1).strip()) if match else ""
 
 
 def load_prompt(prompt_name: str) -> str:

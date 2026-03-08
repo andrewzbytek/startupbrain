@@ -198,7 +198,8 @@ def _classify_query(text: str) -> str:
     _recall_keywords = [
         "list all meetings", "list all sessions", "how many meetings",
         "what meetings", "meeting with", "meetings with",
-        "what did we discuss", "summarize all",
+        "what did we discuss", "did we discuss", "did we talk about",
+        "summarize all",
         "what did investors say", "what did customers say",
         "who said", "who was the most", "recap",
         "customer feedback", "investor feedback", "advisor feedback",
@@ -751,6 +752,7 @@ def _apply_hypothesis_status_update(user_message: str) -> str:
             release_doc_lock(lock_id)
 
         # Update MongoDB
+        synced = False
         try:
             synced = update_hypothesis_status(fragment, new_status)
             if not synced:
@@ -758,7 +760,10 @@ def _apply_hypothesis_status_update(user_message: str) -> str:
         except Exception as e:
             logging.error("Failed to sync hypothesis status to MongoDB: %s", e)
 
-        return f"Hypothesis updated to **{new_status}**: {fragment}"
+        confirmation = f"Hypothesis updated to **{new_status}**: {fragment}"
+        if not synced:
+            confirmation += " (note: database sync did not match — status may be out of sync in query results)"
+        return confirmation
     except Exception as e:
         logging.error("Could not update hypothesis: %s", e)
         return "Could not update hypothesis. Please try again."
@@ -1122,9 +1127,10 @@ def render_contradiction_resolution():
 
     severity = contradiction.get("severity", "Notable")
     severity_cls = "critical" if severity == "Critical" else "notable"
-    existing_position = html.escape(contradiction.get("existing_position", "Not found"))
-    new_claim_display = html.escape(contradiction.get("new_claim", "Not found"))
-    tension = contradiction.get("tension_description", "") or contradiction.get("evidence_summary", "")
+    import html as _html_mod
+    existing_position = html.escape(_html_mod.unescape(contradiction.get("existing_position", "Not found")))
+    new_claim_display = html.escape(_html_mod.unescape(contradiction.get("new_claim", "Not found")))
+    tension = _html_mod.unescape(contradiction.get("tension_description", "") or contradiction.get("evidence_summary", ""))
     section = contradiction.get("existing_section", "")
 
     severity_html = (

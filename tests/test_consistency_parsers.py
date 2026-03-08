@@ -46,8 +46,9 @@ class TestExtractTag:
         assert "<inner>value</inner>" in result
 
     def test_special_characters_in_content(self):
+        """extract_xml_tag now applies html.unescape() — entities are decoded."""
         text = "<note>Price is &amp; cost &lt; $100</note>"
-        assert _extract_tag(text, "note") == "Price is &amp; cost &lt; $100"
+        assert _extract_tag(text, "note") == "Price is & cost < $100"
 
     def test_first_match_wins(self):
         text = "<x>first</x><x>second</x>"

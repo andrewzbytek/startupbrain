@@ -54,7 +54,19 @@ def generate_context_export(brain: str = "pitch") -> str:
             return dt.replace(tzinfo=timezone.utc)
         return dt
 
-    sessions.sort(key=_safe_sort_dt)  # oldest first
+    def _sort_by_session_date(s):
+        """Sort by session_date (YYYY-MM-DD string) when available, fallback to created_at."""
+        sd = s.get("session_date", "")
+        if sd and sd != "Unknown date":
+            return sd
+        dt = s.get("created_at")
+        if dt is None:
+            return ""
+        if hasattr(dt, "strftime"):
+            return dt.strftime("%Y-%m-%d")
+        return str(dt)
+
+    sessions.sort(key=_sort_by_session_date)  # oldest first (lexicographic on YYYY-MM-DD)
 
     if not sessions:
         lines.append("_No sessions recorded yet._")
@@ -83,14 +95,14 @@ def generate_context_export(brain: str = "pitch") -> str:
 
             # Claims for this session
             session_id = str(session["_id"])
-            claims = get_claims(session_id=session_id, limit=500)
+            claims = get_claims(session_id=session_id, limit=500, brain=brain)
             claims.sort(key=_safe_sort_dt)  # chronological
 
             if claims:
                 lines.append(f"**Claims extracted ({len(claims)}):**")
                 for claim in claims:
                     confidence = claim.get("confidence", "unknown")
-                    claim_text = claim.get("claim_text", "")
+                    claim_text = claim.get("claim_text", "").replace("\n", " ")
                     lines.append(f"- [{confidence}] {claim_text}")
             else:
                 lines.append("_No claims extracted._")

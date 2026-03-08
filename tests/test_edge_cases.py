@@ -58,16 +58,16 @@ class TestXMLParsing:
         assert "line three" in result
 
     def test_special_characters_ampersand(self):
-        """Ampersands in tag content are preserved."""
+        """Ampersands in tag content are unescaped (html.unescape applied)."""
         text = "<data>R&amp;D &amp; Operations</data>"
         result = consistency_extract_tag(text, "data")
-        assert "R&amp;D" in result
+        assert "R&D" in result
 
     def test_special_characters_angle_brackets(self):
-        """Escaped angle brackets in tag content."""
+        """Escaped angle brackets in tag content are unescaped."""
         text = "<data>value &lt; 100 &gt; 0</data>"
         result = consistency_extract_tag(text, "data")
-        assert "&lt; 100" in result
+        assert "< 100" in result
 
     def test_special_characters_quotes(self):
         """Quotes in tag content are preserved."""
