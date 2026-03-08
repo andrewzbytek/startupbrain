@@ -6,6 +6,7 @@ Tests marked @pytest.mark.slow involve multiple LLM calls or Opus routing.
 Tests requiring MongoDB are individually skipped if MONGODB_URI is not set.
 
 Run only integration tests:
+    python -m pytest tests/ -m integration -v
     python -m pytest tests/test_integration.py -v
 
 Run excluding slow tests:
@@ -22,10 +23,13 @@ import pytest
 # Module-level skip: skip everything if no API key
 # ---------------------------------------------------------------------------
 
-pytestmark = pytest.mark.skipif(
-    not os.environ.get("ANTHROPIC_API_KEY"),
-    reason="ANTHROPIC_API_KEY not set — skipping integration tests",
-)
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.skipif(
+        not os.environ.get("ANTHROPIC_API_KEY"),
+        reason="ANTHROPIC_API_KEY not set — skipping integration tests",
+    ),
+]
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -1051,3 +1055,659 @@ class TestChatBehavior:
         assert len(result["text"]) < 500, (
             f"Casual greeting should get brief response (<500 chars). Got {len(result['text'])} chars"
         )
+
+
+# ===========================================================================
+# 11. TestBrainIsolation (3 tests)
+# ===========================================================================
+
+class TestBrainIsolation:
+    """Verify that pitch and ops operations don't cross-contaminate."""
+
+    def test_pitch_diff_does_not_affect_ops_doc(self):
+        """Pitch diff applied to pitch doc -> ops doc completely unchanged."""
+        from services.document_updater import generate_diff, parse_diff_output, apply_diff
+        from tests.conftest import get_sample_living_document, get_sample_ops_document
+
+        pitch_doc = get_sample_living_document()
+        ops_doc = get_sample_ops_document()
+
+        new_info = (
+            "We decided to raise implementation fee to £60,000 per facility. "
+            "This replaces the previous £50,000 figure after customer validation."
+        )
+
+        raw_diff = generate_diff(
+            current_doc=pitch_doc,
+            new_info=new_info,
+            update_reason="pricing update from customer validation",
+            brain="pitch",
+        )
+
+        diff_blocks = parse_diff_output(raw_diff)
+        assert len(diff_blocks) >= 1, "Should produce at least 1 diff block"
+
+        updated_pitch = apply_diff(pitch_doc, diff_blocks, brain="pitch")
+
+        # Pitch doc should have changed
+        assert updated_pitch != pitch_doc, "Pitch doc should be modified by pitch diff"
+
+        # Ops doc must be completely unchanged (apply_diff is pure — no side effects)
+        assert ops_doc == get_sample_ops_document(), (
+            "Ops document must be completely unchanged after pitch diff operation"
+        )
+
+    def test_ops_diff_does_not_affect_pitch_doc(self):
+        """Ops diff applied to ops doc -> pitch doc completely unchanged."""
+        from services.document_updater import generate_diff, parse_diff_output, apply_diff
+        from tests.conftest import get_sample_living_document, get_sample_ops_document
+
+        pitch_doc = get_sample_living_document()
+        ops_doc = get_sample_ops_document()
+
+        new_info = (
+            "New contact: Elena Vasquez from Nuclear Skills Organisation. "
+            "Met at NIA conference. Interested in workforce training collaboration."
+        )
+
+        raw_diff = generate_diff(
+            current_doc=ops_doc,
+            new_info=new_info,
+            update_reason="new contact from NIA conference",
+            brain="ops",
+        )
+
+        diff_blocks = parse_diff_output(raw_diff)
+        assert len(diff_blocks) >= 1, "Should produce at least 1 diff block"
+
+        updated_ops = apply_diff(ops_doc, diff_blocks, brain="ops")
+
+        # Ops doc should have changed
+        assert updated_ops != ops_doc, "Ops doc should be modified by ops diff"
+
+        # Pitch doc must be completely unchanged
+        assert pitch_doc == get_sample_living_document(), (
+            "Pitch document must be completely unchanged after ops diff operation"
+        )
+
+    def test_claims_tagged_with_correct_brain(self):
+        """Claims stored via store_confirmed_claims carry the correct brain tag."""
+        from services.ingestion import extract_claims, store_confirmed_claims
+
+        # Extract pitch claims
+        pitch_extraction = extract_claims(
+            transcript="We decided to target UK nuclear plants with £50K annual SaaS.",
+            participants="Alex",
+            topic_hint="pricing strategy",
+            prompt_name="extraction",
+        )
+        pitch_claims = pitch_extraction["claims"]
+        assert len(pitch_claims) >= 1, "Should extract at least 1 pitch claim"
+
+        # Extract ops claims
+        ops_extraction = extract_claims(
+            transcript="Met Sarah Chen from EDF Energy. She wants a demo next week.",
+            participants="Alex",
+            topic_hint="contact from conference",
+            prompt_name="ops_extraction",
+        )
+        ops_claims = ops_extraction["claims"]
+        assert len(ops_claims) >= 1, "Should extract at least 1 ops claim"
+
+        # Mark all claims as confirmed
+        for c in pitch_claims:
+            c["confirmed"] = True
+        for c in ops_claims:
+            c["confirmed"] = True
+
+        # Mock MongoDB and store claims with respective brains
+        with patch("services.mongo_client.insert_claim", return_value="mock_claim_id") as mock_insert:
+            pitch_ids = store_confirmed_claims(
+                claims=pitch_claims,
+                session_id="pitch-session-001",
+                brain="pitch",
+            )
+            ops_ids = store_confirmed_claims(
+                claims=ops_claims,
+                session_id="ops-session-001",
+                brain="ops",
+            )
+
+        assert len(pitch_ids) >= 1, "Should store at least 1 pitch claim"
+        assert len(ops_ids) >= 1, "Should store at least 1 ops claim"
+
+        # Verify each call passed the correct brain kwarg
+        calls = mock_insert.call_args_list
+        pitch_call_count = sum(
+            1 for call in calls if call.kwargs.get("brain") == "pitch"
+        )
+        ops_call_count = sum(
+            1 for call in calls if call.kwargs.get("brain") == "ops"
+        )
+
+        assert pitch_call_count == len(pitch_claims), (
+            f"Expected {len(pitch_claims)} pitch-tagged insert_claim calls, got {pitch_call_count}"
+        )
+        assert ops_call_count == len(ops_claims), (
+            f"Expected {len(ops_claims)} ops-tagged insert_claim calls, got {ops_call_count}"
+        )
+
+
+# ===========================================================================
+# 12. TestDirectCorrectionBrainRouting (3 tests)
+# ===========================================================================
+
+class TestDirectCorrectionBrainRouting:
+    """Verify direct corrections route correctly per brain."""
+
+    def test_pitch_correction_triggers_consistency(self):
+        """Pitch brain: consistency check fires and returns pass1 results."""
+        from services.consistency import run_consistency_check
+        from tests.conftest import get_sample_living_document
+
+        correction_claims = [
+            {
+                "claim_text": "We changed pricing to £75K per facility, replacing the previous £50K figure.",
+                "claim_type": "decision",
+                "confidence": "definite",
+                "who_said_it": "Alex",
+                "topic_tags": ["pricing"],
+                "confirmed": True,
+            },
+        ]
+
+        # run_consistency_check reads the living doc internally — mock it
+        with patch(
+            "services.consistency.read_living_document",
+            return_value=get_sample_living_document(),
+        ):
+            result = run_consistency_check(
+                claims=correction_claims,
+                session_type="Pitch review",
+                brain="pitch",
+            )
+
+        # pass1 must be populated (not None) — proves the LLM was called
+        assert result["pass1"] is not None, (
+            f"Pitch correction should trigger Pass 1 consistency check. Got: {result}"
+        )
+        # pass1 should have the standard structure
+        assert "total_found" in result["pass1"], (
+            f"pass1 should contain total_found key. Got keys: {list(result['pass1'].keys())}"
+        )
+
+    def test_ops_update_document_works(self):
+        """Ops brain: update_document goes through full diff-verify-apply cycle."""
+        from services.document_updater import update_document
+        from tests.conftest import get_sample_ops_document
+
+        new_risk = (
+            "New risk identified: key dependency on single cloud provider (AWS). "
+            "If AWS has an outage in eu-west-2, our entire platform goes down. "
+            "Should investigate multi-cloud failover strategy."
+        )
+
+        with patch("services.document_updater.read_living_document", return_value=get_sample_ops_document()), \
+             patch("services.document_updater.write_living_document"), \
+             patch("services.document_updater._git_commit", return_value=True), \
+             patch("services.mongo_client.upsert_living_document", return_value=True), \
+             patch("services.ingestion_lock.acquire_doc_lock", return_value="mock_lock_id"), \
+             patch("services.ingestion_lock.release_doc_lock"):
+
+            result = update_document(
+                new_info=new_risk,
+                update_reason="New infrastructure risk from architecture review",
+                brain="ops",
+            )
+
+        assert result["success"] is True, (
+            f"Ops update_document should succeed. Got: {result}"
+        )
+        assert result["changes_applied"] > 0, (
+            f"Ops update should apply at least 1 change. Got: {result}"
+        )
+
+    def test_decision_log_skipped_for_ops(self):
+        """_add_decision and _add_dismissed are pitch-only — no-op for ops."""
+        from services.document_updater import _add_decision, _add_dismissed
+        from tests.conftest import get_sample_ops_document
+
+        ops_doc = get_sample_ops_document()
+
+        # _add_decision should return the ops doc unchanged
+        result_decision = _add_decision(ops_doc, "### Decision entry\nWe decided X.", brain="ops")
+        assert result_decision == ops_doc, (
+            "_add_decision should return ops doc unchanged — Decision Log is pitch-only"
+        )
+
+        # _add_dismissed should return the ops doc unchanged
+        result_dismissed = _add_dismissed(ops_doc, "- Dismissed entry: contradiction Y", brain="ops")
+        assert result_dismissed == ops_doc, (
+            "_add_dismissed should return ops doc unchanged — Dismissed Contradictions is pitch-only"
+        )
+
+
+# ===========================================================================
+# 13. TestConsistencyBrainGuards (3 tests)
+# ===========================================================================
+
+class TestConsistencyBrainGuards:
+    """Verify consistency engine brain-specific guards."""
+
+    def test_audit_returns_early_for_ops(self):
+        """run_audit(brain='ops') returns early-exit result without LLM calls."""
+        from services.consistency import run_audit
+
+        result = run_audit(brain="ops")
+
+        assert result == {
+            "discrepancies": [],
+            "overall_assessment": "healthy",
+            "summary_message": "Audit is only available for Pitch Brain.",
+            "raw": "",
+        }
+
+    def test_consistency_check_reads_correct_brain_doc(self):
+        """run_consistency_check passes brain='pitch' through to read_living_document."""
+        from services.consistency import run_consistency_check
+        from tests.conftest import get_sample_living_document
+
+        claim = {
+            "claim_text": "Our pricing is £50K per year for enterprise licenses.",
+            "claim_type": "pricing",
+            "confidence": "high",
+            "confirmed": True,
+        }
+
+        with patch(
+            "services.consistency.read_living_document",
+            return_value=get_sample_living_document(),
+        ) as mock_read:
+            result = run_consistency_check([claim], brain="pitch")
+            mock_read.assert_called_with(brain="pitch")
+
+        # Should have produced some result (not the empty-claims early exit)
+        assert result is not None
+        assert "has_contradictions" in result
+
+    def test_check_dismissed_handles_ops_doc_without_section(self):
+        """Ops doc has no Dismissed Contradictions — all contradictions pass through."""
+        from services.consistency import check_dismissed
+        from tests.conftest import get_sample_ops_document
+
+        ops_doc = get_sample_ops_document()
+        contradictions = [
+            {
+                "id": "1",
+                "new_claim": "Nuclear utilities prefer building compliance tools in-house",
+                "existing_position": "Utilities prefer vendor-managed solutions",
+                "severity": "High",
+            },
+            {
+                "id": "2",
+                "new_claim": "Sales cycles are only 2-3 months for nuclear enterprise",
+                "existing_position": "Long sales cycles 6-12 months",
+                "severity": "Critical",
+            },
+        ]
+
+        filtered = check_dismissed(contradictions, ops_doc)
+
+        assert len(filtered) == len(contradictions), (
+            f"All contradictions should pass through ops doc (no Dismissed section), "
+            f"but {len(contradictions) - len(filtered)} were filtered out"
+        )
+        assert filtered == contradictions
+
+
+# ===========================================================================
+# 14. TestFreshnessCheck (2 tests, slow)
+# ===========================================================================
+
+@pytest.mark.slow
+class TestFreshnessCheck:
+    """Verify DeferredWriter freshness check detects concurrent changes."""
+
+    def test_freshness_check_detects_modified_document(self):
+        """batch_commit detects hash mismatch and re-diffs against current doc."""
+        from services.deferred_writer import DeferredWriter
+        from tests.conftest import get_sample_living_document
+        from tests.test_mockup_data import session_01_initial_strategy
+        from services.ingestion import extract_claims
+
+        data = session_01_initial_strategy()
+        extraction = extract_claims(
+            transcript=data["transcript"],
+            participants=data["participants"],
+            topic_hint=data["topic_hint"],
+        )
+        claims = extraction["claims"]
+        assert len(claims) >= 1, "Need at least 1 claim for freshness test"
+
+        writer = DeferredWriter()
+        original_doc = get_sample_living_document()
+        # Modified doc simulates a concurrent write during the pipeline
+        modified_doc = original_doc + "\n- 2026-03-01: New concurrent change. Source: Another user\n"
+
+        # Initialize with original doc
+        with patch("services.document_updater.read_living_document", return_value=original_doc):
+            writer.initialize(
+                transcript=data["transcript"],
+                confirmed_claims=claims,
+                metadata={"session_date": "2026-02-01", "participants": data["participants"]},
+                session_summary=extraction["session_summary"],
+                topic_tags=extraction.get("topic_tags", []),
+                brain="pitch",
+            )
+
+        # Apply deferred update (real LLM call) with original doc
+        with patch("services.document_updater.read_living_document", return_value=original_doc), \
+             patch("services.document_updater._git_commit", return_value=True), \
+             patch("services.mongo_client.upsert_living_document", return_value=True):
+
+            new_info = " | ".join(c["claim_text"] for c in claims)
+            writer.apply_document_update_deferred(
+                new_info=new_info,
+                update_reason="Session: initial strategy",
+            )
+
+        # batch_commit: read_living_document returns MODIFIED doc -> hash mismatch -> re-diff
+        with patch("services.document_updater.read_living_document", return_value=modified_doc), \
+             patch("services.document_updater.write_living_document"), \
+             patch("services.document_updater._git_commit", return_value=True), \
+             patch("services.mongo_client.upsert_living_document", return_value=True), \
+             patch("services.mongo_client.insert_session", return_value="mock_session_id"), \
+             patch("services.mongo_client.insert_claim", return_value="mock_claim_id"), \
+             patch("services.mongo_client.find_one", return_value=None), \
+             patch("services.mongo_client.find_many", return_value=[]), \
+             patch("services.ingestion_lock.check_lock", return_value=True), \
+             patch("services.ingestion_lock.acquire_doc_lock", return_value="mock_lock_id"), \
+             patch("services.ingestion_lock.release_doc_lock"), \
+             patch("services.deferred_writer.save_checkpoint", return_value=True), \
+             patch("services.deferred_writer.delete_checkpoint"):
+
+            result = writer.batch_commit()
+
+            assert result["success"] is True, (
+                f"batch_commit should succeed after re-diff. Message: {result.get('message', '')}"
+            )
+
+    def test_freshness_check_unchanged_document_skips_rediff(self):
+        """batch_commit with unchanged doc -> success without re-diff."""
+        from services.deferred_writer import DeferredWriter
+        from tests.conftest import get_sample_living_document
+        from tests.test_mockup_data import session_01_initial_strategy
+        from services.ingestion import extract_claims
+
+        data = session_01_initial_strategy()
+        extraction = extract_claims(
+            transcript=data["transcript"],
+            participants=data["participants"],
+            topic_hint=data["topic_hint"],
+        )
+        claims = extraction["claims"]
+        assert len(claims) >= 1, "Need at least 1 claim for freshness test"
+
+        writer = DeferredWriter()
+        doc_content = get_sample_living_document()
+
+        # Initialize and apply with same doc — then batch_commit also sees same doc
+        with patch("services.document_updater.read_living_document", return_value=doc_content), \
+             patch("services.document_updater.write_living_document"), \
+             patch("services.document_updater._git_commit", return_value=True), \
+             patch("services.mongo_client.upsert_living_document", return_value=True), \
+             patch("services.mongo_client.insert_session", return_value="mock_session_id"), \
+             patch("services.mongo_client.insert_claim", return_value="mock_claim_id"), \
+             patch("services.mongo_client.find_one", return_value=None), \
+             patch("services.mongo_client.find_many", return_value=[]), \
+             patch("services.ingestion_lock.check_lock", return_value=True), \
+             patch("services.ingestion_lock.acquire_doc_lock", return_value="mock_lock_id"), \
+             patch("services.ingestion_lock.release_doc_lock"), \
+             patch("services.deferred_writer.save_checkpoint", return_value=True), \
+             patch("services.deferred_writer.delete_checkpoint"):
+
+            writer.initialize(
+                transcript=data["transcript"],
+                confirmed_claims=claims,
+                metadata={"session_date": "2026-02-01", "participants": data["participants"]},
+                session_summary=extraction["session_summary"],
+                topic_tags=extraction.get("topic_tags", []),
+                brain="pitch",
+            )
+
+            new_info = " | ".join(c["claim_text"] for c in claims)
+            writer.apply_document_update_deferred(
+                new_info=new_info,
+                update_reason="Session: initial strategy",
+            )
+
+            result = writer.batch_commit()
+
+            assert result["success"] is True, (
+                f"batch_commit should succeed with unchanged doc. Message: {result.get('message', '')}"
+            )
+            assert result["document_updated"] is True, (
+                "Document should be updated when hash matches (no re-diff needed)"
+            )
+
+
+# ===========================================================================
+# 15. TestOpsCheckpointRoundTrip (1 test)
+# ===========================================================================
+
+class TestOpsCheckpointRoundTrip:
+    """Verify ops brain checkpoint serialization."""
+
+    def test_ops_checkpoint_preserves_brain(self):
+        """to_checkpoint -> from_checkpoint preserves ops brain and all fields."""
+        from services.deferred_writer import DeferredWriter
+        from tests.conftest import get_sample_ops_document
+        from tests.test_mockup_data import ops_session_01_contacts_and_risks
+        from services.ingestion import extract_claims
+
+        data = ops_session_01_contacts_and_risks()
+        extraction = extract_claims(
+            transcript=data["transcript"],
+            participants=data["participants"],
+            topic_hint=data["topic_hint"],
+            prompt_name="ops_extraction",
+        )
+        claims = extraction["claims"]
+        assert len(claims) >= 1, "Need at least 1 ops claim for checkpoint test"
+
+        writer = DeferredWriter()
+        with patch("services.document_updater.read_living_document", return_value=get_sample_ops_document()):
+            writer.initialize(
+                transcript=data["transcript"],
+                confirmed_claims=claims,
+                metadata={"session_date": "2026-03-01", "participants": data["participants"]},
+                session_summary=extraction["session_summary"],
+                topic_tags=extraction.get("topic_tags", []),
+                brain="ops",
+            )
+
+        checkpoint = writer.to_checkpoint()
+        restored = DeferredWriter.from_checkpoint(checkpoint)
+
+        assert restored.brain == "ops", (
+            f"Restored brain should be 'ops', got '{restored.brain}'"
+        )
+        assert restored.transcript == writer.transcript, (
+            "Restored transcript should match original"
+        )
+        assert len(restored.confirmed_claims) == len(writer.confirmed_claims), (
+            f"Restored claims count ({len(restored.confirmed_claims)}) should match original ({len(writer.confirmed_claims)})"
+        )
+        assert restored.original_doc == writer.original_doc, (
+            "Restored original_doc should match"
+        )
+        assert restored.original_doc_hash == writer.original_doc_hash, (
+            "Restored original_doc_hash should match"
+        )
+
+
+# ===========================================================================
+# 16. TestOpsStructuralDiff (4 tests)
+# ===========================================================================
+
+class TestOpsStructuralDiff:
+    """Verify ops brain diff application uses correct document structure."""
+
+    def test_ops_add_changelog_uses_top_level_headers(self):
+        """Ops diff should place new info under ## top-level headers, not ### with **Changelog:**."""
+        from services.document_updater import generate_diff, parse_diff_output, apply_diff
+        from tests.conftest import get_sample_ops_document
+
+        current_doc = get_sample_ops_document()
+        new_info = (
+            "Key risk update: NRC has announced a new AI oversight framework "
+            "for nuclear facilities, expected to take effect in Q4 2026. "
+            "This changes our regulatory timeline assumptions significantly."
+        )
+
+        raw_diff = generate_diff(
+            current_doc, new_info,
+            update_reason="Regulatory risk update",
+            brain="ops",
+        )
+        blocks = parse_diff_output(raw_diff)
+        if not blocks:
+            pytest.skip("Diff generation produced no blocks")
+
+        updated_doc = apply_diff(current_doc, blocks, brain="ops")
+
+        # The new info should appear under a ## top-level section (e.g. Key Risks)
+        assert "AI oversight" in updated_doc or "NRC" in updated_doc.lower() or "regulatory" in updated_doc.lower(), (
+            f"Updated doc should contain the new risk info. Doc tail: {updated_doc[-500:]}"
+        )
+        # Ops brain should NOT use the pitch pattern of ### subsection + **Changelog:**
+        # Check that no **Changelog:** label was introduced
+        changelog_count_before = current_doc.count("**Changelog:**")
+        changelog_count_after = updated_doc.count("**Changelog:**")
+        assert changelog_count_after == changelog_count_before, (
+            f"Ops doc should not gain **Changelog:** entries (pitch pattern). "
+            f"Before: {changelog_count_before}, After: {changelog_count_after}"
+        )
+
+    def test_ops_feedback_inserts_under_individual_feedback(self):
+        """Feedback in ops brain should appear under ### Individual Feedback, not at ## level."""
+        from services.document_updater import generate_diff, parse_diff_output, apply_diff
+        from tests.conftest import get_sample_ops_document
+
+        current_doc = get_sample_ops_document()
+        new_info = (
+            "Feedback from Dave Morrison at GridPoint Energy: "
+            "They want a read-only compliance dashboard before committing to full automation. "
+            "Concerned about giving AI write access to safety-critical documents."
+        )
+
+        raw_diff = generate_diff(
+            current_doc, new_info,
+            update_reason="Customer feedback from GridPoint Energy",
+            brain="ops",
+        )
+        blocks = parse_diff_output(raw_diff)
+        if not blocks:
+            pytest.skip("Diff generation produced no blocks")
+
+        updated_doc = apply_diff(current_doc, blocks, brain="ops")
+
+        # Find the Individual Feedback section and verify new feedback is there
+        individual_idx = updated_doc.find("### Individual Feedback")
+        assert individual_idx != -1, "### Individual Feedback section should still exist"
+
+        # Find the next ## section after Individual Feedback
+        next_section_idx = updated_doc.find("\n## ", individual_idx)
+        if next_section_idx == -1:
+            next_section_idx = len(updated_doc)
+
+        individual_section = updated_doc[individual_idx:next_section_idx]
+
+        # The feedback should be within the Individual Feedback subsection
+        has_feedback = (
+            "morrison" in individual_section.lower()
+            or "gridpoint" in individual_section.lower()
+            or "dashboard" in individual_section.lower()
+            or "read-only" in individual_section.lower()
+        )
+        assert has_feedback, (
+            f"Feedback should appear under ### Individual Feedback. "
+            f"Section content: {individual_section[:500]}"
+        )
+
+    def test_ops_hypothesis_addition(self):
+        """New hypothesis info should appear under ## Active Hypotheses in ops brain."""
+        from services.document_updater import generate_diff, parse_diff_output, apply_diff
+        from tests.conftest import get_sample_ops_document
+
+        current_doc = get_sample_ops_document()
+        new_info = (
+            "New hypothesis: Small modular reactor (SMR) operators will adopt "
+            "compliance tooling faster than traditional large plant operators because "
+            "they have smaller teams and less institutional inertia. "
+            "Test: Interview 3 SMR operators by end of Q2."
+        )
+
+        raw_diff = generate_diff(
+            current_doc, new_info,
+            update_reason="New hypothesis from market research",
+            brain="ops",
+        )
+        blocks = parse_diff_output(raw_diff)
+        if not blocks:
+            pytest.skip("Diff generation produced no blocks")
+
+        updated_doc = apply_diff(current_doc, blocks, brain="ops")
+
+        # Find the Active Hypotheses section
+        hyp_idx = updated_doc.find("## Active Hypotheses")
+        assert hyp_idx != -1, "## Active Hypotheses section should still exist"
+
+        # Find the next ## section after Active Hypotheses
+        next_section_idx = updated_doc.find("\n## ", hyp_idx + 1)
+        if next_section_idx == -1:
+            next_section_idx = len(updated_doc)
+
+        hyp_section = updated_doc[hyp_idx:next_section_idx]
+
+        has_hypothesis = (
+            "smr" in hyp_section.lower()
+            or "small modular" in hyp_section.lower()
+            or "modular reactor" in hyp_section.lower()
+        )
+        assert has_hypothesis, (
+            f"New hypothesis should appear under ## Active Hypotheses. "
+            f"Section content: {hyp_section[:500]}"
+        )
+
+    def test_ops_add_section_inserts_before_scratchpad(self):
+        """_add_section with brain='ops' should insert new section before ## Scratchpad Notes."""
+        from services.document_updater import _add_section
+        from tests.conftest import get_sample_ops_document
+
+        current_doc = get_sample_ops_document()
+        new_section_content = "## Partnerships\n\n- Exploring partnership with NRC-certified auditors\n"
+
+        updated_doc = _add_section(
+            current_doc,
+            section="Partnerships",
+            section_content=new_section_content,
+            brain="ops",
+        )
+
+        # New section should exist in the document
+        assert "## Partnerships" in updated_doc, "New section should be added"
+
+        # It should appear BEFORE ## Scratchpad Notes
+        partnerships_idx = updated_doc.find("## Partnerships")
+        scratchpad_idx = updated_doc.find("## Scratchpad Notes")
+        assert scratchpad_idx != -1, "## Scratchpad Notes should still exist"
+        assert partnerships_idx < scratchpad_idx, (
+            f"New section should be inserted before Scratchpad Notes. "
+            f"Partnerships at {partnerships_idx}, Scratchpad at {scratchpad_idx}"
+        )
+
+        # Verify existing content is preserved
+        assert "## Active Hypotheses" in updated_doc
+        assert "## Key Risks" in updated_doc
+        assert "Sarah Chen" in updated_doc
