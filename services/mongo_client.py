@@ -479,7 +479,7 @@ def vector_search_text(
     collection_name: str,
     query_text: str,
     index_name: str,
-    path: str = "claim_text_embedding",
+    path: str = "claim_text",
     limit: int = 5,
     filter_query: dict | None = None,
 ) -> list:

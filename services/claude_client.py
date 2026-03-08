@@ -266,6 +266,19 @@ def _stream_response(client, kwargs: dict, model: str, task_type: str, cost_trac
     Internal generator that streams the response and logs cost after completion.
     Yields text chunk strings.
     """
+    # Estimate input tokens from prompt length for fallback cost tracking
+    prompt_text = ""
+    for msg in kwargs.get("messages", []):
+        content = msg.get("content", "")
+        if isinstance(content, str):
+            prompt_text += content
+        elif isinstance(content, list):
+            for block in content:
+                if isinstance(block, dict) and block.get("type") == "text":
+                    prompt_text += block.get("text", "")
+    system_text = kwargs.get("system", "") or ""
+    estimated_input_tokens = int(len(prompt_text + system_text) / 4)  # ~4 chars per token
+
     def _generate():
         tokens_in = 0
         tokens_out = 0
@@ -279,9 +292,9 @@ def _stream_response(client, kwargs: dict, model: str, task_type: str, cost_trac
                 tokens_out = final.usage.output_tokens
         except Exception as e:
             logging.error("Claude API stream failed (%s): %s", task_type, e)
+            # Use estimated input tokens so partial streams are not logged as $0
+            tokens_in = estimated_input_tokens
             yield "AI service temporarily unavailable."
-        # Note: On stream error, token counts may be 0 — Anthropic still charges
-        # for partial streams but we can't reliably get usage after an error.
         finally:
             cost_tracker.log_api_call(model, tokens_in, tokens_out, task_type)
 

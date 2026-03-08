@@ -401,8 +401,20 @@ def _get_system_prompt(query_type: str = "") -> str:
         "- Do NOT surface related context on every message — only when genuinely relevant.\n"
         "- Respond in plain markdown.\n\n"
     )
+    # Token budget: cap living document to ~120K chars (~30K tokens) to leave headroom
+    # for scratchpad, book framework, conversation history, and response within 200K context
+    _MAX_DOC_CHARS = 120_000
     if doc:
-        base += f"<startup_brain>\n{escape_xml(doc)}\n</startup_brain>"
+        original_len = len(doc)
+        if original_len > _MAX_DOC_CHARS:
+            doc = doc[:_MAX_DOC_CHARS]
+            logging.warning(
+                "Living document truncated for system prompt: %d chars exceeds %d limit",
+                original_len, _MAX_DOC_CHARS,
+            )
+            base += f"<startup_brain>\n{escape_xml(doc)}\n[Document truncated — showing first {_MAX_DOC_CHARS:,} characters]\n</startup_brain>"
+        else:
+            base += f"<startup_brain>\n{escape_xml(doc)}\n</startup_brain>"
 
     # Append recent scratchpad notes so the AI can reference them
     try:

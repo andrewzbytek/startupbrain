@@ -141,7 +141,7 @@ class TestVectorSearchText:
 
             assert pipeline[0]["$vectorSearch"]["queryString"] == "target market pricing"
             assert pipeline[0]["$vectorSearch"]["index"] == "claims_vector_index"
-            assert pipeline[0]["$vectorSearch"]["path"] == "claim_text_embedding"
+            assert pipeline[0]["$vectorSearch"]["path"] == "claim_text"
             assert "queryVector" not in pipeline[0]["$vectorSearch"]
             assert "$addFields" in pipeline[1]
             assert len(results) == 1
@@ -633,7 +633,7 @@ class TestCheckRagHealth:
             result = check_rag_health()
 
         assert result["needs_upgrade"] is True
-        assert "Upgrade" in result["message"]
+        assert "10 most recent" in result["message"]
 
     def test_above_threshold_upgrade_needed(self):
         """Should flag upgrade needed when claim count exceeds threshold."""
@@ -644,7 +644,7 @@ class TestCheckRagHealth:
 
         assert result["needs_upgrade"] is True
         assert result["claim_count"] == 500
-        assert "M10+" in result["message"]
+        assert "vector search" in result["message"]
 
     def test_zero_claims_no_upgrade(self):
         """Should report healthy when no claims exist."""

@@ -51,6 +51,12 @@ INDEXES = [
     ("feedback", "source_type", "feedback_source_type"),
     ("feedback", "created_at", "feedback_created_at"),
     ("cost_log", "created_at", "cost_log_created_at"),
+    # Brain-filtered queries use $or pattern — index supports both equality and $exists checks
+    ("sessions", "brain", "sessions_brain"),
+    ("claims", "brain", "claims_brain"),
+    ("feedback", "brain", "feedback_brain"),
+    # Hypothesis queries filter by claim_type + optional status
+    ("claims", "claim_type", "claims_claim_type"),
 ]
 
 LIVING_DOC_PATH = Path(__file__).parent.parent / "documents" / "pitch_brain.md"

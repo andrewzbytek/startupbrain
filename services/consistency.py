@@ -250,8 +250,8 @@ def check_rag_health(brain: str = "pitch") -> dict:
     if needs_upgrade:
         message = (
             f"You have {claim_count} claims (threshold: {RAG_UPGRADE_CLAIM_THRESHOLD}). "
-            f"Time-based retrieval only checks the 50 most recent claims — older evidence may be missed. "
-            f"Upgrade to Atlas M10+ ($57/mo) to enable vector search with Voyage AI automated embedding."
+            f"Time-based retrieval only checks the 10 most recent claims — older evidence may be missed. "
+            f"Contact your developer about enabling vector search for better consistency checks."
         )
     else:
         remaining = RAG_UPGRADE_CLAIM_THRESHOLD - claim_count
