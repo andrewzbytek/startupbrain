@@ -57,6 +57,9 @@ Respond ONLY with valid XML in this exact structure:
       <topic_tags>
         <tag>tag1</tag>
       </topic_tags>
+      <entities>
+        <entity>Key people, companies, products, or concepts mentioned</entity>
+      </entities>
     </claim>
   </claims>
 </extraction_output>
@@ -93,6 +96,7 @@ So we talked through the pricing model again. We're going to go with per-facilit
       <confidence>definite</confidence>
       <who_said_it></who_said_it>
       <topic_tags><tag>pricing</tag><tag>business-model</tag></topic_tags>
+      <entities></entities>
     </claim>
     <claim>
       <claim_text>Usage-based pricing was rejected because it is harder to forecast revenue and VCs dislike variable MRR.</claim_text>
@@ -100,6 +104,7 @@ So we talked through the pricing model again. We're going to go with per-facilit
       <confidence>definite</confidence>
       <who_said_it>Jordan</who_said_it>
       <topic_tags><tag>pricing</tag><tag>fundraising</tag></topic_tags>
+      <entities><entity>Jordan</entity></entities>
     </claim>
     <claim>
       <claim_text>Initial pricing anchor is £50K per facility per year for the first customer, with expectation to raise it as value is proven.</claim_text>
@@ -107,6 +112,7 @@ So we talked through the pricing model again. We're going to go with per-facilit
       <confidence>definite</confidence>
       <who_said_it></who_said_it>
       <topic_tags><tag>pricing</tag></topic_tags>
+      <entities></entities>
     </claim>
     <claim>
       <claim_text>Primary target market is small nuclear plants. BP-scale enterprises are a phase two target, not the immediate focus.</claim_text>
@@ -114,6 +120,7 @@ So we talked through the pricing model again. We're going to go with per-facilit
       <confidence>definite</confidence>
       <who_said_it></who_said_it>
       <topic_tags><tag>target-market</tag></topic_tags>
+      <entities><entity>BP</entity></entities>
     </claim>
     <claim>
       <claim_text>First hire must be a nuclear domain expert, not a developer, because domain access is the scarcer resource.</claim_text>
@@ -121,6 +128,7 @@ So we talked through the pricing model again. We're going to go with per-facilit
       <confidence>definite</confidence>
       <who_said_it></who_said_it>
       <topic_tags><tag>hiring</tag><tag>strategy</tag></topic_tags>
+      <entities></entities>
     </claim>
     <claim>
       <claim_text>Target is to close the first customer within six months of launch.</claim_text>
@@ -128,6 +136,7 @@ So we talked through the pricing model again. We're going to go with per-facilit
       <confidence>definite</confidence>
       <who_said_it></who_said_it>
       <topic_tags><tag>go-to-market</tag><tag>timeline</tag></topic_tags>
+      <entities></entities>
     </claim>
     <claim>
       <claim_text>Whether to sell direct or through a channel partner in the nuclear space is unresolved.</claim_text>
@@ -135,6 +144,7 @@ So we talked through the pricing model again. We're going to go with per-facilit
       <confidence>speculative</confidence>
       <who_said_it></who_said_it>
       <topic_tags><tag>go-to-market</tag><tag>sales</tag></topic_tags>
+      <entities><entity>Nuclear Safety Associates</entity></entities>
     </claim>
   </claims>
 </extraction_output>

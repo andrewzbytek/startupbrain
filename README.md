@@ -104,7 +104,7 @@ Both documents are git-tracked, mirrored to MongoDB, and auto-recovered from Mon
 ```
 Paste transcript → Select session type → [Optional: upload whiteboard]
     │
-    ├→ Extract claims (Sonnet + extraction.md)
+    ├→ Extract claims + entities (Sonnet + extraction.md)
     │   → Human reviews/edits claims
     │
     ├→ Store session + claims in MongoDB (brain="pitch")
@@ -123,7 +123,7 @@ Paste transcript → Select session type → [Optional: upload whiteboard]
 ```
 Paste transcript → Select session type
     │
-    ├→ Extract claims (Sonnet + ops_extraction.md)
+    ├→ Extract claims + entities (Sonnet + ops_extraction.md)
     │   → Human reviews/edits claims
     │
     ├→ Store session + claims in MongoDB (brain="ops")
@@ -141,6 +141,7 @@ Paste transcript → Select session type
 - **XML tags** for all structured LLM input/output
 - **Prompts as markdown files** — loaded at runtime, easy to iterate
 - **Session types** — categorize sessions (co-founder discussion, investor meeting, customer interview, etc.) to calibrate extraction and consistency behavior
+- **Structured entity extraction** — each claim extracts named entities (people, companies, products, concepts) for entity-based retrieval without vector search
 - **Claim confirmation** — human-in-the-loop before anything enters the system
 - **Informational pushback** — surfaces context on direction changes, never blocks
 - **Book cross-check** — upload a .md book summary in chat for temporary framework cross-referencing
@@ -274,7 +275,7 @@ All 24 sections of the spec are implemented plus the two-brain architecture exte
 - Pipeline robustness (Pass 5 — 28 findings fixed): pipeline flow gating (doc update failure stops pipeline, contradiction resolution checks write success, ops warns on zero claims); retry idempotency (`batch_commit` tracks committed session ID, skips re-insert on retry); developer jargon removed from all user-facing strings (raw enums, model names, exception text, MongoDB tier names); disabled widgets get help tooltips; direct correction consistency check skipped for Ops Brain (saves 2 Sonnet calls); evolution narrative pitch-only guarded; 8 silent `except: pass` blocks now log errors
 
 **Deliberate deviations from spec:**
-- **Vector search**: Code is in place but Atlas free tier (M0) doesn't support Voyage AI autoEmbed. System uses time-based retrieval with a health monitor that alerts at 200 claims when upgrading to M10+ becomes worthwhile.
+- **Vector search**: Code is in place but Atlas free tier (M0) doesn't support Voyage AI autoEmbed. System uses time-based retrieval with a health monitor that alerts at 200 claims when upgrading to M10+ becomes worthwhile. Structured entity extraction provides an alternative retrieval path via `{"entities": {"$in": [...]}}` queries.
 - **Book frameworks**: Temporary .md upload in chat replaces the spec's persistent MongoDB storage. No book framework collection is populated.
 - **MongoDB backup script** (`scripts/backup_mongodb.py`): Not yet built. Optional — Atlas has its own backup.
 

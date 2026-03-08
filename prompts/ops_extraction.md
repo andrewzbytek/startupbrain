@@ -53,6 +53,9 @@ Respond ONLY with valid XML in this exact structure:
       <topic_tags>
         <tag>tag1</tag>
       </topic_tags>
+      <entities>
+        <entity>Key people, companies, products, or concepts mentioned</entity>
+      </entities>
     </claim>
   </claims>
 </extraction_output>
@@ -91,6 +94,7 @@ Marcus said he liked the demo but thinks we need a technical co-founder or senio
       <confidence>definite</confidence>
       <who_said_it>Marcus</who_said_it>
       <topic_tags><tag>fundraising</tag><tag>hiring</tag></topic_tags>
+      <entities><entity>Marcus</entity></entities>
     </claim>
     <claim>
       <claim_text>Sarah Chen is VP of Engineering at Atomica and is reportedly looking for her next role. Marcus can make a warm intro.</claim_text>
@@ -98,6 +102,7 @@ Marcus said he liked the demo but thinks we need a technical co-founder or senio
       <confidence>leaning</confidence>
       <who_said_it>Marcus</who_said_it>
       <topic_tags><tag>contacts</tag><tag>hiring</tag></topic_tags>
+      <entities><entity>Sarah Chen</entity><entity>Atomica</entity><entity>Marcus</entity></entities>
     </claim>
     <claim>
       <claim_text>Any software purchase over $10K at a utility goes through formal procurement, with a minimum 6-month cycle.</claim_text>
@@ -105,6 +110,7 @@ Marcus said he liked the demo but thinks we need a technical co-founder or senio
       <confidence>definite</confidence>
       <who_said_it>Marcus</who_said_it>
       <topic_tags><tag>sales-cycle</tag><tag>target-market</tag></topic_tags>
+      <entities><entity>Marcus</entity></entities>
     </claim>
     <claim>
       <claim_text>Can we structure a pilot under $10K to bypass utility procurement processes?</claim_text>
@@ -112,6 +118,7 @@ Marcus said he liked the demo but thinks we need a technical co-founder or senio
       <confidence>speculative</confidence>
       <who_said_it></who_said_it>
       <topic_tags><tag>sales-cycle</tag><tag>pricing</tag></topic_tags>
+      <entities></entities>
     </claim>
     <claim>
       <claim_text>Lisa Park, former head of sales at GridPoint, may have insight into the utility buying process. Jordan suggested reaching out.</claim_text>
@@ -119,6 +126,7 @@ Marcus said he liked the demo but thinks we need a technical co-founder or senio
       <confidence>leaning</confidence>
       <who_said_it>Jordan</who_said_it>
       <topic_tags><tag>contacts</tag><tag>sales-cycle</tag></topic_tags>
+      <entities><entity>Lisa Park</entity><entity>GridPoint</entity><entity>Jordan</entity></entities>
     </claim>
     <claim>
       <claim_text>If the first customer churns before the second is closed, the fundraising narrative collapses.</claim_text>
@@ -126,6 +134,7 @@ Marcus said he liked the demo but thinks we need a technical co-founder or senio
       <confidence>definite</confidence>
       <who_said_it>Alex</who_said_it>
       <topic_tags><tag>risks</tag><tag>fundraising</tag></topic_tags>
+      <entities><entity>Alex</entity></entities>
     </claim>
     <claim>
       <claim_text>Can the DOE grant be used for compute costs? Alex is checking.</claim_text>
@@ -133,6 +142,7 @@ Marcus said he liked the demo but thinks we need a technical co-founder or senio
       <confidence>speculative</confidence>
       <who_said_it>Alex</who_said_it>
       <topic_tags><tag>fundraising</tag><tag>infrastructure</tag></topic_tags>
+      <entities><entity>DOE</entity><entity>Alex</entity></entities>
     </claim>
     <claim>
       <claim_text>Marcus recommended looking into Render's startup program for deployment.</claim_text>
@@ -140,6 +150,7 @@ Marcus said he liked the demo but thinks we need a technical co-founder or senio
       <confidence>leaning</confidence>
       <who_said_it>Marcus</who_said_it>
       <topic_tags><tag>infrastructure</tag><tag>contacts</tag></topic_tags>
+      <entities><entity>Marcus</entity><entity>Render</entity></entities>
     </claim>
   </claims>
 </extraction_output>

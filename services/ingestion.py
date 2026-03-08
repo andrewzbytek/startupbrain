@@ -67,6 +67,7 @@ def extract_claims(
             "confidence": _extract_tag(block, "confidence"),
             "who_said_it": _extract_tag(block, "who_said_it"),
             "topic_tags": re.findall(r"<tag>(.*?)</tag>", _extract_tag(block, "topic_tags")),
+            "entities": re.findall(r"<entity>(.*?)</entity>", _extract_tag(block, "entities")),
             "confirmed": True,  # default confirmed; UI can uncheck
         }
         if claim["claim_text"]:
@@ -213,6 +214,7 @@ def store_confirmed_claims(claims: list, session_id: str, metadata: Optional[dic
             "confidence": claim.get("confidence", "definite"),
             "who_said_it": claim.get("who_said_it", ""),
             "topic_tags": claim.get("topic_tags", []),
+            "entities": claim.get("entities", []),
             "source_type": (metadata or {}).get("session_type", ""),
         }
         claim_id = insert_claim(doc, brain=brain)
