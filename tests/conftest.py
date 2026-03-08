@@ -164,6 +164,67 @@ Last updated: 2026-03-01
 """
 
 
+def _sample_ops_document_content():
+    """Return the ops document string (same content as fixture, usable outside pytest)."""
+    return """# Ops Brain — NuclearCompliance.ai
+Last updated: 2026-03-01
+
+## Contacts / Prospects
+
+- [2026-02-15] **Sarah Chen** (Entergy)
+  Role: VP Engineering | Type: customer | Status: in-conversation
+  Context: Met at NEI conference, interested in pilot
+  Last interaction: 2026-02-20 demo call
+  Next step: Send pricing proposal by 2026-03-01
+
+## Active Hypotheses
+
+- [2026-02-10] **Nuclear utilities will pay premium for compliance automation**
+  Status: testing | Test: Validate with 3 utility pricing conversations
+  Evidence: Entergy showed strong interest at $50k/yr price point
+
+## Key Assumptions
+
+- Regulatory burden increasing (NRC backlog growing)
+- Utilities prefer vendor-managed solutions over in-house builds
+
+## Key Risks
+
+- Long sales cycles (6-12 months for enterprise nuclear)
+- Regulatory approval process for AI tools in nuclear unclear
+
+## Open Questions
+
+- What's the minimum viable compliance module to start with?
+- Should we target operating plants or new builds first?
+
+## Feedback Tracker
+
+### Recurring Themes
+
+- Compliance documentation is painful (3 sources)
+- Integration with existing plant systems is key concern (2 sources)
+
+### Individual Feedback
+
+- [2026-02-20] Sarah Chen (customer): Excited about automated documentation, concerned about integration with Maximo
+- [2026-02-15] Tom Rivera (advisor): Focus on one regulation first, don't try to boil the ocean
+
+## Hiring Plans
+
+- Looking for nuclear domain expert (part-time advisor)
+- Need ML engineer with NLP experience by Q2
+
+## Scratchpad Notes
+
+- Check NRC ADAMS database for public compliance docs as training data
+- Competitor analysis: no one doing AI-specific nuclear compliance yet
+"""
+
+
+get_sample_ops_document = _sample_ops_document_content
+
+
 @pytest.fixture
 def sample_claims():
     """Return a list of claim dicts matching the schema from SPEC Section 15.2."""

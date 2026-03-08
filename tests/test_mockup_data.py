@@ -936,6 +936,197 @@ on standard cloud infrastructure.
 
 
 # ---------------------------------------------------------------------------
+# Ops brain sessions
+# ---------------------------------------------------------------------------
+
+def ops_session_01_contacts_and_risks() -> dict:
+    """
+    Ops-focused meeting: contacts, risks, assumptions, questions, hiring.
+    Expected: 5-10 claims, 0 contradictions.
+    """
+    transcript = """Ops Session 1 — Industry Contacts and Risk Assessment
+Date: 2026-03-01
+Participants: Alex, Jordan
+
+Meeting with two key industry contacts today. Sarah Chen from Atomica — she is the
+Compliance Director, met her at the NIA conference last month. She has 15 years in
+nuclear compliance and is open to being an early design partner. She specifically
+mentioned that their Hartlepool site still tracks compliance documents in Excel with
+over 4,000 rows. She would be willing to run a pilot if we can demonstrate extraction
+accuracy above 90% on their Safety Case documents.
+
+Also spoke with David Patel, who consults for the Office for Nuclear Regulation. He is
+not currently employed by ONR but does independent safety reviews for them on contract.
+He warned us that any software used in compliance workflows at licensed nuclear sites
+may require ONR pre-approval under Licence Condition 26. This is a key risk — the
+approval process can take 6-12 months and requires a formal safety case for the software
+itself.
+
+Key assumption we are working with: procurement for software under £100,000 at small
+nuclear operators does not require a formal tender process. David confirmed this is
+generally true — most operators have a threshold of £100K-£150K below which the
+Compliance Manager and IT Director can approve directly. Above that threshold, it goes
+to a formal procurement board.
+
+Open question we need to resolve: should we pursue Cyber Essentials Plus certification
+or go straight to ISO 27001? David's view is that Cyber Essentials Plus is the minimum
+for any nuclear site, but ISO 27001 will be expected by the time we reach our third
+customer. His recommendation is to start Cyber Essentials Plus immediately and begin
+ISO 27001 preparation in parallel.
+
+On hiring: we need a nuclear domain expert as our first hire. Salary range is £80,000
+to £100,000. This person needs to have either worked at a nuclear plant in a compliance
+role or done regulatory consulting for ONR. Rachel is circulating a job description
+through her network.
+"""
+    return {
+        "transcript": transcript,
+        "participants": "Alex, Jordan",
+        "topic_hint": "industry contacts risk assessment ONR certification",
+        "expected_claims_min": 5,
+        "expected_claims_max": 10,
+        "expected_contradictions": 0,
+    }
+
+
+def ops_session_02_hypotheses_and_feedback() -> dict:
+    """
+    Ops-focused session: testable hypotheses and attributed investor feedback.
+    Expected: 4-8 claims, 0 contradictions.
+    """
+    transcript = """Ops Session 2 — Hypothesis Validation and Investor Feedback
+Date: 2026-03-03
+Participants: Alex, Jordan
+
+We have two key hypotheses to track going forward.
+
+First hypothesis: SharePoint pre-population will be the primary adoption driver.
+Our belief is that most nuclear operators already store compliance documents in
+SharePoint but without structured metadata. If we can automatically pre-populate
+metadata fields in their existing SharePoint environment, that reduces the perceived
+switching cost to near zero. Test: validate with the next 3 customer conversations
+whether SharePoint integration is mentioned as a top-3 requirement.
+
+Second hypothesis: our £50,000 per facility pricing is justified because operators
+currently spend £80,000 to £120,000 per year on compliance administration through
+internal staff time and external consultants. We are a cost-saving play, not just a
+productivity tool. Test: confirm with at least 3 operators that their current compliance
+spend is in the £80K-£120K range.
+
+Investor feedback from this week:
+
+Marcus Webb from Frontier Ventures gave us detailed feedback. His main concern is that
+we have no traction yet — no signed customers, no LOIs, no pilots in progress. He said
+he would be interested in a follow-up conversation once we have at least one signed pilot
+agreement. He specifically asked about our competitive moat and whether the extraction
+prompts are defensible IP.
+
+Tom Bradley from Hartlepool Nuclear — he is actually a potential customer, not an investor,
+but gave us useful product feedback. He needs a 4-week proof of concept, not 2 weeks. His
+reasoning: the first 2 weeks would be spent getting IT security approval to connect our
+system to their SharePoint, leaving only the actual document ingestion trial for the
+remaining time. He suggested we budget 4 weeks minimum for any nuclear site PoC.
+"""
+    return {
+        "transcript": transcript,
+        "participants": "Alex, Jordan",
+        "topic_hint": "hypothesis validation investor feedback pricing",
+        "expected_claims_min": 4,
+        "expected_claims_max": 8,
+        "expected_contradictions": 0,
+    }
+
+
+def ops_session_03_scratchpad_and_mixed() -> dict:
+    """
+    Ops-focused session: conference notes, contacts, competitive intel, questions.
+    Expected: 3-6 claims, 0 contradictions.
+    """
+    transcript = """Ops Session 3 — NIA Conference Follow-Up Notes
+Date: 2026-03-05
+Participants: Alex
+
+Quick notes from the NIA conference follow-up calls today.
+
+Lisa Park from GridPoint Energy — she is the Head of Safety Documentation at their
+Torness site. Brief conversation, she is interested in a demo but no commitment yet.
+She mentioned they use a custom-built document management system, not SharePoint.
+Worth noting as a potential objection to our SharePoint integration hypothesis.
+
+James Thornton, who is the CTO of ComplianceDB, was at the conference. Interesting
+competitive intel: ComplianceDB 4.0 is adding what they call "AI-assisted tagging" but
+from James's description it sounds like keyword matching with a GPT wrapper, not true
+structured extraction. Their pricing is £30K-£45K per site, which undercuts us. However,
+James admitted their extraction accuracy is "getting better but still requires significant
+manual review." This confirms our positioning — we win on extraction quality.
+
+Open question from the conference: several compliance managers asked whether we provide
+Data Processing Agreement templates for handling nuclear safety documents. We do not
+currently have a DPA template. Need to develop one — this could be a blocker for pilots.
+
+New contact: Elena Vasquez from the Nuclear Skills Organisation. She runs their digital
+transformation programme and is interested in how AI tools are being adopted across the
+nuclear sector. Not a direct customer but could be a valuable connector and reference.
+She offered to introduce us to compliance managers at three sites.
+"""
+    return {
+        "transcript": transcript,
+        "participants": "Alex",
+        "topic_hint": "conference notes competitive intel contacts",
+        "expected_claims_min": 3,
+        "expected_claims_max": 6,
+        "expected_contradictions": 0,
+    }
+
+
+def edge_entity_extraction() -> dict:
+    """
+    Dense with named entities for testing structured entity extraction.
+    People: Sarah Chen, Marcus Webb, Tom Bradley.
+    Companies: Atomica, Frontier Ventures, ComplianceDB, ONR.
+    Products: ComplianceDB 4.0, SharePoint.
+    Concepts: ISO 27001, ALARP.
+    Expected: 4-7 claims, 0 contradictions.
+    """
+    transcript = """Session — Entity-Dense Strategy Update
+Date: 2026-03-06
+Participants: Alex, Jordan
+
+Sarah Chen from Atomica confirmed that their Hartlepool site uses the ALARP principle
+(As Low As Reasonably Practicable) for all safety case decisions. This is standard ONR
+methodology and our extraction prompts need to correctly identify ALARP references in
+compliance documents. Sarah estimates they process approximately 200 ALARP assessments
+per year across their safety case portfolio.
+
+Marcus Webb at Frontier Ventures asked specifically about our competitive position against
+ComplianceDB 4.0. We told him ComplianceDB's approach is keyword-based tagging, not
+LLM extraction. Our accuracy on structured metadata extraction is 95%+ compared to
+ComplianceDB's estimated 70-75%. Marcus said this differentiation is compelling but wants
+to see it demonstrated on real nuclear documents, not test data.
+
+Tom Bradley from Hartlepool Nuclear confirmed they require ISO 27001 certification before
+any vendor can access their document management systems. He also mentioned they are
+evaluating whether to migrate from their legacy DMS to SharePoint, which would make our
+integration much simpler. His timeline for the SharePoint migration is Q3 2026.
+
+The Office for Nuclear Regulation published new guidance this week on digital tools in
+compliance workflows. The guidance suggests that AI-assisted document management tools
+should undergo a proportionate safety assessment, with the level of rigour depending on
+whether the tool is used for information retrieval (lower risk) or compliance decision
+support (higher risk). Our product falls in the information retrieval category, which
+means a lighter-touch approval process. This is positive for our ONR approval timeline.
+"""
+    return {
+        "transcript": transcript,
+        "participants": "Alex, Jordan",
+        "topic_hint": "entity-dense strategy update ALARP ONR ComplianceDB",
+        "expected_claims_min": 4,
+        "expected_claims_max": 7,
+        "expected_contradictions": 0,
+    }
+
+
+# ---------------------------------------------------------------------------
 # Registry for easy iteration in tests
 # ---------------------------------------------------------------------------
 
@@ -947,9 +1138,16 @@ ALL_SESSIONS = [
     session_05_direct_correction,
 ]
 
+ALL_OPS_SESSIONS = [
+    ops_session_01_contacts_and_risks,
+    ops_session_02_hypotheses_and_feedback,
+    ops_session_03_scratchpad_and_mixed,
+]
+
 ALL_EDGE_CASES = [
     edge_empty,
     edge_long,
     edge_xml_injection,
     edge_multiple_contradictions,
+    edge_entity_extraction,
 ]

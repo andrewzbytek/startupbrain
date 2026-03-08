@@ -63,7 +63,7 @@ When splitting tasks across agents, avoid overlapping file edits:
 - Test transcripts in `tests/test_transcripts/`
 - Run unit tests: `python -m pytest tests/ -m "not integration"`
 - Run integration tests: `python -m pytest tests/ -m integration` (requires API key + MongoDB)
-- 1024 unit tests + 45 integration tests across 29 test files, all unit tests run fully offline with mocks
+- 1024 unit tests + 40 integration tests across 29 test files, all unit tests run fully offline with mocks
 
 ## Deployment
 - **Render** (primary): `render.yaml` Blueprint — free tier, auto-deploy from GitHub
@@ -125,7 +125,7 @@ All 24 sections of `docs/SPEC.md` are implemented plus brain split architecture.
 
 **Document freshness check in DeferredWriter (2026-03-07 — 1 race condition fixed, 1 checkpoint bug fixed):** `DeferredWriter.batch_commit()` snapshots the living document at pipeline initialization but writes it 2-5 minutes later. Concurrent writes (hypothesis, contact, correction) via `doc_write_lock` during the pipeline window were silently overwritten by the stale snapshot. Fix: `batch_commit()` now computes `original_doc_hash` (SHA-256) at initialization, serialized in checkpoints. At commit time, re-reads the current document and compares hashes. If changed, re-generates diffs against the current document (Option A: one extra Sonnet call, ~$0.02) via `generate_diff()` + `verify_diff()` + `apply_diff()`. If re-diff verification fails, aborts doc write but still stores session + claims, and deletes the checkpoint (prevents duplicate session on Resume). `_build_claims_summary()` helper builds the re-diff input from confirmed claims. Backward compatible: old checkpoints without `original_doc_hash` recompute it from `original_doc`. The fallback `_resolve_contradiction()` path (non-deferred) was verified safe — `update_document()` acquires its own lock and reads fresh. Adversarial verification (35 points): all PASS except the checkpoint bug above (now fixed). `apply_document_update_deferred()` confirmed in-memory only — contradiction resolution during pipeline does NOT cause false conflicts.
 
-**Tests:** 1024 unit tests, 45 integration tests across 29 test files. All unit tests run fully offline with mocks.
+**Tests:** 1024 unit tests, 40 integration tests across 29 test files. All unit tests run fully offline with mocks.
 
 ### Decided Against
 
