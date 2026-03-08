@@ -53,8 +53,8 @@ def read_living_document(brain: str = "pitch") -> str:
                     with open(path, "w", encoding="utf-8") as f:
                         f.write(content)
                     logging.info("Living document (%s) recovered from MongoDB", brain)
-                except Exception:
-                    pass  # Disk write failed — return content from memory anyway
+                except Exception as e:
+                    logging.warning("Could not write recovered document (%s) to disk: %s", brain, e)
         except Exception as e:
             logging.warning("Failed to recover living document (%s) from MongoDB: %s", brain, e)
 

@@ -127,10 +127,13 @@ class DeferredWriter:
             "explanation": explanation,
         })
 
-    def save_checkpoint(self):
+    def save_checkpoint(self) -> bool:
         """Persist current pipeline state to MongoDB pending_ingestion collection."""
         from services.mongo_client import upsert_pending_ingestion
-        upsert_pending_ingestion(self.to_checkpoint())
+        ok = upsert_pending_ingestion(self.to_checkpoint())
+        if not ok:
+            logging.error("save_checkpoint: checkpoint not persisted to MongoDB")
+        return ok
 
     def batch_commit(self) -> dict:
         """
@@ -144,7 +147,7 @@ class DeferredWriter:
         Returns dict with: success (bool), message (str), claims_stored (int), session_id (str)
         """
         from services.document_updater import write_living_document, _git_commit
-        from services.mongo_client import upsert_living_document, delete_pending_ingestion
+        from services.mongo_client import upsert_living_document, delete_pending_ingestion, find_many
         from services.ingestion import store_session, store_confirmed_claims
         from services.ingestion_lock import acquire_doc_lock, release_doc_lock
 
@@ -153,6 +156,7 @@ class DeferredWriter:
 
         session_id = getattr(self, '_committed_session_id', None)
         claims_stored = 0
+        doc_write_succeeded = False
 
         try:
             # 1. Write file (only if changed) — acquire doc lock to prevent clobbering
@@ -171,6 +175,7 @@ class DeferredWriter:
                             brain=self.brain,
                         )
                         if session_id_result:
+                            self._committed_session_id = session_id_result
                             inserted = store_confirmed_claims(
                                 self.confirmed_claims, session_id_result,
                                 metadata=self.metadata, brain=self.brain,
@@ -179,7 +184,8 @@ class DeferredWriter:
                     except Exception as store_err:
                         logging.error("Failed to store session/claims on doc-lock failure: %s", store_err)
                     try:
-                        delete_pending_ingestion()
+                        if not delete_pending_ingestion():
+                            logging.error("checkpoint deletion failed — stale checkpoint may trigger false recovery on next load")
                     except Exception as cleanup_err:
                         logging.warning("Could not delete checkpoint after doc-lock failure: %s", cleanup_err)
                     return {
@@ -203,6 +209,7 @@ class DeferredWriter:
                         logging.error("MongoDB mirror failed in batch_commit — continuing with file write: %s", mirror_err)
 
                     write_living_document(self.in_memory_doc, brain=self.brain)
+                    doc_write_succeeded = True
 
                     # 3. Single git commit
                     brain_label = "pitch_brain.md" if self.brain == "pitch" else "ops_brain.md"
@@ -225,23 +232,29 @@ class DeferredWriter:
                 else:
                     logging.error("batch_commit: store_session returned None — session not persisted")
 
-            # 5. Store claims
+            # 5. Store claims (skip if already stored from a previous attempt)
             claims_stored = 0
             if session_id:
-                inserted = store_confirmed_claims(
-                    self.confirmed_claims, session_id, metadata=self.metadata,
-                    brain=self.brain,
-                )
-                claims_stored = len(inserted)
-                if self.confirmed_claims and claims_stored == 0:
-                    logging.error("batch_commit: all claim inserts failed — session stored but no RAG evidence")
+                existing_claims = find_many("claims", {"session_id": session_id})
+                if existing_claims:
+                    claims_stored = len(existing_claims)
+                    logging.info("batch_commit: %d claims already exist for session %s — skipping re-insert", claims_stored, session_id)
+                else:
+                    inserted = store_confirmed_claims(
+                        self.confirmed_claims, session_id, metadata=self.metadata,
+                        brain=self.brain,
+                    )
+                    claims_stored = len(inserted)
+                    if self.confirmed_claims and claims_stored == 0:
+                        logging.error("batch_commit: all claim inserts failed — session stored but no RAG evidence")
 
             # 6. Delete checkpoint
-            delete_pending_ingestion()
+            if not delete_pending_ingestion():
+                logging.error("checkpoint deletion failed — stale checkpoint may trigger false recovery on next load")
 
             return {
-                "success": bool(session_id),
-                "message": "Batch commit complete." if session_id else "Document updated but session could not be saved to database.",
+                "success": bool(session_id) and (claims_stored > 0 or not self.confirmed_claims),
+                "message": "Batch commit complete." if (session_id and (claims_stored > 0 or not self.confirmed_claims)) else "Document updated but session could not be saved to database.",
                 "claims_stored": claims_stored,
                 "session_id": session_id or "",
                 "document_updated": doc_changed,
@@ -254,7 +267,8 @@ class DeferredWriter:
             if session_id and claims_stored == 0:
                 try:
                     from services.mongo_client import delete_one
-                    delete_one("sessions", {"_id": session_id})
+                    if not delete_one("sessions", {"_id": session_id}):
+                        logging.warning("batch_commit: could not clean up orphaned session %s", session_id)
                     self._committed_session_id = None
                     logging.info("Cleaned up orphaned session %s after batch_commit failure", session_id)
                 except Exception as cleanup_err:
@@ -270,7 +284,8 @@ class DeferredWriter:
                     logging.warning("Could not save checkpoint for retry: %s", cp_err)
             else:
                 try:
-                    delete_pending_ingestion()
+                    if not delete_pending_ingestion():
+                        logging.error("checkpoint deletion failed — stale checkpoint may trigger false recovery on next load")
                 except Exception as cp_err:
                     logging.warning("Could not delete checkpoint in batch_commit failure path: %s", cp_err)
             return {
@@ -278,8 +293,8 @@ class DeferredWriter:
                 "message": f"Batch commit failed: {e}",
                 "claims_stored": 0,
                 "session_id": "",
-                "document_updated": False,
-                "changes_applied": 0,
+                "document_updated": doc_write_succeeded,
+                "changes_applied": getattr(self, '_changes_applied', 0) if doc_write_succeeded else 0,
             }
 
     def rollback(self):
@@ -321,6 +336,7 @@ class DeferredWriter:
             "stage": self.stage,
             "lock_session_id": self.lock_session_id,
             "brain": self.brain,
+            "committed_session_id": getattr(self, "_committed_session_id", None),
             "saved_at": datetime.now(timezone.utc).isoformat(),
         }
 
@@ -341,6 +357,7 @@ class DeferredWriter:
         writer.stage = data.get("stage", "unknown")
         writer.lock_session_id = data.get("lock_session_id")
         writer.brain = data.get("brain", "pitch")
+        writer._committed_session_id = data.get("committed_session_id")
         return writer
 
 
@@ -452,13 +469,13 @@ def rollback_last_session() -> dict:
         # 4. Revert living document FIRST (before deleting MongoDB data)
         #    so that if the file write fails, MongoDB data is still intact.
         if prev_content is not None:
-            write_living_document(prev_content, brain=brain)
             date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
             upsert_living_document(
                 prev_content,
                 metadata={"last_updated": date_str, "update_reason": f"Rollback session {session_id}"},
                 brain=brain,
             )
+            write_living_document(prev_content, brain=brain)
             _git_commit(f"Rollback session: {session_id}", brain=brain)
 
         # 5. Delete the session document first (orphaned claims are less visible than orphaned sessions)

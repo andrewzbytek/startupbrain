@@ -520,5 +520,6 @@ def vector_search_text(
 
     try:
         return list(db[collection_name].aggregate(pipeline))
-    except Exception:
+    except Exception as e:
+        logging.error("Vector text search failed (%s): %s", collection_name, e)
         return []

@@ -6,6 +6,7 @@ Auth is skipped entirely when APP_USERNAME / APP_PASSWORD env vars are not set.
 
 import hashlib
 import hmac
+import logging
 import os
 import time
 
@@ -115,8 +116,8 @@ def is_authenticated() -> bool:
         if token and _verify_token(token):
             st.session_state._authenticated = True
             return True
-    except Exception:
-        pass
+    except Exception as e:
+        logging.warning("Cookie read failed: %s", e)
 
     return False
 
@@ -149,8 +150,8 @@ def render_login_page():
                     cookies = CookieController()
                     token = _create_token(username)
                     cookies.set(_COOKIE_NAME, token, max_age=_COOKIE_MAX_AGE_SECONDS)
-                except Exception:
-                    pass  # Cookie storage failed — session-only auth
+                except Exception as e:
+                    logging.warning("Cookie write failed (session-only auth): %s", e)
                 st.rerun()
             else:
                 st.error("Invalid username or password.")

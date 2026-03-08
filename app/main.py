@@ -160,6 +160,10 @@ def render_ingesting():
         label_visibility="collapsed",
     )
     if uploaded_file is not None:
+        current_name = uploaded_file.name
+        if current_name != st.session_state.get("_whiteboard_filename", ""):
+            st.session_state.whiteboard_text = ""
+            st.session_state._whiteboard_filename = current_name
         if uploaded_file.size > 10_000_000:
             st.error("File too large. Maximum upload size is 10 MB.")
         else:
@@ -437,7 +441,11 @@ def render_checking_consistency():
                 progress.complete("Consistency check found issues. Review required.")
                 set_mode("resolving_contradiction")
             else:
-                progress.complete("All checks passed. Committing...")
+                summary = consistency_results.get("summary", "")
+                if "failed" in summary.lower() or "error" in summary.lower():
+                    progress.complete("Consistency check could not be completed. Proceeding with ingestion.")
+                else:
+                    progress.complete("No contradictions found.")
                 invalidate_sidebar()
                 set_mode("done")
 
@@ -478,8 +486,10 @@ def render_done():
             logging.error("Batch commit failed: %s", commit_result.get("message", ""))
             st.session_state._batch_commit_failed = True
             st.error("Saving your session failed. Click below to retry.")
-            if st.session_state.get("pipeline_result", {}).get("document_updated"):
+            if commit_result.get("document_updated"):
                 st.info("Your living document was already updated successfully. Only the session record failed to save.")
+            else:
+                st.info("Your document changes are preserved in memory and will be written on successful retry.")
 
     if st.session_state.get("_batch_commit_failed") and not st.session_state.get("_batch_committed"):
         if st.button("Retry Save", type="primary", key="retry_batch_commit"):
@@ -492,16 +502,17 @@ def render_done():
     doc_update_msg = pipeline_result.get("document_update_message", "")
     session_id = st.session_state.get("current_session_id", "")
 
-    if doc_updated:
-        st.success("Session ingested successfully. Living document updated.")
-    else:
-        st.warning(
-            "Session ingested but the living document was NOT updated. "
-            "Your claims are safely stored in the database. "
-            "You can try ingesting again or use chat to update the document manually."
-        )
-        if doc_update_msg:
-            logging.error("Document update error: %s", doc_update_msg)
+    if st.session_state.get("_batch_committed"):
+        if doc_updated:
+            st.success("Session ingested successfully. Living document updated.")
+        else:
+            st.warning(
+                "Session ingested but the living document was NOT updated. "
+                "Your claims are safely stored in the database. "
+                "You can try ingesting again or use chat to update the document manually."
+            )
+            if doc_update_msg:
+                logging.error("Document update error: %s", doc_update_msg)
 
     col1, col2, col3, col4 = st.columns(4)
     with col1:
@@ -853,6 +864,8 @@ else:
                             set_mode("done")
                         else:
                             set_mode("resolving_contradiction")
+                    elif writer.stage in ("consistency_check", "initialized"):
+                        set_mode("checking_consistency")
                     else:
                         set_mode("done")
                     st.rerun()

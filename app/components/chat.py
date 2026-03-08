@@ -660,7 +660,9 @@ def _apply_hypothesis(user_message: str) -> str:
             doc = read_living_document(brain="ops")
             doc = _add_hypothesis(doc, entry)
             # Mirror to MongoDB first (source of truth on Render's ephemeral FS)
-            upsert_living_document(doc, metadata={"last_updated": date_str, "update_reason": "New hypothesis"}, brain="ops")
+            mirror_ok = upsert_living_document(doc, metadata={"last_updated": date_str, "update_reason": "New hypothesis"}, brain="ops")
+            if not mirror_ok:
+                logging.error("upsert_living_document failed for hypothesis update — not mirrored to MongoDB")
             try:
                 write_living_document(doc, brain="ops")
                 _git_commit(f"Add hypothesis: {hypothesis_text[:50]}", brain="ops")
@@ -731,7 +733,9 @@ def _apply_hypothesis_status_update(user_message: str) -> str:
                 return f"Could not find a hypothesis matching: **{fragment}**. Check the sidebar for exact text."
 
             # Mirror to MongoDB first (source of truth on Render's ephemeral FS)
-            upsert_living_document(updated_doc, metadata={"last_updated": date_str}, brain="ops")
+            mirror_ok = upsert_living_document(updated_doc, metadata={"last_updated": date_str}, brain="ops")
+            if not mirror_ok:
+                logging.error("upsert_living_document failed for hypothesis status update — not mirrored to MongoDB")
             try:
                 write_living_document(updated_doc, brain="ops")
                 _git_commit(f"Hypothesis {new_status}: {fragment[:50]}", brain="ops")
@@ -742,7 +746,9 @@ def _apply_hypothesis_status_update(user_message: str) -> str:
 
         # Update MongoDB
         try:
-            update_hypothesis_status(fragment, new_status)
+            synced = update_hypothesis_status(fragment, new_status)
+            if not synced:
+                logging.warning("update_hypothesis_status matched nothing in claims for fragment: %s", fragment[:80])
         except Exception as e:
             logging.error("Failed to sync hypothesis status to MongoDB: %s", e)
 
@@ -1234,7 +1240,12 @@ def _resolve_contradiction_deferred(contradiction: dict, action: str, new_claim:
     writer = st.session_state.get("deferred_writer")
     if writer is None:
         logging.warning("No deferred_writer in session state — falling back to immediate contradiction resolution.")
-        _resolve_contradiction(contradiction, action, new_claim, explanation)
+        try:
+            _resolve_contradiction(contradiction, action, new_claim, explanation)
+        except Exception as e:
+            logging.error("Fallback contradiction resolution failed: %s", e)
+            st.warning("Could not apply resolution. Please try again.")
+            return False
         return True
 
     try:
@@ -1344,7 +1355,11 @@ def _resolve_contradiction(contradiction: dict, action: str, new_claim: str, exp
             )
             reason = f"Contradiction resolved — updated {section} ({date_str})"
             # update_document manages its own doc lock internally
-            update_document(new_info, update_reason=reason, brain=brain)
+            result = update_document(new_info, update_reason=reason, brain=brain)
+            if not result or not result.get("success"):
+                logging.error("Contradiction resolution document update failed: %s", result.get("message", "unknown") if result else "no result")
+                st.warning("Could not update document. Please try again.")
+                return  # Don't write Decision Log for a failed update
 
             # Separate lock scope for the Decision Log entry
             lock_id = acquire_doc_lock(timeout_seconds=60)
@@ -1399,7 +1414,11 @@ def _resolve_contradiction(contradiction: dict, action: str, new_claim: str, exp
             )
             reason = f"Contradiction resolved with explanation — {section} ({date_str})"
             # update_document manages its own doc lock internally
-            update_document(new_info, update_reason=reason, brain=brain)
+            result = update_document(new_info, update_reason=reason, brain=brain)
+            if not result or not result.get("success"):
+                logging.error("Contradiction resolution document update failed: %s", result.get("message", "unknown") if result else "no result")
+                st.warning("Could not update document. Please try again.")
+                return  # Don't write Decision Log for a failed update
 
             # Separate lock scope for the Decision Log entry
             lock_id = acquire_doc_lock(timeout_seconds=60)

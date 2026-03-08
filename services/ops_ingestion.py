@@ -16,6 +16,7 @@ def run_ops_ingestion(
     topic_tags: Optional[list] = None,
     session_type: str = "",
     brain: str = "ops",
+    existing_session_id: Optional[str] = None,
 ) -> dict:
     """
     Simplified Ops Brain ingestion pipeline:
@@ -53,27 +54,37 @@ def run_ops_ingestion(
     # Update ops document
     doc_result = update_document(new_info, update_reason=update_reason, brain=brain)
 
-    # Store session
-    session_id = store_session(
-        transcript,
-        metadata=metadata,
-        session_summary=session_summary,
-        topic_tags=topic_tags,
-        brain=brain,
-    )
+    # Store session (skip if retrying with an existing session)
+    if existing_session_id:
+        session_id = existing_session_id
+    else:
+        session_id = store_session(
+            transcript,
+            metadata=metadata,
+            session_summary=session_summary,
+            topic_tags=topic_tags,
+            brain=brain,
+        )
 
     if not session_id:
         logging.error("run_ops_ingestion: store_session returned None — session not persisted")
 
-    # Store claims
+    # Store claims (check for existing claims to avoid duplicates on retry)
     claims_stored = 0
     if session_id:
-        inserted = store_confirmed_claims(
-            confirmed_claims, session_id, metadata=metadata, brain=brain,
-        )
-        claims_stored = len(inserted)
+        from services.mongo_client import find_many
+        existing = find_many("claims", {"session_id": session_id})
+        if existing:
+            claims_stored = len(existing)
+            logging.info("run_ops_ingestion: %d claims already exist for session %s — skipping insert", claims_stored, session_id)
+        else:
+            inserted = store_confirmed_claims(
+                confirmed_claims, session_id, metadata=metadata, brain=brain,
+            )
+            claims_stored = len(inserted)
 
-    success = doc_result.get("success", False) or claims_stored > 0
+    session_ok = session_id is not None or not confirmed_claims
+    success = doc_result.get("success", False) and session_ok
 
     return {
         "success": success,

@@ -292,8 +292,8 @@ def _get_rag_evidence(claims: list, brain: str = "pitch") -> list:
                         "relevant_excerpt": r.get("claim_text", ""),
                     })
                 return evidence
-    except Exception:
-        pass  # Fall back to time-based retrieval
+    except Exception as e:
+        logging.debug("Vector search unavailable, using time-based fallback: %s", e)
 
     # Fallback: time-based retrieval
     evidence = []
@@ -328,8 +328,8 @@ def _get_rag_evidence(claims: list, brain: str = "pitch") -> list:
                 "Consistency checks may miss older relevant evidence.",
                 total, RAG_UPGRADE_CLAIM_THRESHOLD,
             )
-    except Exception:
-        pass
+    except Exception as e:
+        logging.warning("Could not check RAG claim count: %s", e)
 
     return evidence
 

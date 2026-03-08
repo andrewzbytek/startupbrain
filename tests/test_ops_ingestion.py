@@ -48,7 +48,7 @@ class TestRunOpsIngestion:
     @patch("services.ingestion.store_session")
     @patch("services.document_updater.update_document")
     def test_ops_ingestion_doc_update_fails(self, mock_update, mock_store_session, mock_store_claims):
-        """Ops ingestion still succeeds if doc update fails but claims stored."""
+        """Ops ingestion returns failure when doc update fails even if claims stored."""
         from services.ops_ingestion import run_ops_ingestion
 
         mock_update.return_value = {"success": False, "message": "Doc lock failed", "changes_applied": 0}
@@ -60,7 +60,7 @@ class TestRunOpsIngestion:
             confirmed_claims=[{"claim_text": "Test", "confirmed": True}],
         )
 
-        assert result["success"] is True  # claims stored successfully
+        assert result["success"] is False  # doc update failed — not a full success
         assert result["document_updated"] is False
         assert result["claims_stored"] == 1
 
@@ -68,7 +68,7 @@ class TestRunOpsIngestion:
     @patch("services.ingestion.store_session")
     @patch("services.document_updater.update_document")
     def test_ops_ingestion_no_session_id(self, mock_update, mock_store_session, mock_store_claims):
-        """Ops ingestion handles None session_id gracefully."""
+        """Ops ingestion returns failure when session_id is None and claims expected."""
         from services.ops_ingestion import run_ops_ingestion
 
         mock_update.return_value = {"success": True, "message": "OK", "changes_applied": 1}
@@ -80,7 +80,7 @@ class TestRunOpsIngestion:
             confirmed_claims=[{"claim_text": "Test", "confirmed": True}],
         )
 
-        assert result["success"] is True
+        assert result["success"] is False  # session failed — not a full success
         assert result["claims_stored"] == 0
         assert result["session_id"] == ""
 

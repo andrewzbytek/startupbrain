@@ -273,8 +273,8 @@ def acquire_doc_lock(timeout_seconds: int = 30) -> Optional[str]:
                         "session_id": lock_id,
                     })
                     return lock_id
-                except Exception:
-                    pass  # Another process just created it — retry
+                except Exception as e:
+                    logging.debug("acquire_doc_lock insert_one race (will retry): %s", e)
         except Exception as _e:
             logging.debug("acquire_doc_lock transient error (will retry): %s", _e)
 
