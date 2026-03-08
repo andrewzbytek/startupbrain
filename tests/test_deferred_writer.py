@@ -736,7 +736,8 @@ class TestDocumentFreshnessCheck:
              patch("services.ingestion.store_session", return_value="sess123"), \
              patch("services.ingestion.store_confirmed_claims", return_value=["c1"]), \
              patch("services.ingestion_lock.acquire_doc_lock", return_value="lock-123"), \
-             patch("services.ingestion_lock.release_doc_lock"):
+             patch("services.ingestion_lock.release_doc_lock"), \
+             patch("services.mongo_client.delete_pending_ingestion") as mock_del_cp:
             result = writer.batch_commit()
 
         assert result["success"] is False
@@ -745,6 +746,42 @@ class TestDocumentFreshnessCheck:
         assert result["claims_stored"] == 1
         # Document should NOT have been written
         mock_write.assert_not_called()
+        # Checkpoint should be DELETED (session+claims stored, user told to re-ingest)
+        mock_del_cp.assert_called_once()
+
+    def test_batch_commit_conflict_api_error(self):
+        """When generate_diff throws during conflict re-diff, stale doc is NOT written."""
+        writer = _make_writer()
+        writer.in_memory_doc = "modified by pipeline"
+
+        concurrent_doc = SAMPLE_DOC + "\n## Extra\n"
+
+        with patch("services.document_updater.read_living_document", return_value=concurrent_doc), \
+             patch("services.document_updater.generate_diff", side_effect=Exception("API timeout")), \
+             patch("services.document_updater.write_living_document") as mock_write, \
+             patch("services.mongo_client.upsert_living_document") as mock_upsert, \
+             patch("services.mongo_client.upsert_pending_ingestion", return_value=True), \
+             patch("services.ingestion_lock.acquire_doc_lock", return_value="lock-123"), \
+             patch("services.ingestion_lock.release_doc_lock") as mock_release:
+            result = writer.batch_commit()
+
+        assert result["success"] is False
+        # CRITICAL: stale document must NOT be written
+        mock_write.assert_not_called()
+        # Lock must be released even on error
+        mock_release.assert_called_once_with("lock-123")
+
+    def test_build_claims_summary(self):
+        """_build_claims_summary should format all confirmed claims."""
+        writer = _make_writer(claims=[
+            {"claim_text": "Price is $100", "claim_type": "decision", "who_said_it": "Alice"},
+            {"claim_text": "TAM is $1B", "claim_type": "market_data"},
+            {"claim_text": "", "claim_type": "claim"},
+        ])
+        summary = writer._build_claims_summary()
+        assert "[decision] Price is $100 (said by Alice)" in summary
+        assert "[market_data] TAM is $1B" in summary
+        assert "(said by" not in summary.split("\n")[1]  # no who_said_it for second claim
 
     def test_checkpoint_preserves_doc_hash(self):
         """original_doc_hash should survive to_checkpoint → from_checkpoint round-trip."""

@@ -261,6 +261,11 @@ class DeferredWriter:
                                     claims_stored_count = len(inserted) if inserted else 0
                             except Exception as store_err:
                                 logging.error("Failed to store session/claims on conflict resolution failure: %s", store_err)
+                            # Delete checkpoint — session+claims stored, user told to re-ingest
+                            try:
+                                delete_pending_ingestion()
+                            except Exception as cp_err:
+                                logging.warning("Could not delete checkpoint after conflict resolution failure: %s", cp_err)
                             return {
                                 "success": False,
                                 "message": "The document was modified while you were reviewing claims. "
