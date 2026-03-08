@@ -50,8 +50,7 @@ def read_living_document(brain: str = "pitch") -> str:
                 # Write back to disk for current session
                 try:
                     path.parent.mkdir(parents=True, exist_ok=True)
-                    with open(path, "w", encoding="utf-8") as f:
-                        f.write(content)
+                    write_living_document(content, brain=brain)
                     logging.info("Living document (%s) recovered from MongoDB", brain)
                 except Exception as e:
                     logging.warning("Could not write recovered document (%s) to disk: %s", brain, e)
@@ -658,9 +657,12 @@ def update_document(new_info: str, update_reason: str = "", max_retries: int = 2
         # Mirror to MongoDB first (source of truth on Render's ephemeral filesystem)
         date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         try:
-            upsert_living_document(updated_doc, metadata={"last_updated": date_str, "update_reason": update_reason}, brain=brain)
+            mirror_ok = upsert_living_document(updated_doc, metadata={"last_updated": date_str, "update_reason": update_reason}, brain=brain)
+            if not mirror_ok:
+                raise RuntimeError("upsert_living_document returned False")
         except Exception as mirror_err:
-            logging.error("MongoDB mirror failed — continuing with file write: %s", mirror_err)
+            logging.error("MongoDB mirror failed — aborting to prevent file-ahead desync: %s", mirror_err)
+            return {"success": False, "message": "Database mirror failed — document not updated to prevent desync.", "changes_applied": 0}
 
         # Write file
         try:

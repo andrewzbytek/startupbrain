@@ -605,6 +605,7 @@ def _apply_contact(contact_text: str) -> str:
             brain="ops",
         )
 
+        claim_synced = True
         try:
             existing = find_one("claims", {"claim_text": contact_text, "claim_type": "claim", "source_type": "contact_note", "brain": "ops"})
             if not existing:
@@ -618,11 +619,16 @@ def _apply_contact(contact_text: str) -> str:
                 }, brain="ops")
                 if not claim_result:
                     logging.warning("Contact claim insert returned None — document updated but claims not synced")
+                    claim_synced = False
         except Exception as e:
             logging.error("Contact claim insert failed: %s", e)
+            claim_synced = False
 
         if result.get("success"):
-            return f"Contact noted — {result.get('message', '')}"
+            msg = f"Contact noted — {result.get('message', '')}"
+            if not claim_synced:
+                msg += " (note: contact is in the document but not indexed for search)"
+            return msg
         else:
             logging.error("Contact save issue: %s", result.get('message', ''))
             return "Contact may not have been saved. Please try again."
@@ -1282,15 +1288,16 @@ def _resolve_contradiction_deferred(contradiction: dict, action: str, new_claim:
                 st.warning(f"Could not apply resolution: {doc_result.get('message', 'unknown error')}. Please try again.")
                 return False
 
-            decision_entry = (
-                f"### {date_str} — Resolved: {section}\n"
-                f"**Decision:** Updated to: {new_claim}\n"
-                f"**Alternatives considered:** Keep previous position\n"
-                f"**Why alternatives were rejected:** New information contradicted existing position. {tension}\n"
-                f"**Context:** Contradiction resolution during ingestion.\n"
-                f"**Participants:** {participants}"
-            )
-            writer.apply_decision_log_deferred(decision_entry)
+            if doc_result.get("changes_applied", 0) > 0:
+                decision_entry = (
+                    f"### {date_str} — Resolved: {section}\n"
+                    f"**Decision:** Updated to: {new_claim}\n"
+                    f"**Alternatives considered:** Keep previous position\n"
+                    f"**Why alternatives were rejected:** New information contradicted existing position. {tension}\n"
+                    f"**Context:** Contradiction resolution during ingestion.\n"
+                    f"**Participants:** {participants}"
+                )
+                writer.apply_decision_log_deferred(decision_entry)
 
         elif action == "keep":
             dismissed_entry = (
@@ -1314,15 +1321,16 @@ def _resolve_contradiction_deferred(contradiction: dict, action: str, new_claim:
                 st.warning(f"Could not apply resolution: {doc_result.get('message', 'unknown error')}. Please try again.")
                 return False
 
-            decision_entry = (
-                f"### {date_str} — Resolved: {section}\n"
-                f"**Decision:** Updated to: {new_claim}\n"
-                f"**Alternatives considered:** Keep previous position\n"
-                f"**Why alternatives were rejected:** {explanation}\n"
-                f"**Context:** Contradiction resolution during ingestion.\n"
-                f"**Participants:** {participants}"
-            )
-            writer.apply_decision_log_deferred(decision_entry)
+            if doc_result.get("changes_applied", 0) > 0:
+                decision_entry = (
+                    f"### {date_str} — Resolved: {section}\n"
+                    f"**Decision:** Updated to: {new_claim}\n"
+                    f"**Alternatives considered:** Keep previous position\n"
+                    f"**Why alternatives were rejected:** {explanation}\n"
+                    f"**Context:** Contradiction resolution during ingestion.\n"
+                    f"**Participants:** {participants}"
+                )
+                writer.apply_decision_log_deferred(decision_entry)
 
         writer.record_contradiction_resolution(idx, action, new_claim, explanation)
         writer.save_checkpoint()

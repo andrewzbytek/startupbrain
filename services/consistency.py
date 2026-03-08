@@ -541,9 +541,13 @@ def run_consistency_check(claims: list, session_type: str = "", brain: str = "pi
 
     # Pass 3 — only if Critical found
     pass3 = None
+    evidence_missing = False
     if pass2["has_critical"]:
         critical_items = [c for c in pass2["retained"] if c.get("severity", "") == "Critical"]
         rag_evidence = _get_rag_evidence(claims, brain=brain)
+        if not rag_evidence:
+            evidence_missing = True
+            logging.warning("RAG evidence empty for Pass 3 — Opus analysis will lack historical context")
         pass3 = pass3_deep_analysis(critical_items, living_doc, rag_evidence)
 
     critical_count = sum(1 for c in pass2["retained"] if c.get("severity", "") == "Critical")
@@ -563,6 +567,7 @@ def run_consistency_check(claims: list, session_type: str = "", brain: str = "pi
         "has_contradictions": True,
         "has_critical": pass2["has_critical"],
         "summary": summary,
+        "evidence_missing": evidence_missing,
     }
 
 

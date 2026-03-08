@@ -531,6 +531,9 @@ def render_done():
             _contradiction_label = "None"
         st.metric("Contradictions", _contradiction_label)
 
+    if consistency_results and consistency_results.get("evidence_missing"):
+        st.warning("Consistency analysis ran without historical evidence — results may be less thorough than usual.")
+
     # Show which sections were changed, if available
     doc_result_sections = pipeline_result.get("sections_changed") or pipeline_result.get("updated_sections")
     if doc_result_sections:

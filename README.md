@@ -76,7 +76,7 @@ startupbrain/
 │   ├── bootstrap.py            # Vector search index bootstrap
 │   └── migrate_brain_split.py  # One-time MongoDB migration for brain split
 ├── render.yaml                 # Render Blueprint deployment config
-├── tests/                      # 1014 unit tests, 45 integration tests
+├── tests/                      # 1015 unit tests, 45 integration tests
 │   ├── conftest.py             # Shared fixtures and sample data
 │   ├── test_transcripts/       # Sample transcripts for testing
 │   └── test_*.py               # 29 test modules (one per service/component)
@@ -202,7 +202,7 @@ python -m pytest tests/ -m integration
 python -m pytest tests/ -v --tb=short -m "not integration"
 ```
 
-1014 unit tests + 45 integration tests across 29 test files. All service and component tests run fully offline with mocks.
+1015 unit tests + 45 integration tests across 29 test files. All service and component tests run fully offline with mocks.
 
 ## Deployment
 
@@ -268,6 +268,7 @@ All 24 sections of the spec are implemented plus the two-brain architecture exte
 - `re.escape()` on all user-provided values in MongoDB `$regex` queries (prevents ReDoS)
 - Crash recovery detects document drift and warns before overwriting recent changes
 - Rollback safely ordered: file write before MongoDB deletes, orphaned session cleanup on failure
+- System invariants audit (Pass 7a): MongoDB mirror failure aborts file write (prevents file-ahead desync on Render restart); recovery write-back uses atomic write; ingestion lock revalidated at batch_commit; parser headers normalized to tolerate trailing whitespace; consistency engine surfaces `evidence_missing` flag when RAG fails silently; feedback miscategorization fixed (unrecognized orgs no longer default to VC bucket)
 - Consistency engine properly filters dismissed contradictions (including short-word claims)
 - Consistency engine detects API errors and surfaces "check failed" instead of silently producing "no contradictions"
 - Brain isolation hardened: `active_brain` (write target) vs `chat_brain_context` (read scope) correctly separated across all write/read paths; 26 cross-brain data integrity bugs fixed via targeted review

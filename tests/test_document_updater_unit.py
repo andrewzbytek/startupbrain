@@ -329,7 +329,7 @@ class TestUpdateDocumentUnit:
             mock_upsert.assert_called_once()
 
     def test_write_permission_error(self, tmp_path, sample_living_document):
-        """Should handle write permission errors gracefully."""
+        """Should handle file write errors gracefully (when MongoDB succeeds)."""
         living_doc_path = tmp_path / "pitch_brain.md"
         living_doc_path.write_text(sample_living_document, encoding="utf-8")
 
@@ -354,11 +354,44 @@ class TestUpdateDocumentUnit:
              patch("services.claude_client.call_sonnet", side_effect=mock_sonnet), \
              patch("services.claude_client.load_prompt", return_value="t"), \
              patch("services.claude_client.escape_xml", side_effect=lambda x: x), \
+             patch("services.mongo_client.upsert_living_document", return_value=True), \
              patch("services.document_updater.write_living_document", side_effect=PermissionError("read-only")):
             from services.document_updater import update_document
             result = update_document("new info")
             assert result["success"] is False
             assert "failed to write" in result["message"].lower()
+
+    def test_mongodb_mirror_failure_aborts(self, tmp_path, sample_living_document):
+        """V1-B: Should abort when MongoDB mirror fails to prevent file-ahead desync."""
+        living_doc_path = tmp_path / "pitch_brain.md"
+        living_doc_path.write_text(sample_living_document, encoding="utf-8")
+
+        diff_text = (
+            "SECTION: Decision Log\n"
+            "ACTION: ADD_DECISION\n"
+            "CONTENT:\n"
+            "### 2026-02-28 \u2014 Test\n**Decision:** X\n**Why:** Y\n**Status:** Active\n"
+        )
+        verified_xml = "<verify_output><verdict>VERIFIED</verdict><notes>ok</notes></verify_output>"
+
+        call_count = [0]
+
+        def mock_sonnet(*args, **kwargs):
+            call_count[0] += 1
+            if call_count[0] == 1:
+                return {"text": diff_text, "tokens_in": 100, "tokens_out": 50, "model": "m"}
+            else:
+                return {"text": verified_xml, "tokens_in": 100, "tokens_out": 50, "model": "m"}
+
+        with patch.dict("services.document_updater._BRAIN_DOC_PATHS", {"pitch": living_doc_path}), \
+             patch("services.claude_client.call_sonnet", side_effect=mock_sonnet), \
+             patch("services.claude_client.load_prompt", return_value="t"), \
+             patch("services.claude_client.escape_xml", side_effect=lambda x: x), \
+             patch("services.mongo_client.upsert_living_document", return_value=False):
+            from services.document_updater import update_document
+            result = update_document("new info")
+            assert result["success"] is False
+            assert "mirror failed" in result["message"].lower()
 
     def test_git_commit_called(self, tmp_path, sample_living_document):
         """Should call _git_commit after successful update."""

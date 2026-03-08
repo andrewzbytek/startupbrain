@@ -158,6 +158,22 @@ class DeferredWriter:
         claims_stored = 0
         doc_write_succeeded = False
 
+        # Revalidate ingestion lock ownership — guard against stale session after network interruption
+        if self.lock_session_id:
+            from services.ingestion_lock import check_lock
+            lock_status = check_lock()
+            if lock_status.get("locked") and lock_status.get("session_id") != self.lock_session_id:
+                logging.error("batch_commit: ingestion lock owned by another session (%s != %s) — aborting",
+                              lock_status.get("session_id"), self.lock_session_id)
+                return {
+                    "success": False,
+                    "message": "Another ingestion took over — your session's lock expired. Please re-ingest.",
+                    "claims_stored": 0,
+                    "session_id": "",
+                    "document_updated": False,
+                    "changes_applied": 0,
+                }
+
         try:
             # 1. Write file (only if changed) — acquire doc lock to prevent clobbering
             if doc_changed:
@@ -200,13 +216,16 @@ class DeferredWriter:
                     # 2. Mirror to MongoDB first (source of truth on Render's ephemeral FS)
                     update_reason = self._build_update_reason()
                     try:
-                        upsert_living_document(
+                        mirror_ok = upsert_living_document(
                             self.in_memory_doc,
                             metadata={"last_updated": date_str, "update_reason": update_reason},
                             brain=self.brain,
                         )
+                        if not mirror_ok:
+                            raise RuntimeError("upsert_living_document returned False")
                     except Exception as mirror_err:
-                        logging.error("MongoDB mirror failed in batch_commit — continuing with file write: %s", mirror_err)
+                        logging.error("MongoDB mirror failed in batch_commit — aborting doc write to prevent desync: %s", mirror_err)
+                        raise  # Let outer except handle checkpoint + retry
 
                     write_living_document(self.in_memory_doc, brain=self.brain)
                     doc_write_succeeded = True

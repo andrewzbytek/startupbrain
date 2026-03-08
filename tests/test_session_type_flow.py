@@ -299,7 +299,7 @@ class TestParseFeedbackBySource:
     def test_empty_doc_returns_empty_dict(self):
         from app.components.sidebar import _parse_feedback_by_source
         result = _parse_feedback_by_source("")
-        assert result == {"vc": [], "customer": [], "advisor": []}
+        assert result == {"vc": [], "customer": [], "advisor": [], "other": []}
 
     def test_no_individual_feedback_section(self):
         doc = """## Feedback Tracker
@@ -309,7 +309,7 @@ class TestParseFeedbackBySource:
 """
         from app.components.sidebar import _parse_feedback_by_source
         result = _parse_feedback_by_source(doc)
-        assert result == {"vc": [], "customer": [], "advisor": []}
+        assert result == {"vc": [], "customer": [], "advisor": [], "other": []}
 
 
 # ---------------------------------------------------------------------------

@@ -160,7 +160,7 @@ def render_ops_dashboard():
         feedback = _parse_feedback_by_source(doc)
         total = sum(len(v) for v in feedback.values())
         if total > 0:
-            for source_type, label in [("vc", "Investor"), ("customer", "Customer"), ("advisor", "Advisor")]:
+            for source_type, label in [("vc", "Investor"), ("customer", "Customer"), ("advisor", "Advisor"), ("other", "Other")]:
                 entries = feedback.get(source_type, [])
                 if entries:
                     st.markdown(f"**{label} Feedback** ({len(entries)})")

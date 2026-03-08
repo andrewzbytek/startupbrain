@@ -8,6 +8,18 @@ import re
 from datetime import date, timedelta
 
 
+def _normalize_headers(doc: str) -> str:
+    """Strip trailing whitespace from header lines to prevent regex mismatches."""
+    lines = doc.split('\n')
+    normalized = []
+    for line in lines:
+        if line.lstrip().startswith('#'):
+            normalized.append(line.rstrip())
+        else:
+            normalized.append(line)
+    return '\n'.join(normalized)
+
+
 def _escape_latex(text: str) -> str:
     """Escape dollar signs so Streamlit doesn't render them as LaTeX math."""
     return text.replace("$", "\\$")
@@ -18,6 +30,7 @@ def _parse_current_state(doc: str) -> list:
     Parse Current State sections from the living document.
     Returns list of dicts: {name, current_position, changelog_entries}
     """
+    doc = _normalize_headers(doc)
     sections = []
     # Find the Current State section
     cs_match = re.search(r"## Current State\n(.*?)(?=\n## |\Z)", doc, re.DOTALL)
@@ -56,6 +69,7 @@ def _parse_recent_changelog(doc: str, limit: int = 8) -> list:
     Collect the most recent changelog entries across all sections.
     Returns list of strings (most recent first).
     """
+    doc = _normalize_headers(doc)
     entries = []
     cs_match = re.search(r"## Current State\n(.*?)(?=\n## |\Z)", doc, re.DOTALL)
     if not cs_match:
@@ -78,6 +92,7 @@ def _parse_feedback_themes(doc: str) -> list:
     Parse recurring themes from Feedback Tracker section.
     Returns list of theme strings.
     """
+    doc = _normalize_headers(doc)
     themes = []
     ft_match = re.search(r"## Feedback Tracker\n(.*?)(?=\n## |\Z)", doc, re.DOTALL)
     if not ft_match:
@@ -103,7 +118,8 @@ def _parse_feedback_by_source(doc: str) -> dict:
     Returns dict like {"vc": [...], "customer": [...], "advisor": [...]}.
     Falls back to empty dict on failure.
     """
-    result = {"vc": [], "customer": [], "advisor": []}
+    result = {"vc": [], "customer": [], "advisor": [], "other": []}
+    doc = _normalize_headers(doc)
     try:
         ft_match = re.search(r"## Feedback Tracker\n(.*?)(?=\n## |\Z)", doc, re.DOTALL)
         if not ft_match:
@@ -149,7 +165,7 @@ def _parse_feedback_by_source(doc: str) -> dict:
                     elif any(kw in lower_line for kw in ("advisor", "mentor", "board")):
                         bucket = "advisor"
                     else:
-                        bucket = "vc"  # Default fallback
+                        bucket = "other"  # Default fallback — don't miscategorize as investor
                 result[bucket].append(summary)
 
     except Exception as e:
@@ -177,6 +193,7 @@ def _parse_hypotheses(doc: str) -> list:
     Parse Active Hypotheses from the living document.
     Returns list of dicts: {date, text, status, test, evidence}
     """
+    doc = _normalize_headers(doc)
     hypotheses = []
     ah_match = re.search(r"## Active Hypotheses\n(.*?)(?=\n## |\Z)", doc, re.DOTALL)
     if not ah_match:
@@ -216,6 +233,7 @@ def _parse_contacts(doc: str) -> list:
     and ops brain (## Contacts / Prospects as top-level section).
     Returns list of dicts: {date, name, org, role, type, status, context, last_interaction, next_step}
     """
+    doc = _normalize_headers(doc)
     contacts = []
     content = None
 
@@ -311,6 +329,7 @@ def _find_changelog_tensions(sections: list, today) -> list:
 
 def _find_dismissed_tensions(doc: str, today) -> list:
     """Find recently dismissed contradictions (within 14 days)."""
+    doc = _normalize_headers(doc)
     tensions = []
     cutoff = today - timedelta(days=14)
 
@@ -356,6 +375,7 @@ def _find_dismissed_tensions(doc: str, today) -> list:
 
 def _find_decision_tensions(doc: str, today) -> list:
     """Find Decision Log entries under evaluation within 14 days."""
+    doc = _normalize_headers(doc)
     tensions = []
     cutoff = today - timedelta(days=14)
 

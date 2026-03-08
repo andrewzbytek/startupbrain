@@ -124,11 +124,11 @@ def render_dashboard():
         # External Feedback panel
         with st.expander("External Feedback", expanded=True):
             feedback_by_source = _parse_feedback_by_source(doc)
-            has_source_feedback = any(feedback_by_source.get(k) for k in ("vc", "customer", "advisor"))
+            has_source_feedback = any(feedback_by_source.get(k) for k in ("vc", "customer", "advisor", "other"))
 
             if has_source_feedback:
-                _FEEDBACK_LABELS = {"vc": "VC/Investor", "customer": "Customer", "advisor": "Advisor"}
-                for key in ("vc", "customer", "advisor"):
+                _FEEDBACK_LABELS = {"vc": "VC/Investor", "customer": "Customer", "advisor": "Advisor", "other": "Other"}
+                for key in ("vc", "customer", "advisor", "other"):
                     items = feedback_by_source.get(key, [])
                     if items:
                         st.markdown(f"**Top {_FEEDBACK_LABELS[key]} feedback:**")
