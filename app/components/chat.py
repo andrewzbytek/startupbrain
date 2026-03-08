@@ -595,7 +595,7 @@ def _apply_contact(contact_text: str) -> str:
     """
     try:
         from services.document_updater import update_document
-        from services.mongo_client import insert_claim
+        from services.mongo_client import find_one, insert_claim
         from datetime import datetime, timezone
 
         result = update_document(
@@ -605,16 +605,18 @@ def _apply_contact(contact_text: str) -> str:
         )
 
         try:
-            claim_result = insert_claim({
-                "claim_text": contact_text,
-                "claim_type": "claim",
-                "confidence": "definite",
-                "source_type": "contact_note",
-                "who_said_it": "Founder",
-                "confirmed": True,
-            }, brain="ops")
-            if not claim_result:
-                logging.warning("Contact claim insert returned None — document updated but claims not synced")
+            existing = find_one("claims", {"claim_text": contact_text, "claim_type": "claim", "source_type": "contact_note", "brain": "ops"})
+            if not existing:
+                claim_result = insert_claim({
+                    "claim_text": contact_text,
+                    "claim_type": "claim",
+                    "confidence": "definite",
+                    "source_type": "contact_note",
+                    "who_said_it": "Founder",
+                    "confirmed": True,
+                }, brain="ops")
+                if not claim_result:
+                    logging.warning("Contact claim insert returned None — document updated but claims not synced")
         except Exception as e:
             logging.error("Contact claim insert failed: %s", e)
 
@@ -637,7 +639,7 @@ def _apply_hypothesis(user_message: str) -> str:
         from services.document_updater import (
             read_living_document, write_living_document, _add_hypothesis, _git_commit,
         )
-        from services.mongo_client import insert_claim, upsert_living_document
+        from services.mongo_client import find_one, insert_claim, upsert_living_document
         from services.ingestion_lock import acquire_doc_lock, release_doc_lock
         from datetime import datetime, timezone
 
@@ -671,20 +673,24 @@ def _apply_hypothesis(user_message: str) -> str:
         finally:
             release_doc_lock(lock_id)
 
-        # Store in MongoDB as a hypothesis claim
+        # Store in MongoDB as a hypothesis claim (dedup guard)
         db_synced = False
         try:
-            result = insert_claim({
-                "claim_text": hypothesis_text,
-                "claim_type": "hypothesis",
-                "confidence": "speculative",
-                "source_type": "hypothesis",
-                "who_said_it": "Founder",
-                "confirmed": True,
-                "status": "unvalidated",
-                "test_plan": "",
-            }, brain="ops")
-            db_synced = result is not None
+            existing = find_one("claims", {"claim_text": hypothesis_text, "claim_type": "hypothesis", "brain": "ops"})
+            if existing:
+                db_synced = True  # Already stored — skip duplicate
+            else:
+                result = insert_claim({
+                    "claim_text": hypothesis_text,
+                    "claim_type": "hypothesis",
+                    "confidence": "speculative",
+                    "source_type": "hypothesis",
+                    "who_said_it": "Founder",
+                    "confirmed": True,
+                    "status": "unvalidated",
+                    "test_plan": "",
+                }, brain="ops")
+                db_synced = result is not None
         except Exception as _hyp_db_err:
             logging.error("Hypothesis claim insert failed: %s", _hyp_db_err)
             db_synced = False

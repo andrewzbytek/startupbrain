@@ -487,6 +487,7 @@ def run_consistency_check(claims: list, session_type: str = "", brain: str = "pi
             "has_contradictions": False,
             "has_critical": False,
             "summary": "Consistency check failed — API error during Pass 1.",
+            "api_error": True,
         }
 
     if pass1["total_found"] == 0:
@@ -524,6 +525,7 @@ def run_consistency_check(claims: list, session_type: str = "", brain: str = "pi
             "has_contradictions": False,
             "has_critical": False,
             "summary": "Consistency check failed — API error during severity filtering.",
+            "api_error": True,
         }
 
     if pass2["total_retained"] == 0:

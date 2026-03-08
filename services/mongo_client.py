@@ -167,8 +167,10 @@ def update_one(
             update["$set"] = {**update["$set"], "updated_at": datetime.now(timezone.utc)}
         else:
             update["$set"] = {"updated_at": datetime.now(timezone.utc)}
-        db[collection_name].update_one(query, update, upsert=upsert)
-        return True
+        result = db[collection_name].update_one(query, update, upsert=upsert)
+        if upsert:
+            return result.modified_count > 0 or result.upserted_id is not None
+        return result.modified_count > 0
     except Exception as e:
         logging.error("MongoDB update failed (%s): %s", collection_name, e)
         logging.warning("Database operation failed. Please try again.")

@@ -327,6 +327,10 @@ class TestUpdateOne:
         """Should return True on successful update."""
         mock_db = MagicMock()
         mock_collection = MagicMock()
+        mock_result = MagicMock()
+        mock_result.modified_count = 1
+        mock_result.upserted_id = None
+        mock_collection.update_one.return_value = mock_result
         mock_db.__getitem__ = MagicMock(return_value=mock_collection)
 
         with patch.object(mc, "get_db", return_value=mock_db):

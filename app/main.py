@@ -442,7 +442,7 @@ def render_checking_consistency():
                 set_mode("resolving_contradiction")
             else:
                 summary = consistency_results.get("summary", "")
-                if "failed" in summary.lower() or "error" in summary.lower():
+                if consistency_results.get("api_error") or "failed" in summary.lower() or "error" in summary.lower():
                     progress.complete("Consistency check could not be completed. Proceeding with ingestion.")
                 else:
                     progress.complete("No contradictions found.")
@@ -523,7 +523,13 @@ def render_done():
         st.metric("Sections updated", changes_applied if doc_updated else 0)
     with col4:
         has_contradictions = consistency_results.get("has_contradictions", False) if consistency_results else False
-        st.metric("Contradictions", "Resolved" if has_contradictions else "None")
+        if consistency_results.get("api_error"):
+            _contradiction_label = "Check failed"
+        elif has_contradictions:
+            _contradiction_label = "Resolved"
+        else:
+            _contradiction_label = "None"
+        st.metric("Contradictions", _contradiction_label)
 
     # Show which sections were changed, if available
     doc_result_sections = pipeline_result.get("sections_changed") or pipeline_result.get("updated_sections")
@@ -867,7 +873,11 @@ else:
                     elif writer.stage in ("consistency_check", "initialized"):
                         set_mode("checking_consistency")
                     else:
-                        set_mode("done")
+                        # Unknown stage — don't attempt batch_commit on unknown state
+                        st.warning("Recovery checkpoint has an unrecognized stage. Discarding to avoid data corruption.")
+                        writer.rollback()
+                        st.session_state.deferred_writer = None
+                        st.session_state._has_pending_ingestion = False
                     st.rerun()
 
             with col_discard:

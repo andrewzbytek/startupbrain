@@ -78,6 +78,7 @@ def init_session_state():
         "_ops_commit_failed": False,
         "_ops_result": {},
         "_confirm_cancel_ingestion": False,
+        "_ops_hyp_lock_failed": False,
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -132,6 +133,7 @@ def reset_ingestion():
     st.session_state.consistency_results = None
     st.session_state.contradiction_index = 0
     st.session_state.whiteboard_text = ""
+    st.session_state.pop("_whiteboard_filename", None)
     st.session_state.ingestion_session_type = ""
     st.session_state.ingestion_session_date = None
     # Don't reset active_view — preserve Dashboard/Chat tab the user was on
@@ -162,4 +164,6 @@ def reset_ingestion():
 
     # Clear pending quick command to prevent stale fire after cancel
     st.session_state.pop("_quick_cmd_pending", None)
+    st.session_state.pop("_consistency_fail_msg", None)
+    st.session_state.pop("_ops_commit_fail_msg", None)
     st.session_state._confirm_cancel_ingestion = False

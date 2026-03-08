@@ -183,11 +183,11 @@ class DeferredWriter:
                             claims_stored_count = len(inserted) if inserted else 0
                     except Exception as store_err:
                         logging.error("Failed to store session/claims on doc-lock failure: %s", store_err)
+                    # Save checkpoint with committed_session_id so retry skips session re-insert
                     try:
-                        if not delete_pending_ingestion():
-                            logging.error("checkpoint deletion failed — stale checkpoint may trigger false recovery on next load")
-                    except Exception as cleanup_err:
-                        logging.warning("Could not delete checkpoint after doc-lock failure: %s", cleanup_err)
+                        self.save_checkpoint()
+                    except Exception as cp_err:
+                        logging.warning("Could not save checkpoint after doc-lock failure session store: %s", cp_err)
                     return {
                         "success": False,
                         "message": "Document lock unavailable — session and claims stored but document not updated. Try again later.",
@@ -236,15 +236,21 @@ class DeferredWriter:
             claims_stored = 0
             if session_id:
                 existing_claims = find_many("claims", {"session_id": session_id})
-                if existing_claims:
+                if existing_claims and len(existing_claims) >= len(self.confirmed_claims):
                     claims_stored = len(existing_claims)
                     logging.info("batch_commit: %d claims already exist for session %s — skipping re-insert", claims_stored, session_id)
                 else:
-                    inserted = store_confirmed_claims(
-                        self.confirmed_claims, session_id, metadata=self.metadata,
-                        brain=self.brain,
-                    )
-                    claims_stored = len(inserted)
+                    # Partial or no claims stored — insert missing ones
+                    existing_texts = {c.get("claim_text", "") for c in existing_claims} if existing_claims else set()
+                    missing_claims = [c for c in self.confirmed_claims if c.get("claim_text", "") not in existing_texts]
+                    if missing_claims:
+                        inserted = store_confirmed_claims(
+                            missing_claims, session_id, metadata=self.metadata,
+                            brain=self.brain,
+                        )
+                        claims_stored = len(inserted) + (len(existing_claims) if existing_claims else 0)
+                    else:
+                        claims_stored = len(existing_claims) if existing_claims else 0
                     if self.confirmed_claims and claims_stored == 0:
                         logging.error("batch_commit: all claim inserts failed — session stored but no RAG evidence")
 
@@ -257,8 +263,8 @@ class DeferredWriter:
                 "message": "Batch commit complete." if (session_id and (claims_stored > 0 or not self.confirmed_claims)) else "Document updated but session could not be saved to database.",
                 "claims_stored": claims_stored,
                 "session_id": session_id or "",
-                "document_updated": doc_changed,
-                "changes_applied": getattr(self, '_changes_applied', 0) if doc_changed else 0,
+                "document_updated": doc_write_succeeded,
+                "changes_applied": getattr(self, '_changes_applied', 0) if doc_write_succeeded else 0,
             }
 
         except Exception as e:
@@ -299,7 +305,24 @@ class DeferredWriter:
 
     def rollback(self):
         """Discard all in-memory changes and delete the checkpoint."""
-        from services.mongo_client import delete_pending_ingestion
+        from services.mongo_client import delete_pending_ingestion, delete_one, delete_many
+        # Clean up any committed session/claims from a partial batch_commit
+        committed_id = getattr(self, '_committed_session_id', None)
+        if committed_id:
+            try:
+                delete_many("claims", {"session_id": str(committed_id)})
+                delete_one("sessions", {"_id": committed_id})
+            except Exception as e:
+                logging.error("rollback: failed to clean up committed session %s: %s", committed_id, e)
+        # Revert document if it was already written to disk/MongoDB
+        if self.in_memory_doc != self.original_doc:
+            try:
+                from services.document_updater import write_living_document
+                from services.mongo_client import upsert_living_document
+                upsert_living_document(self.original_doc, metadata={"update_reason": "Discard recovery"}, brain=self.brain)
+                write_living_document(self.original_doc, brain=self.brain)
+            except Exception as e:
+                logging.error("rollback: failed to revert document: %s", e)
         self.in_memory_doc = self.original_doc
         self.contradiction_resolutions = []
         delete_pending_ingestion()
@@ -337,6 +360,7 @@ class DeferredWriter:
             "lock_session_id": self.lock_session_id,
             "brain": self.brain,
             "committed_session_id": getattr(self, "_committed_session_id", None),
+            "changes_applied": getattr(self, "_changes_applied", 0),
             "saved_at": datetime.now(timezone.utc).isoformat(),
         }
 
@@ -358,6 +382,7 @@ class DeferredWriter:
         writer.lock_session_id = data.get("lock_session_id")
         writer.brain = data.get("brain", "pitch")
         writer._committed_session_id = data.get("committed_session_id")
+        writer._changes_applied = data.get("changes_applied", 0)
         return writer
 
 
@@ -479,17 +504,27 @@ def rollback_last_session() -> dict:
             _git_commit(f"Rollback session: {session_id}", brain=brain)
 
         # 5. Delete the session document first (orphaned claims are less visible than orphaned sessions)
-        delete_one("sessions", {"_id": session["_id"]})
+        session_deleted = delete_one("sessions", {"_id": session["_id"]})
+        if not session_deleted:
+            logging.warning("rollback: session %s could not be deleted from MongoDB", session_id)
 
         # 6. Delete claims for this session
         claims_deleted = delete_many("claims", {"session_id": session_id})
+
+        # 7. Delete feedback for this session
+        try:
+            feedback_deleted = delete_many("feedback", {"session_id": session_id})
+            if feedback_deleted:
+                logging.info("rollback: deleted %d feedback records for session %s", feedback_deleted, session_id)
+        except Exception as fb_err:
+            logging.warning("rollback: could not delete feedback for session %s: %s", session_id, fb_err)
     finally:
         if doc_lock_id:
             release_doc_lock(doc_lock_id)
 
     if prev_content is not None:
         return {
-            "success": True,
+            "success": session_deleted,
             "message": f"Rolled back session {session_id}: {claims_deleted} claims deleted, "
                        f"document reverted to commit {prev_hash}.",
             "session_id": session_id,
@@ -497,7 +532,7 @@ def rollback_last_session() -> dict:
         }
     elif git_error is not None:
         return {
-            "success": True,
+            "success": session_deleted,
             "message": f"Session {session_id} deleted from MongoDB ({claims_deleted} claims). "
                        f"Git revert failed: {git_error}",
             "session_id": session_id,
@@ -505,7 +540,7 @@ def rollback_last_session() -> dict:
         }
     else:
         return {
-            "success": True,
+            "success": session_deleted,
             "message": f"Session {session_id} deleted from MongoDB ({claims_deleted} claims). "
                        "Only one git commit for the document — no git revert performed.",
             "session_id": session_id,

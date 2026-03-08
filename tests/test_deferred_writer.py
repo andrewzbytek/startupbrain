@@ -372,19 +372,20 @@ class TestBatchCommit:
         mock_delete.assert_called_once()
 
     def test_batch_commit_doc_lock_failure(self):
-        """batch_commit should handle doc lock failure gracefully."""
+        """batch_commit should handle doc lock failure gracefully and save checkpoint for retry."""
         writer = _make_writer()
         writer.in_memory_doc = "changed content"
 
         with patch("services.ingestion_lock.acquire_doc_lock", return_value=None), \
              patch("services.document_updater.write_living_document") as mock_write, \
-             patch("services.mongo_client.delete_pending_ingestion") as mock_delete:
+             patch("services.mongo_client.upsert_pending_ingestion", return_value=True) as mock_save_cp:
             result = writer.batch_commit()
 
         assert result["success"] is False
         assert "lock" in result["message"].lower()
         mock_write.assert_not_called()
-        mock_delete.assert_called_once()
+        # Checkpoint should be saved (not deleted) so retry can skip session re-insert
+        mock_save_cp.assert_called_once()
 
 
 # ---------------------------------------------------------------------------
@@ -484,7 +485,7 @@ class TestRollbackLastSession:
 
         with patch("services.mongo_client.get_latest_session", return_value=session), \
              patch("services.mongo_client.delete_many", return_value=3) as mock_del_many, \
-             patch("services.mongo_client.delete_one") as mock_del_one, \
+             patch("services.mongo_client.delete_one", return_value=True) as mock_del_one, \
              patch("subprocess.run", side_effect=self._mock_subprocess_run()), \
              patch("services.document_updater.write_living_document"), \
              patch("services.mongo_client.upsert_living_document"), \
@@ -492,7 +493,10 @@ class TestRollbackLastSession:
             from services.deferred_writer import rollback_last_session
             result = rollback_last_session()
 
-        mock_del_many.assert_called_once_with("claims", {"session_id": str(sid)})
+        # delete_many called for claims and feedback
+        assert mock_del_many.call_count == 2
+        mock_del_many.assert_any_call("claims", {"session_id": str(sid)})
+        mock_del_many.assert_any_call("feedback", {"session_id": str(sid)})
         mock_del_one.assert_called_once_with("sessions", {"_id": sid})
         assert result["claims_deleted"] == 3
 
@@ -503,7 +507,7 @@ class TestRollbackLastSession:
 
         with patch("services.mongo_client.get_latest_session", return_value=session), \
              patch("services.mongo_client.delete_many", return_value=1), \
-             patch("services.mongo_client.delete_one"), \
+             patch("services.mongo_client.delete_one", return_value=True), \
              patch("subprocess.run", side_effect=self._mock_subprocess_run(show_stdout="reverted content")), \
              patch("services.document_updater.write_living_document") as mock_write, \
              patch("services.mongo_client.upsert_living_document") as mock_upsert, \
@@ -522,7 +526,7 @@ class TestRollbackLastSession:
 
         with patch("services.mongo_client.get_latest_session", return_value=session), \
              patch("services.mongo_client.delete_many", return_value=0), \
-             patch("services.mongo_client.delete_one"), \
+             patch("services.mongo_client.delete_one", return_value=True), \
              patch("subprocess.run", side_effect=self._mock_subprocess_run()), \
              patch("services.document_updater.write_living_document"), \
              patch("services.mongo_client.upsert_living_document"), \
@@ -540,7 +544,7 @@ class TestRollbackLastSession:
 
         with patch("services.mongo_client.get_latest_session", return_value=session), \
              patch("services.mongo_client.delete_many", return_value=2), \
-             patch("services.mongo_client.delete_one"), \
+             patch("services.mongo_client.delete_one", return_value=True), \
              patch("subprocess.run", side_effect=self._mock_subprocess_run(log_stdout="abc1234 Only commit")), \
              patch("services.document_updater.write_living_document") as mock_write:
             from services.deferred_writer import rollback_last_session
@@ -561,7 +565,7 @@ class TestRollbackLastSession:
 
         with patch("services.mongo_client.get_latest_session", return_value=session), \
              patch("services.mongo_client.delete_many", return_value=1), \
-             patch("services.mongo_client.delete_one"), \
+             patch("services.mongo_client.delete_one", return_value=True), \
              patch("subprocess.run", side_effect=fail_subprocess):
             from services.deferred_writer import rollback_last_session
             result = rollback_last_session()
@@ -578,7 +582,7 @@ class TestRollbackLastSession:
 
         with patch("services.mongo_client.get_latest_session", return_value=session), \
              patch("services.mongo_client.delete_many", return_value=0), \
-             patch("services.mongo_client.delete_one"), \
+             patch("services.mongo_client.delete_one", return_value=True), \
              patch("subprocess.run", side_effect=self._mock_subprocess_run()), \
              patch("services.document_updater.write_living_document"), \
              patch("services.mongo_client.upsert_living_document"), \
@@ -596,7 +600,7 @@ class TestRollbackLastSession:
 
         with patch("services.mongo_client.get_latest_session", return_value=session), \
              patch("services.mongo_client.delete_many", return_value=1), \
-             patch("services.mongo_client.delete_one"), \
+             patch("services.mongo_client.delete_one", return_value=True), \
              patch("subprocess.run", side_effect=self._mock_subprocess_run(show_stdout="ops reverted content")), \
              patch("services.document_updater.write_living_document") as mock_write, \
              patch("services.mongo_client.upsert_living_document") as mock_upsert, \
