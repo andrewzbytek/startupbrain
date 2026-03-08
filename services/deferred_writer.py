@@ -6,6 +6,7 @@ until batch_commit() at the very end of the pipeline.
 Checkpoints pipeline state to MongoDB so crashes are recoverable.
 """
 
+import hashlib
 import logging
 import subprocess
 from datetime import datetime, timezone
@@ -49,6 +50,7 @@ class DeferredWriter:
 
         doc = read_living_document(brain=brain)
         self.original_doc = doc
+        self.original_doc_hash = hashlib.sha256(doc.encode()).hexdigest()
         self.in_memory_doc = doc
         self.transcript = transcript
         self.confirmed_claims = list(confirmed_claims)
@@ -213,27 +215,88 @@ class DeferredWriter:
                         "changes_applied": 0,
                     }
                 try:
+                    # Freshness check: detect concurrent document modifications
+                    from services.document_updater import read_living_document, generate_diff, verify_diff, parse_diff_output, apply_diff
+                    current_doc = read_living_document(brain=self.brain)
+                    current_hash = hashlib.sha256(current_doc.encode()).hexdigest()
+
+                    if current_hash != getattr(self, "original_doc_hash", ""):
+                        logging.warning("batch_commit: document was modified during pipeline — re-generating diffs against current document")
+                        # Re-apply diffs to the current (not stale) document (Option A)
+                        new_info = self._build_claims_summary()
+                        update_reason_for_diff = self._build_update_reason()
+                        diff_output = generate_diff(current_doc, new_info, update_reason_for_diff, brain=self.brain)
+                        verification = verify_diff(current_doc, diff_output, new_info, brain=self.brain)
+
+                        if verification["verified"]:
+                            diff_blocks = parse_diff_output(diff_output)
+                            if diff_blocks:
+                                self.in_memory_doc = apply_diff(current_doc, diff_blocks, brain=self.brain)
+                                self._changes_applied = len(diff_blocks)
+                                logging.info("batch_commit: re-applied %d diff block(s) to current document", len(diff_blocks))
+                            else:
+                                # No changes needed — information already present in current doc
+                                self.in_memory_doc = current_doc
+                                self._changes_applied = 0
+                                logging.info("batch_commit: re-diff produced no changes — concurrent write may have included same info")
+                        else:
+                            logging.error("batch_commit: re-generated diff failed verification — aborting doc write")
+                            # Store session + claims even though doc can't be updated
+                            session_id_result = None
+                            claims_stored_count = 0
+                            try:
+                                session_id_result = store_session(
+                                    self.transcript,
+                                    metadata=self.metadata,
+                                    session_summary=self.session_summary,
+                                    topic_tags=self.topic_tags,
+                                    brain=self.brain,
+                                )
+                                if session_id_result:
+                                    self._committed_session_id = session_id_result
+                                    inserted = store_confirmed_claims(
+                                        self.confirmed_claims, session_id_result,
+                                        metadata=self.metadata, brain=self.brain,
+                                    )
+                                    claims_stored_count = len(inserted) if inserted else 0
+                            except Exception as store_err:
+                                logging.error("Failed to store session/claims on conflict resolution failure: %s", store_err)
+                            return {
+                                "success": False,
+                                "message": "The document was modified while you were reviewing claims. "
+                                           "Session and claims saved, but document could not be updated. Please re-ingest to apply document changes.",
+                                "claims_stored": claims_stored_count,
+                                "session_id": session_id_result or "",
+                                "document_updated": False,
+                                "changes_applied": 0,
+                            }
+
+                        # Update doc_changed flag after re-diff
+                        doc_changed = self.in_memory_doc != current_doc
+
                     # 2. Mirror to MongoDB first (source of truth on Render's ephemeral FS)
                     update_reason = self._build_update_reason()
-                    try:
-                        mirror_ok = upsert_living_document(
-                            self.in_memory_doc,
-                            metadata={"last_updated": date_str, "update_reason": update_reason},
-                            brain=self.brain,
-                        )
-                        if not mirror_ok:
-                            raise RuntimeError("upsert_living_document returned False")
-                    except Exception as mirror_err:
-                        logging.error("MongoDB mirror failed in batch_commit — aborting doc write to prevent desync: %s", mirror_err)
-                        raise  # Let outer except handle checkpoint + retry
+                    if doc_changed:
+                        try:
+                            mirror_ok = upsert_living_document(
+                                self.in_memory_doc,
+                                metadata={"last_updated": date_str, "update_reason": update_reason},
+                                brain=self.brain,
+                            )
+                            if not mirror_ok:
+                                raise RuntimeError("upsert_living_document returned False")
+                        except Exception as mirror_err:
+                            logging.error("MongoDB mirror failed in batch_commit — aborting doc write to prevent desync: %s", mirror_err)
+                            raise  # Let outer except handle checkpoint + retry
 
-                    write_living_document(self.in_memory_doc, brain=self.brain)
-                    doc_write_succeeded = True
+                        write_living_document(self.in_memory_doc, brain=self.brain)
+                        doc_write_succeeded = True
 
                     # 3. Single git commit
-                    brain_label = "pitch_brain.md" if self.brain == "pitch" else "ops_brain.md"
-                    commit_msg = f"Update {brain_label}: {self._build_update_reason()} ({date_str})"
-                    _git_commit(commit_msg, brain=self.brain)
+                    if doc_changed:
+                        brain_label = "pitch_brain.md" if self.brain == "pitch" else "ops_brain.md"
+                        commit_msg = f"Update {brain_label}: {self._build_update_reason()} ({date_str})"
+                        _git_commit(commit_msg, brain=self.brain)
                 finally:
                     release_doc_lock(lock_id)
 
@@ -346,6 +409,19 @@ class DeferredWriter:
         self.contradiction_resolutions = []
         delete_pending_ingestion()
 
+    def _build_claims_summary(self) -> str:
+        """Build a summary of confirmed claims for re-generating diffs."""
+        parts = []
+        for claim in self.confirmed_claims:
+            text = claim.get("claim_text", "")
+            ctype = claim.get("claim_type", "claim")
+            who = claim.get("who_said_it", "")
+            line = f"[{ctype}] {text}"
+            if who:
+                line += f" (said by {who})"
+            parts.append(line)
+        return "\n".join(parts)
+
     def _build_update_reason(self) -> str:
         """Build an update reason string from metadata."""
         date_str = self.metadata.get(
@@ -366,6 +442,7 @@ class DeferredWriter:
         return {
             "_id": "pending",
             "original_doc": self.original_doc,
+            "original_doc_hash": getattr(self, "original_doc_hash", ""),
             "in_memory_doc": self.in_memory_doc,
             "transcript": self.transcript,
             "confirmed_claims": self.confirmed_claims,
@@ -388,6 +465,10 @@ class DeferredWriter:
         """Restore a DeferredWriter from a MongoDB checkpoint dict."""
         writer = cls()
         writer.original_doc = data.get("original_doc", "")
+        writer.original_doc_hash = data.get("original_doc_hash", "")
+        # Recompute hash if missing (backward compat with old checkpoints)
+        if not writer.original_doc_hash and writer.original_doc:
+            writer.original_doc_hash = hashlib.sha256(writer.original_doc.encode()).hexdigest()
         writer.in_memory_doc = data.get("in_memory_doc", "")
         writer.transcript = data.get("transcript", "")
         writer.confirmed_claims = data.get("confirmed_claims", [])

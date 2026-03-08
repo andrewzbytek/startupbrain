@@ -615,3 +615,163 @@ class TestRollbackLastSession:
         mock_upsert.assert_called_once()
         # Verify upsert was called with brain="ops"
         assert mock_upsert.call_args[1].get("brain") == "ops"
+
+
+# ---------------------------------------------------------------------------
+# Document freshness check tests
+# ---------------------------------------------------------------------------
+
+class TestDocumentFreshnessCheck:
+    """Tests for the document freshness check in batch_commit (Option A: re-diff)."""
+
+    def test_batch_commit_detects_stale_document(self):
+        """When the document changes during the pipeline, batch_commit should detect it."""
+        writer = _make_writer()
+        writer.in_memory_doc = "modified by pipeline"
+
+        # read_living_document returns a different doc than the original snapshot
+        concurrent_doc = SAMPLE_DOC + "\n### New Hypothesis\n**hypothesis text**\n"
+
+        with patch("services.document_updater.read_living_document", return_value=concurrent_doc), \
+             patch("services.document_updater.generate_diff", return_value="SECTION: Current State → Pricing\nACTION: UPDATE_POSITION\nCONTENT:\n**Current position:** $100/mo") as mock_gen, \
+             patch("services.document_updater.verify_diff", return_value={"verified": True, "notes": "", "issues": []}) as mock_verify, \
+             patch("services.document_updater.write_living_document"), \
+             patch("services.document_updater._git_commit", return_value=True), \
+             patch("services.mongo_client.upsert_living_document", return_value=True), \
+             patch("services.mongo_client.delete_pending_ingestion", return_value=True), \
+             patch("services.ingestion.store_session", return_value="sess123"), \
+             patch("services.ingestion.store_confirmed_claims", return_value=["c1"]), \
+             patch("services.ingestion_lock.acquire_doc_lock", return_value="lock-123"), \
+             patch("services.ingestion_lock.release_doc_lock"):
+            result = writer.batch_commit()
+
+        assert result["success"] is True
+        # generate_diff should be called with the CURRENT doc, not the stale snapshot
+        mock_gen.assert_called_once()
+        assert mock_gen.call_args[0][0] == concurrent_doc
+
+    def test_batch_commit_reapplies_diffs_on_conflict(self):
+        """On conflict, generate_diff is called with the current document and claims summary."""
+        writer = _make_writer()
+        writer.in_memory_doc = "modified by pipeline"
+
+        concurrent_doc = SAMPLE_DOC + "\n## Extra Section\n"
+
+        with patch("services.document_updater.read_living_document", return_value=concurrent_doc), \
+             patch("services.document_updater.generate_diff", return_value="SECTION: Current State → Pricing\nACTION: UPDATE_POSITION\nCONTENT:\n**Current position:** $100/mo") as mock_gen, \
+             patch("services.document_updater.verify_diff", return_value={"verified": True, "notes": "", "issues": []}), \
+             patch("services.document_updater.write_living_document") as mock_write, \
+             patch("services.document_updater._git_commit", return_value=True), \
+             patch("services.mongo_client.upsert_living_document", return_value=True), \
+             patch("services.mongo_client.delete_pending_ingestion", return_value=True), \
+             patch("services.ingestion.store_session", return_value="sess123"), \
+             patch("services.ingestion.store_confirmed_claims", return_value=["c1"]), \
+             patch("services.ingestion_lock.acquire_doc_lock", return_value="lock-123"), \
+             patch("services.ingestion_lock.release_doc_lock"):
+            result = writer.batch_commit()
+
+        assert result["success"] is True
+        # The written doc should be the result of apply_diff on concurrent_doc, not stale snapshot
+        written_doc = mock_write.call_args[0][0]
+        assert "$100/mo" in written_doc
+
+    def test_batch_commit_preserves_concurrent_changes(self):
+        """A hypothesis written during the pipeline should survive batch_commit."""
+        writer = _make_writer()
+        writer.in_memory_doc = "modified by pipeline"
+
+        hypothesis_line = "- [2026-03-07] **We should pivot to enterprise**"
+        concurrent_doc = SAMPLE_DOC + f"\n## Active Hypotheses\n{hypothesis_line}\n"
+
+        with patch("services.document_updater.read_living_document", return_value=concurrent_doc), \
+             patch("services.document_updater.generate_diff", return_value="SECTION: Current State → Pricing\nACTION: UPDATE_POSITION\nCONTENT:\n**Current position:** $100/mo"), \
+             patch("services.document_updater.verify_diff", return_value={"verified": True, "notes": "", "issues": []}), \
+             patch("services.document_updater.write_living_document") as mock_write, \
+             patch("services.document_updater._git_commit", return_value=True), \
+             patch("services.mongo_client.upsert_living_document", return_value=True), \
+             patch("services.mongo_client.delete_pending_ingestion", return_value=True), \
+             patch("services.ingestion.store_session", return_value="sess123"), \
+             patch("services.ingestion.store_confirmed_claims", return_value=["c1"]), \
+             patch("services.ingestion_lock.acquire_doc_lock", return_value="lock-123"), \
+             patch("services.ingestion_lock.release_doc_lock"):
+            result = writer.batch_commit()
+
+        assert result["success"] is True
+        written_doc = mock_write.call_args[0][0]
+        # The hypothesis from the concurrent write should be preserved
+        assert "pivot to enterprise" in written_doc
+
+    def test_batch_commit_no_conflict_skips_rediff(self):
+        """When document hasn't changed, no re-diff should happen."""
+        writer = _make_writer()
+        writer.in_memory_doc = "modified by pipeline"
+
+        with patch("services.document_updater.read_living_document", return_value=SAMPLE_DOC), \
+             patch("services.document_updater.generate_diff") as mock_gen, \
+             patch("services.document_updater.write_living_document"), \
+             patch("services.document_updater._git_commit", return_value=True), \
+             patch("services.mongo_client.upsert_living_document", return_value=True), \
+             patch("services.mongo_client.delete_pending_ingestion", return_value=True), \
+             patch("services.ingestion.store_session", return_value="sess123"), \
+             patch("services.ingestion.store_confirmed_claims", return_value=["c1"]), \
+             patch("services.ingestion_lock.acquire_doc_lock", return_value="lock-123"), \
+             patch("services.ingestion_lock.release_doc_lock"):
+            result = writer.batch_commit()
+
+        assert result["success"] is True
+        # generate_diff should NOT be called when document hasn't changed
+        mock_gen.assert_not_called()
+
+    def test_batch_commit_conflict_verification_fails(self):
+        """When re-diff verification fails, session+claims stored but doc not updated."""
+        writer = _make_writer()
+        writer.in_memory_doc = "modified by pipeline"
+
+        concurrent_doc = SAMPLE_DOC + "\n## Extra\n"
+
+        with patch("services.document_updater.read_living_document", return_value=concurrent_doc), \
+             patch("services.document_updater.generate_diff", return_value="bad diff"), \
+             patch("services.document_updater.verify_diff", return_value={"verified": False, "notes": "", "issues": ["bad"]}), \
+             patch("services.document_updater.write_living_document") as mock_write, \
+             patch("services.ingestion.store_session", return_value="sess123"), \
+             patch("services.ingestion.store_confirmed_claims", return_value=["c1"]), \
+             patch("services.ingestion_lock.acquire_doc_lock", return_value="lock-123"), \
+             patch("services.ingestion_lock.release_doc_lock"):
+            result = writer.batch_commit()
+
+        assert result["success"] is False
+        assert result["document_updated"] is False
+        assert "modified while you were reviewing" in result["message"]
+        assert result["claims_stored"] == 1
+        # Document should NOT have been written
+        mock_write.assert_not_called()
+
+    def test_checkpoint_preserves_doc_hash(self):
+        """original_doc_hash should survive to_checkpoint → from_checkpoint round-trip."""
+        from services.deferred_writer import DeferredWriter
+        writer = _make_writer()
+        original_hash = writer.original_doc_hash
+
+        assert original_hash != ""
+        assert len(original_hash) == 64  # SHA-256 hex digest
+
+        cp = writer.to_checkpoint()
+        assert cp["original_doc_hash"] == original_hash
+
+        restored = DeferredWriter.from_checkpoint(cp)
+        assert restored.original_doc_hash == original_hash
+
+    def test_checkpoint_recomputes_hash_for_old_checkpoints(self):
+        """Old checkpoints without original_doc_hash should recompute it."""
+        import hashlib
+        from services.deferred_writer import DeferredWriter
+
+        old_checkpoint = {
+            "_id": "pending",
+            "original_doc": "some doc content",
+            "in_memory_doc": "modified",
+            # No original_doc_hash key
+        }
+        restored = DeferredWriter.from_checkpoint(old_checkpoint)
+        expected = hashlib.sha256("some doc content".encode()).hexdigest()
+        assert restored.original_doc_hash == expected
