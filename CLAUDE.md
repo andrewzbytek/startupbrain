@@ -16,7 +16,7 @@ AI-powered knowledge management for a 2-person startup. See `docs/SPEC.md` for f
 - Parser functions shared in `app/components/_parsers.py` — all parsing functions call `_normalize_headers()` to strip trailing whitespace from markdown header lines before regex matching
 - Services in `services/` — each service is a single-purpose module
 - LLM prompts in `prompts/` as markdown files — loaded at runtime, never hardcoded
-- Two-brain architecture: **Pitch Brain** (`documents/pitch_brain.md`) for investor narrative, **Ops Brain** (`documents/ops_brain.md`) for operational knowledge — both git-tracked, mirrored to MongoDB, auto-recovered from MongoDB on ephemeral filesystems (Render)
+- Two-brain architecture: **Pitch Brain** (`documents/pitch_brain.md`) for investor narrative, **Ops Brain** (`documents/ops_brain.md`) for operational knowledge — both git-tracked, MongoDB is authoritative source of truth for reads (local file is synced cache, enables seamless switching between localhost and Render)
 - Brain-aware services: all document/storage functions accept `brain="pitch"|"ops"` parameter (default "pitch" for backward compat). MongoDB queries use `$or` pattern with `{"$exists": False}` to include pre-migration docs that lack the `brain` field.
 - Two brain variables with different semantics: `active_brain` is the **write target** (set by top bar toggle, always `"pitch"` or `"ops"`, never `"both"`); `chat_brain_context` is the **read scope** (set by chat context selector, can be `"pitch"`, `"ops"`, or `"both"`). Write operations must use `active_brain`; read/display operations use `chat_brain_context`.
 - Pitch-only document helpers (`_add_decision`, `_add_dismissed`) accept `brain=` and skip for non-pitch — ops brain has no Decision Log or Dismissed Contradictions sections.
@@ -40,7 +40,7 @@ AI-powered knowledge management for a 2-person startup. See `docs/SPEC.md` for f
 - Use XML tags for structured LLM input/output
 - Git commit living documents after every update with descriptive message (no-ops gracefully when git unavailable, e.g. Render)
 - Living document file writes are atomic: `tempfile.mkstemp()` + `os.replace()` prevents partial-write corruption on crash
-- MongoDB mirror is written before the file (source of truth on Render's ephemeral filesystem). If MongoDB mirror fails, file write is **aborted** to prevent file-ahead desync (V1-B fix). Recovery write-back from MongoDB uses atomic `write_living_document()` (V1-C fix).
+- MongoDB is the authoritative source for living document reads — `read_living_document()` checks MongoDB first, syncs local file as cache, falls back to file when MongoDB is unavailable. This enables seamless switching between localhost and Render without document drift. MongoDB mirror is written before the file on writes. If MongoDB mirror fails, file write is **aborted** to prevent file-ahead desync (V1-B fix).
 - Session types (defined in `app/state.py:SESSION_TYPES`) flow through extraction, consistency, pushback, audit, and storage
 - All new service function parameters must default to empty string/None for backward compatibility
 - Auth: shared credentials via `APP_USERNAME` + `APP_PASSWORD` env vars. Cookie-based 7-day sessions (`streamlit-cookies-controller`). Auth skipped in local dev when env vars unset; production (Render) requires credentials or explicit `DISABLE_AUTH=true`.

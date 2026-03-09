@@ -798,7 +798,9 @@ class TestCheckRagHealthBrainIsolation:
         """check_rag_health should count pitch brain claims only."""
         with patch("services.mongo_client.count_documents", return_value=50) as mock_count:
             result = check_rag_health()
-            mock_count.assert_called_once_with("claims", {"brain": "pitch"})
+            mock_count.assert_called_once_with("claims", {
+                "$or": [{"brain": "pitch"}, {"brain": {"$exists": False}}]
+            })
             assert result["claim_count"] == 50
             assert result["needs_upgrade"] is False
 

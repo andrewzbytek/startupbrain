@@ -31,31 +31,35 @@ def _doc_path(brain: str = "pitch") -> Path:
 def read_living_document(brain: str = "pitch") -> str:
     """Read and return the current living document content.
 
-    If the file is missing or empty (e.g. ephemeral filesystem after restart),
-    attempts to recover from MongoDB mirror.
+    MongoDB is the authoritative source when available. This ensures that
+    changes made on Render (or any other instance sharing the same database)
+    are always picked up, regardless of the local file state.
+
+    Falls back to the local file when MongoDB is unavailable or empty.
     """
     path = _doc_path(brain)
     content = ""
+
+    # 1. Try MongoDB first (authoritative source)
+    try:
+        from services.mongo_client import get_living_document
+        doc = get_living_document(brain=brain)
+        if doc and isinstance(doc.get("content"), str) and doc["content"]:
+            content = doc["content"]
+            # Sync local file to match MongoDB
+            try:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                write_living_document(content, brain=brain)
+            except Exception as e:
+                logging.warning("Could not sync local file (%s) from MongoDB: %s", brain, e)
+            return content
+    except Exception as e:
+        logging.warning("MongoDB unavailable for living document (%s), falling back to file: %s", brain, e)
+
+    # 2. Fall back to local file
     if path.exists():
         with open(path, "r", encoding="utf-8") as f:
             content = f.read()
-
-    if not content:
-        # Recover from MongoDB mirror
-        try:
-            from services.mongo_client import get_living_document
-            doc = get_living_document(brain=brain)
-            if doc and isinstance(doc.get("content"), str) and doc["content"]:
-                content = doc["content"]
-                # Write back to disk for current session
-                try:
-                    path.parent.mkdir(parents=True, exist_ok=True)
-                    write_living_document(content, brain=brain)
-                    logging.info("Living document (%s) recovered from MongoDB", brain)
-                except Exception as e:
-                    logging.warning("Could not write recovered document (%s) to disk: %s", brain, e)
-        except Exception as e:
-            logging.warning("Failed to recover living document (%s) from MongoDB: %s", brain, e)
 
     return content
 

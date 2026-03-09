@@ -244,7 +244,9 @@ def check_rag_health(brain: str = "pitch") -> dict:
     """
     from services.mongo_client import count_documents
 
-    claim_count = count_documents("claims", {"brain": brain})
+    claim_count = count_documents("claims", {
+        "$or": [{"brain": brain}, {"brain": {"$exists": False}}]
+    })
     needs_upgrade = claim_count >= RAG_UPGRADE_CLAIM_THRESHOLD
 
     if needs_upgrade:
