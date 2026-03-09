@@ -234,20 +234,26 @@ class TestRollback:
     def test_restores_original_doc(self):
         writer = _make_writer()
         writer.in_memory_doc = "modified content"
-        with patch("services.mongo_client.delete_pending_ingestion"):
+        with patch("services.mongo_client.delete_pending_ingestion"), \
+             patch("services.document_updater.write_living_document"), \
+             patch("services.mongo_client.upsert_living_document"):
             writer.rollback()
         assert writer.in_memory_doc == SAMPLE_DOC
 
     def test_deletes_checkpoint(self):
         writer = _make_writer()
-        with patch("services.mongo_client.delete_pending_ingestion") as mock_delete:
+        with patch("services.mongo_client.delete_pending_ingestion") as mock_delete, \
+             patch("services.document_updater.write_living_document"), \
+             patch("services.mongo_client.upsert_living_document"):
             writer.rollback()
         mock_delete.assert_called_once()
 
     def test_clears_resolutions(self):
         writer = _make_writer()
         writer.contradiction_resolutions = [{"index": 0}]
-        with patch("services.mongo_client.delete_pending_ingestion"):
+        with patch("services.mongo_client.delete_pending_ingestion"), \
+             patch("services.document_updater.write_living_document"), \
+             patch("services.mongo_client.upsert_living_document"):
             writer.rollback()
         assert writer.contradiction_resolutions == []
 
@@ -262,7 +268,8 @@ class TestBatchCommit:
         writer = _make_writer()
         writer.in_memory_doc = "changed content"
 
-        with patch("services.document_updater.write_living_document") as mock_write, \
+        with patch("services.document_updater.read_living_document", return_value=SAMPLE_DOC), \
+             patch("services.document_updater.write_living_document") as mock_write, \
              patch("services.document_updater._git_commit", return_value=True), \
              patch("services.mongo_client.upsert_living_document"), \
              patch("services.mongo_client.delete_pending_ingestion"), \
@@ -296,7 +303,8 @@ class TestBatchCommit:
         writer = _make_writer()
         writer.in_memory_doc = "changed"
 
-        with patch("services.document_updater.write_living_document"), \
+        with patch("services.document_updater.read_living_document", return_value=SAMPLE_DOC), \
+             patch("services.document_updater.write_living_document"), \
              patch("services.document_updater._git_commit", return_value=True) as mock_git, \
              patch("services.mongo_client.upsert_living_document"), \
              patch("services.mongo_client.delete_pending_ingestion"), \
@@ -312,7 +320,8 @@ class TestBatchCommit:
         writer = _make_writer()
         writer.in_memory_doc = "changed"
 
-        with patch("services.document_updater.write_living_document"), \
+        with patch("services.document_updater.read_living_document", return_value=SAMPLE_DOC), \
+             patch("services.document_updater.write_living_document"), \
              patch("services.document_updater._git_commit", return_value=True), \
              patch("services.mongo_client.upsert_living_document"), \
              patch("services.mongo_client.delete_pending_ingestion"), \
@@ -329,7 +338,8 @@ class TestBatchCommit:
     def test_deletes_checkpoint_on_success(self):
         writer = _make_writer()
 
-        with patch("services.document_updater.write_living_document"), \
+        with patch("services.document_updater.read_living_document", return_value=SAMPLE_DOC), \
+             patch("services.document_updater.write_living_document"), \
              patch("services.document_updater._git_commit", return_value=True), \
              patch("services.mongo_client.upsert_living_document"), \
              patch("services.mongo_client.delete_pending_ingestion") as mock_delete, \
@@ -346,7 +356,8 @@ class TestBatchCommit:
         writer = _make_writer()
         writer.in_memory_doc = "changed"
 
-        with patch("services.document_updater.write_living_document", side_effect=IOError("disk full")), \
+        with patch("services.document_updater.read_living_document", return_value=SAMPLE_DOC), \
+             patch("services.document_updater.write_living_document", side_effect=IOError("disk full")), \
              patch("services.mongo_client.delete_pending_ingestion") as mock_delete, \
              patch("services.mongo_client.upsert_pending_ingestion") as mock_save_cp, \
              patch("services.ingestion_lock.acquire_doc_lock", return_value="lock-123"), \

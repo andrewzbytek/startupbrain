@@ -448,6 +448,7 @@ def render_checking_consistency():
                     progress.complete("No contradictions found.")
                 invalidate_sidebar()
                 set_mode("done")
+                st.rerun()
 
     except Exception as e:
         logging.error("Ingestion pipeline failed: %s", e)
