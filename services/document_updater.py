@@ -36,32 +36,46 @@ def read_living_document(brain: str = "pitch") -> str:
     are always picked up, regardless of the local file state.
 
     Falls back to the local file when MongoDB is unavailable or empty.
+    Safety: refuses to overwrite a local file with significantly shorter
+    MongoDB content (>50% shorter) to prevent accidental truncation.
     """
     path = _doc_path(brain)
-    content = ""
 
-    # 1. Try MongoDB first (authoritative source)
+    # Read local file first (needed for safety comparison)
+    local_content = ""
+    if path.exists():
+        with open(path, "r", encoding="utf-8") as f:
+            local_content = f.read()
+
+    # Try MongoDB (authoritative source)
     try:
         from services.mongo_client import get_living_document
         doc = get_living_document(brain=brain)
         if doc and isinstance(doc.get("content"), str) and doc["content"]:
-            content = doc["content"]
-            # Sync local file to match MongoDB
-            try:
-                path.parent.mkdir(parents=True, exist_ok=True)
-                write_living_document(content, brain=brain)
-            except Exception as e:
-                logging.warning("Could not sync local file (%s) from MongoDB: %s", brain, e)
-            return content
+            mongo_content = doc["content"]
+
+            # Safety: don't overwrite local file with drastically shorter content
+            if local_content and len(mongo_content) < len(local_content) * 0.5:
+                logging.warning(
+                    "MongoDB %s doc (%d chars) is >50%% shorter than local file (%d chars) — "
+                    "using local file to prevent data loss. If MongoDB is correct, "
+                    "delete the local file and restart.",
+                    brain, len(mongo_content), len(local_content),
+                )
+                return local_content
+
+            # Sync local file only if content actually differs
+            if mongo_content != local_content:
+                try:
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    write_living_document(mongo_content, brain=brain)
+                except Exception as e:
+                    logging.warning("Could not sync local file (%s) from MongoDB: %s", brain, e)
+            return mongo_content
     except Exception as e:
         logging.warning("MongoDB unavailable for living document (%s), falling back to file: %s", brain, e)
 
-    # 2. Fall back to local file
-    if path.exists():
-        with open(path, "r", encoding="utf-8") as f:
-            content = f.read()
-
-    return content
+    return local_content
 
 
 def write_living_document(content: str, brain: str = "pitch") -> None:
