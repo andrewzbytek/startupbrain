@@ -5,6 +5,9 @@
 .streamlit/secrets.toml
 .env
 
+# Backups (contain user data)
+backups/
+
 # Python
 __pycache__/
 *.pyc

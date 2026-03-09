@@ -62,7 +62,7 @@ When splitting tasks across agents, avoid overlapping file edits:
 ## Testing
 - Test transcripts in `tests/test_transcripts/`
 - Run unit tests: `python -m pytest tests/ -m "not integration"`
-- Run integration tests: `python -m pytest tests/ -m integration` (requires API key + MongoDB)
+- Run integration tests: `python -m pytest tests/test_integration.py -v` (requires API key + MongoDB — keys in `.streamlit/secrets.toml`, must export to env vars for pytest)
 - 1024 unit tests + 56 integration tests across 29 test files, all unit tests run fully offline with mocks
 
 ## Deployment
@@ -78,7 +78,7 @@ When splitting tasks across agents, avoid overlapping file edits:
 - Required secrets/env vars: `ANTHROPIC_API_KEY`, `MONGODB_URI`
 - Optional secrets/env vars: `APP_USERNAME`, `APP_PASSWORD` (enables login gate), `DISABLE_AUTH` (set to `true` to skip auth in production)
 
-## Current Status (as of 2026-03-07)
+## Current Status (as of 2026-03-08)
 
 ### Implementation: Complete
 All 24 sections of `docs/SPEC.md` are implemented plus brain split architecture. The system is production-ready for daily use.
@@ -124,6 +124,16 @@ All 24 sections of `docs/SPEC.md` are implemented plus brain split architecture.
 **Temporal degradation & scale hardening (2026-03-07 — 5 fixes across 5 files):** Code review Pass 7b audited 6 temporal degradation scenarios and 8 adversarial user scenarios. Fixed: (1) RAG health message said "50 most recent claims" but code uses `limit=10` — corrected message. (2) Missing MongoDB indexes on `brain` field for claims/sessions/feedback + `claim_type` for claims — added to `bootstrap.py` (prevents full collection scans at 500+ claims). (3) Vector search `path` default was `"claim_text_embedding"` but Atlas autoEmbed index uses `"claim_text"` — fixed mismatch in `mongo_client.py` (dead code today, ready for M10+ upgrade). (4) System prompt had no token budget — living document could grow unbounded until hitting 200K context limit with opaque "temporarily unavailable" error. Added 120K char cap (~30K tokens) with truncation warning in `chat.py`. (5) Streaming API failures logged `tokens_in=0` — added input token estimation from prompt length (~4 chars/token) so partial streams are not recorded as $0 in `claude_client.py`. Adversarial scenarios verified safe: prompt injection blocked (escape_xml on all inputs), concurrent tabs handled (ingestion lock), brain toggle debounced by Streamlit, stale tabs recovered via checkpoint, empty inputs guarded.
 
 **Document freshness check in DeferredWriter (2026-03-07 — 1 race condition fixed, 1 checkpoint bug fixed):** `DeferredWriter.batch_commit()` snapshots the living document at pipeline initialization but writes it 2-5 minutes later. Concurrent writes (hypothesis, contact, correction) via `doc_write_lock` during the pipeline window were silently overwritten by the stale snapshot. Fix: `batch_commit()` now computes `original_doc_hash` (SHA-256) at initialization, serialized in checkpoints. At commit time, re-reads the current document and compares hashes. If changed, re-generates diffs against the current document (Option A: one extra Sonnet call, ~$0.02) via `generate_diff()` + `verify_diff()` + `apply_diff()`. If re-diff verification fails, aborts doc write but still stores session + claims, and deletes the checkpoint (prevents duplicate session on Resume). `_build_claims_summary()` helper builds the re-diff input from confirmed claims. Backward compatible: old checkpoints without `original_doc_hash` recompute it from `original_doc`. The fallback `_resolve_contradiction()` path (non-deferred) was verified safe — `update_document()` acquires its own lock and reads fresh. Adversarial verification (35 points): all PASS except the checkpoint bug above (now fixed). `apply_document_update_deferred()` confirmed in-memory only — contradiction resolution during pipeline does NOT cause false conflicts.
+
+**MongoDB-first document reads (2026-03-08):** `read_living_document()` now checks MongoDB first (authoritative source), syncs local file as cache, falls back to file when MongoDB unavailable. Enables seamless switching between localhost and Render without document drift. Safety guard: refuses to overwrite local file if MongoDB content is >50% shorter (prevents accidental truncation from corrupt data). File write skipped when content matches (no unnecessary disk I/O).
+
+**LaTeX escaping in chat (2026-03-08):** Dollar amounts like `$150B` were rendered as LaTeX math by Streamlit. All dynamic `st.markdown()` calls in chat now use `_escape_latex()`. Streaming chunks escaped for live display, unescaped before storing in conversation history (clean data for LLM context).
+
+**RAG health backward-compat fix (2026-03-08):** `check_rag_health()` was missing the `$or` pattern for pre-migration claims lacking the `brain` field — showed "0/200" despite 107 claims. Fixed to use same backward-compat query as all other brain-filtered functions.
+
+**Integration test fixes (2026-03-08):** 3 tests patched non-existent module-level functions (`save_checkpoint`/`delete_checkpoint` in `services.deferred_writer`) — fixed to `patch.object(DeferredWriter, ...)` and `patch("services.mongo_client.delete_pending_ingestion")`. 1 test relaxed for LLM non-determinism.
+
+**Fresh start (2026-03-08):** Wiped all session data (7 sessions, 107 claims). Backup at `backups/2026-03-08/mongodb_backup.json`. Cost log preserved (272 entries). Living documents reset to clean templates.
 
 **Tests:** 1024 unit tests, 56 integration tests across 29 test files. All unit tests run fully offline with mocks.
 

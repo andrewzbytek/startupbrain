@@ -1,5 +1,5 @@
 # Ops Brain — [Your Startup Name]
-Last updated: 2026-03-04
+Last updated: [date]
 
 ## Contacts / Prospects
 
