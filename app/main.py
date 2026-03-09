@@ -839,9 +839,14 @@ else:
             col_resume, col_discard = st.columns(2)
             with col_resume:
                 if st.button("Resume", type="primary", use_container_width=True, key="resume_pending"):
-                    # Re-acquire the ingestion lock for this session (fix L3)
-                    from services.ingestion_lock import acquire_lock
-                    lock_session_id = st.session_state.get("_lock_session_id") or str(uuid.uuid4())
+                    # Re-acquire the ingestion lock — prefer the checkpoint's lock session ID
+                    # so we can reclaim the lock from the interrupted session
+                    from services.ingestion_lock import acquire_lock, release_lock
+                    checkpoint_lock_id = getattr(writer, 'lock_session_id', None)
+                    lock_session_id = checkpoint_lock_id or st.session_state.get("_lock_session_id") or str(uuid.uuid4())
+                    # Release the old lock first if it belongs to the checkpoint session
+                    if checkpoint_lock_id:
+                        release_lock(session_id=checkpoint_lock_id)
                     st.session_state._lock_session_id = lock_session_id
                     lock_result = acquire_lock(session_id=lock_session_id)
                     if not lock_result["acquired"]:
