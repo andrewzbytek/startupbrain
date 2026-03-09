@@ -504,7 +504,8 @@ def _call_claude_stream(user_message: str, query_type: str):
         from services.claude_client import call_with_routing
         full_prompt, task_type, system = _build_claude_prompt(user_message, query_type)
         generator = call_with_routing(full_prompt, task_type=task_type, system=system, stream=True)
-        yield from generator
+        for chunk in generator:
+            yield chunk.replace("$", "\\$") if isinstance(chunk, str) else chunk
     except Exception as e:
         logging.error("Chat stream error: %s", e)
         yield "I had trouble responding. Please try again."
@@ -882,11 +883,12 @@ def _render_quick_command_panel():
 def _handle_quick_action(text: str, query_type: str):
     """Process a quick-action button click as a user message."""
     with st.chat_message("user"):
-        st.markdown(text)
+        st.markdown(_escape_latex(text))
     add_message("user", text)
     with st.chat_message("assistant"):
         response = st.write_stream(_call_claude_stream(text, query_type))
-    add_message("assistant", response if isinstance(response, str) else "".join(response) if response else "")
+    raw = response if isinstance(response, str) else "".join(response) if response else ""
+    add_message("assistant", raw.replace("\\$", "$"))
     st.rerun()
 
 
@@ -922,7 +924,7 @@ def render_chat():
         # Display conversation history
         for msg in history:
             with st.chat_message(msg["role"]):
-                st.markdown(msg["content"])
+                st.markdown(_escape_latex(msg["content"]))
 
         # --- Welcome area (only when empty) — compact, centered above chat input ---
         if not history:
@@ -1019,7 +1021,7 @@ def render_chat():
     if user_input:
         # Display user message
         with st.chat_message("user"):
-            st.markdown(user_input)
+            st.markdown(_escape_latex(user_input))
 
         # Check if user pasted a transcript
         if _is_likely_transcript(user_input):
@@ -1030,7 +1032,7 @@ def render_chat():
                 "Click **Ingest Session** in the top bar to get started."
             )
             with st.chat_message("assistant"):
-                st.markdown(response)
+                st.markdown(_escape_latex(response))
             add_message("assistant", response)
             st.rerun()
             return
@@ -1046,7 +1048,7 @@ def render_chat():
             with st.chat_message("assistant"):
                 with st.spinner("Noting..."):
                     response = _apply_quick_note(note_text)
-                st.markdown(response)
+                st.markdown(_escape_latex(response))
             add_message("assistant", response)
             st.rerun()
             return
@@ -1057,7 +1059,7 @@ def render_chat():
             with st.chat_message("assistant"):
                 with st.spinner("Updating contacts..."):
                     response = _apply_contact(contact_text)
-                st.markdown(response)
+                st.markdown(_escape_latex(response))
             add_message("assistant", response)
             invalidate_sidebar()
             st.rerun()
@@ -1068,7 +1070,7 @@ def render_chat():
             with st.chat_message("assistant"):
                 with st.spinner("Tracking hypothesis..."):
                     response = _apply_hypothesis(user_input)
-                st.markdown(response)
+                st.markdown(_escape_latex(response))
             add_message("assistant", response)
             invalidate_sidebar()
             st.rerun()
@@ -1079,7 +1081,7 @@ def render_chat():
             with st.chat_message("assistant"):
                 with st.spinner("Updating hypothesis..."):
                     response = _apply_hypothesis_status_update(user_input)
-                st.markdown(response)
+                st.markdown(_escape_latex(response))
             add_message("assistant", response)
             invalidate_sidebar()
             st.rerun()
@@ -1099,7 +1101,7 @@ def render_chat():
             with st.chat_message("assistant"):
                 with st.spinner("Updating..."):
                     response = _apply_direct_correction(user_input)
-                st.markdown(response)
+                st.markdown(_escape_latex(response))
             add_message("assistant", response)
             # Invalidate sidebar cache so it reflects the update
             invalidate_sidebar()
@@ -1112,9 +1114,11 @@ def render_chat():
             response = st.write_stream(_call_claude_stream(user_input, query_type))
 
         # Don't pollute conversation history with error messages
-        if response and not str(response).startswith("Error: "):
-            add_message("assistant", response)
-        elif response:
+        # Unescape \$ back to $ for clean storage (escaped only for display)
+        raw_response = str(response).replace("\\$", "$") if response else ""
+        if raw_response and not raw_response.startswith("Error: "):
+            add_message("assistant", raw_response)
+        elif raw_response:
             # Show error but don't save to history (would pollute future Claude context)
             add_message("assistant", "I had trouble responding. Please try again.")
         st.rerun()
